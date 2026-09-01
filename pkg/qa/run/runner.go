@@ -31,13 +31,14 @@ func Execute(opts Options) (Result, error) {
 	if blocked, status := mobileReadinessExecutionStatus(plan); blocked {
 		result.Status = status
 		result = sanitizeResult(result)
-		if err := writeIndex(result, opts, started, time.Now().UTC()); err != nil {
-			return result, err
+		published, err := publishResult(result, opts, started, time.Now().UTC())
+		if err != nil {
+			return published, err
 		}
 		if status == "blocked" {
-			return result, fmt.Errorf("qa run blocked")
+			return published, fmt.Errorf("qa run blocked")
 		}
-		return result, nil
+		return published, nil
 	}
 	packs, err := executionPacks(opts, plan)
 	if err != nil {
@@ -74,13 +75,14 @@ func Execute(opts Options) (Result, error) {
 		result.FeedbackAvailable = len(result.FeedbackBundlePaths) > 0
 		result = sanitizeResult(result)
 	}
-	if err := writeIndex(result, opts, started, time.Now().UTC()); err != nil {
-		return result, err
+	published, err := publishResult(result, opts, started, time.Now().UTC())
+	if err != nil {
+		return published, err
 	}
-	if result.Status == "failed" || result.Status == "blocked" {
-		return result, fmt.Errorf("qa run %s", result.Status)
+	if published.Status == "failed" || published.Status == "blocked" {
+		return published, fmt.Errorf("qa run %s", published.Status)
 	}
-	return result, nil
+	return published, nil
 }
 
 func validFeedbackTarget(target string) bool {

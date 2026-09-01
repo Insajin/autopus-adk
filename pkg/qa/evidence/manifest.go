@@ -24,9 +24,21 @@ func LoadManifest(path string) (Manifest, error) {
 		return Manifest{}, fmt.Errorf("parse manifest: %w", err)
 	}
 	if isDesktopObservationContract(manifest) || hasDesktopObservationJSONMarker(body) {
-		return decodeDesktopObservationManifest(body)
+		desktop, err := decodeDesktopObservationManifest(body)
+		if err != nil {
+			return Manifest{}, err
+		}
+		return withSourceDir(desktop, path), nil
 	}
-	return manifest, nil
+	return withSourceDir(manifest, path), nil
+}
+
+// withSourceDir anchors a decoded manifest to the directory it came from so
+// manifest-relative artifact paths stay resolvable. Every decode entry point
+// must go through it, including the desktop observation path.
+func withSourceDir(manifest Manifest, manifestPath string) Manifest {
+	manifest.sourceDir = filepath.Dir(manifestPath)
+	return manifest
 }
 
 func decodeDesktopObservationManifest(body []byte) (Manifest, error) {
@@ -106,6 +118,7 @@ func ResolveArtifactPaths(manifest Manifest, baseDir string) (Manifest, error) {
 		}
 		manifest.Artifacts[index].Path = resolved
 	}
+	manifest.sourceDir = base
 	return manifest, nil
 }
 

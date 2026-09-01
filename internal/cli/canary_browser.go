@@ -2,21 +2,30 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 )
 
-func runCanaryRemoteBrowser(ctx context.Context, projectDir string, baseURL string, result *canaryResult) string {
-	frontendDir := filepath.Join(projectDir, "Autopus", "frontend")
-	if _, err := os.Stat(filepath.Join(frontendDir, "package.json")); err != nil {
-		result.Skipped = append(result.Skipped, canarySkippedCheck{"browser", "frontend package.json not found"})
+// runCanaryRemoteBrowser probes the deployed frontend from the project's own
+// node tree. It used to require an Autopus/frontend directory and probe the
+// Autopus routes /login, /docs and /marketplace, so it could only ever run for
+// one repository; every other project got a bare SKIPPED with a reason that
+// described a directory it never had.
+func runCanaryRemoteBrowser(ctx context.Context, projectDir string, targets canaryTargets, result *canaryResult) string {
+	if targets.FrontendURL == "" {
+		result.Skipped = append(result.Skipped, canarySkippedCheck{"browser", "no frontend URL supplied (pass --frontend-url or --url)"})
 		return "SKIPPED"
 	}
-	run := runCanaryBrowserScript(ctx, frontendDir, strings.TrimRight(baseURL, "/"))
-	run.ID = "browser-staging"
+	browserDir, reason := canaryBrowserTarget(projectDir, canaryBuildUnits(projectDir))
+	if reason != "" {
+		result.Skipped = append(result.Skipped, canarySkippedCheck{"browser", reason})
+		return "SKIPPED"
+	}
+	run := runCanaryBrowserScript(ctx, browserDir, strings.TrimRight(targets.FrontendURL, "/"), targets.BrowserPaths)
+	run.ID = "browser-remote"
 	result.Targets = append(result.Targets, run)
 	if run.Status != "PASS" {
 		return "FAIL"
@@ -24,11 +33,13 @@ func runCanaryRemoteBrowser(ctx context.Context, projectDir string, baseURL stri
 	return "PASS"
 }
 
-func runCanaryBrowserScript(ctx context.Context, dir, baseURL string) canaryTargetResult {
-	script := `
+// canaryBrowserScript probes each requested path. Paths arrive as JSON through
+// the environment rather than being interpolated into the script body so a path
+// can never terminate the string literal and inject code.
+const canaryBrowserScript = `
 const { chromium } = require('playwright');
 const base = process.env.AUTOPUS_CANARY_BASE_URL;
-const targets = ['/login', '/docs', '/marketplace'];
+const targets = JSON.parse(process.env.AUTOPUS_CANARY_PATHS);
 (async () => {
   const browser = await chromium.launch({ headless: true });
   const failures = [];
@@ -57,17 +68,27 @@ const targets = ['/login', '/docs', '/marketplace'];
   }
 })().catch(err => { console.error(err.stack || err.message); process.exit(1); });
 `
+
+func runCanaryBrowserScript(ctx context.Context, dir, baseURL string, paths []string) canaryTargetResult {
+	encodedPaths, err := json.Marshal(paths)
+	if err != nil {
+		return canaryTargetResult{ID: "browser-remote", Status: "FAIL", Detail: err.Error()}
+	}
+	display := "node playwright probe " + baseURL + " " + strings.Join(paths, ",")
 	timeoutCtx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(timeoutCtx, "node", "-e", script) //nolint:gosec
+	cmd := exec.CommandContext(timeoutCtx, "node", "-e", canaryBrowserScript) //nolint:gosec
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "AUTOPUS_CANARY_BASE_URL="+baseURL)
-	output, err := cmd.CombinedOutput()
+	cmd.Env = append(os.Environ(),
+		"AUTOPUS_CANARY_BASE_URL="+baseURL,
+		"AUTOPUS_CANARY_PATHS="+string(encodedPaths),
+	)
+	output, runErr := cmd.CombinedOutput()
 	if timeoutCtx.Err() == context.DeadlineExceeded {
-		return canaryTargetResult{ID: "browser-local", Status: "FAIL", Detail: "timed out"}
+		return canaryTargetResult{ID: "browser-remote", Command: display, Status: "FAIL", Detail: "timed out"}
 	}
-	if err != nil {
-		return canaryTargetResult{ID: "browser-local", Status: "FAIL", Detail: string(output)}
+	if runErr != nil {
+		return canaryCheckFailure("browser-remote", display, output, runErr)
 	}
-	return canaryTargetResult{ID: "browser-local", Status: "PASS"}
+	return canaryTargetResult{ID: "browser-remote", Command: display, Status: "PASS"}
 }

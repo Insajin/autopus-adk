@@ -11,12 +11,12 @@ import (
 // are still redacted defensively.
 func RedactDiff(diff Diff) Diff {
 	out := Diff{
-		AddedCount:   diff.AddedCount,
-		ChangedCount: diff.ChangedCount,
-		RemovedCount: diff.RemovedCount,
-		Added:        redactEntries(diff.Added),
-		Changed:      redactEntries(diff.Changed),
-		Removed:      redactEntries(diff.Removed),
+		AddedCount:     diff.AddedCount,
+		ChangedCount:   diff.ChangedCount,
+		UnmatchedCount: diff.UnmatchedCount,
+		Added:          redactEntries(diff.Added),
+		Changed:        redactEntries(diff.Changed),
+		Unmatched:      redactEntries(diff.Unmatched),
 	}
 	return out
 }
@@ -48,7 +48,7 @@ func redactEntries(entries []DiffEntry) []DiffEntry {
 // an unsafe token after redaction. Callers persisting or publishing the diff
 // must gate on this returning nil.
 func AssertDiffSafe(diff Diff) error {
-	groups := [][]DiffEntry{diff.Added, diff.Changed, diff.Removed}
+	groups := [][]DiffEntry{diff.Added, diff.Changed, diff.Unmatched}
 	for _, group := range groups {
 		for _, e := range group {
 			if err := qaevidence.AssertSafeText(e.JourneyID, "diff.journey_id"); err != nil {

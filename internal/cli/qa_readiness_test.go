@@ -63,6 +63,10 @@ func TestQAReadinessCmd_DefaultsToLatestWorkspaceIndexes(t *testing.T) {
 	fixture := filepath.Join("..", "..", "testdata", "qa", "readiness", "non_autopus_fixture")
 	dir := t.TempDir()
 	copyFixtureFile(t, filepath.Join(fixture, "qa", "run-index.json"), filepath.Join(dir, ".autopus", "qa", "runs", "run-001", "run-index.json"))
+	// The release index names qa/run-index.json as the evidence behind two of
+	// its lanes; the projection now reads every run index the release claims,
+	// so that ref has to resolve in this tree too.
+	copyFixtureFile(t, filepath.Join(fixture, "qa", "run-index.json"), filepath.Join(dir, "qa", "run-index.json"))
 	copyFixtureFile(t, filepath.Join(fixture, "qa", "release-index.json"), filepath.Join(dir, ".autopus", "qa", "releases", "release-001", "release-index.json"))
 	copyFixtureFile(t, filepath.Join(fixture, "qa", "evidence", "manifests", "login.json"), filepath.Join(dir, "qa", "evidence", "manifests", "login.json"))
 

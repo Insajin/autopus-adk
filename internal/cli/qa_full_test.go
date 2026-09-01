@@ -12,6 +12,9 @@ import (
 	qarelease "github.com/insajin/autopus-adk/pkg/qa/release"
 )
 
+// TestQAFullCmd_DefaultPlansFullGateWithoutSideEffects also pins D16: a blocked
+// plan is an error envelope with a non-zero exit, never envelope warn over
+// data.summary.status "blocked". `qa release` maps blocked the same way.
 func TestQAFullCmd_DefaultPlansFullGateWithoutSideEffects(t *testing.T) {
 	t.Parallel()
 
@@ -24,10 +27,11 @@ func TestQAFullCmd_DefaultPlansFullGateWithoutSideEffects(t *testing.T) {
 	cmd.SetOut(&out)
 	cmd.SetArgs([]string{"full", "--project-dir", dir, "--output", output, "--format", "json"})
 
-	require.NoError(t, cmd.Execute())
+	require.Error(t, cmd.Execute())
 	payload := decodeJSONMap(t, out.Bytes())
 	assertCommonJSONEnvelope(t, payload, "qa full")
-	assert.Equal(t, "warn", payload["status"])
+	assert.Equal(t, "error", payload["status"])
+	assert.Equal(t, "qa_full_blocked", payload["error"].(map[string]any)["code"])
 	data := payload["data"].(map[string]any)
 	assert.Equal(t, "qamesh.full.v1", data["schema_version"])
 	assert.Equal(t, "plan", data["mode"])
@@ -96,8 +100,13 @@ func TestQAFullCmd_BootstrapCreatesSafeStarterFiles(t *testing.T) {
 	cmd.SetOut(&out)
 	cmd.SetArgs([]string{"full", "--project-dir", dir, "--bootstrap", "--format", "json"})
 
-	require.NoError(t, cmd.Execute())
+	// The plan is legitimately blocked here: `qa init` deliberately ships no
+	// gui-explore Journey Pack, and gui-explore is a `must` lane once browser
+	// signals are present, so `--run` on this project returns blocked too. The
+	// error envelope still carries the full payload.
+	require.Error(t, cmd.Execute())
 	payload := decodeJSONMap(t, out.Bytes())
+	assert.Equal(t, "error", payload["status"])
 	data := payload["data"].(map[string]any)
 	bootstrap := data["bootstrap"].(map[string]any)
 	assert.Equal(t, "created", bootstrap["status"])
@@ -157,4 +166,75 @@ func TestBuildQAFullRunPayloadIncludesRootJourneyBlocker(t *testing.T) {
 	assert.Equal(t, "journey_failed:desktop-messenger-core", payload.Summary.RootBlockerReason)
 	assert.Equal(t, "desktop-messenger-core", payload.Summary.RootFailedJourneyID)
 	assert.Equal(t, "expected exit_code=0", payload.Summary.RootFailureSummary)
+}
+
+// TestQAFullTextModePrintsRootBlockerOnFailure is the D15 guard: the failure path
+// used to return a bare "qa release blocked" and discard the root blocker lane,
+// reason, failed journey, and failure summary the payload already carried.
+func TestQAFullTextModePrintsRootBlockerOnFailure(t *testing.T) {
+	t.Parallel()
+
+	cmd := newQAFullCmd()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+
+	payload := buildQAFullRunPayload(
+		qaFullOptions{ProjectDir: "."},
+		qarelease.ExecutionPayload{Index: qarelease.Index{
+			Profile:       "prelaunch",
+			Status:        qarelease.GateStatusBlocked,
+			SelectedLanes: []string{"fast"},
+			LaneRows: []qarelease.LaneRow{{
+				Lane:            "fast",
+				Status:          qarelease.LaneStatusFailed,
+				LaneVerdict:     qarelease.LaneVerdictBlock,
+				FailedJourneyID: "go-fast",
+				FailureSummary:  "expected exit_code=0, got 1",
+				Blockers:        []qarelease.Blocker{{Lane: "fast", Reason: "journey_failed:go-fast"}},
+			}},
+		}},
+		qaFullDomainReadiness{Status: "ready"},
+		nil,
+	)
+	writeQAFullText(cmd, payload)
+
+	text := out.String()
+	assert.Contains(t, text, "lane=fast")
+	assert.Contains(t, text, "reason=journey_failed:go-fast")
+	assert.Contains(t, text, "journey=go-fast")
+	assert.Contains(t, text, "summary=expected exit_code=0, got 1")
+	assert.Contains(t, text, "next: auto qa feedback")
+}
+
+// TestQAFullRunSummaryCountsJourneyPacksNotLanes is the D17 guard: run mode used
+// to report len(LaneRows) under journey_pack_count, so a two-pack project claimed
+// seven. Both modes must count Journey Packs.
+func TestQAFullRunSummaryCountsJourneyPacksNotLanes(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	packs := filepath.Join(dir, ".autopus", "qa", "journeys")
+	require.NoError(t, os.MkdirAll(packs, 0o755))
+	for _, id := range []string{"go-fast", "canary-explicit"} {
+		body := "id: " + id + "\ntitle: " + id + "\nsurface: cli\nlanes: [fast]\n" +
+			"adapter:\n  id: go-test\ncommand:\n  argv: [\"go\", \"test\", \"./...\"]\n  cwd: .\n  timeout: 60s\n" +
+			"checks:\n  - id: unit\n    type: unit_test\n"
+		require.NoError(t, os.WriteFile(filepath.Join(packs, id+".yaml"), []byte(body), 0o644))
+	}
+
+	lanes := qarelease.ReleaseLanes()
+	rows := make([]qarelease.LaneRow, 0, len(lanes))
+	for _, lane := range lanes {
+		rows = append(rows, qarelease.LaneRow{Lane: lane, LaneVerdict: qarelease.LaneVerdictPass})
+	}
+
+	payload := buildQAFullRunPayload(
+		qaFullOptions{ProjectDir: dir},
+		qarelease.ExecutionPayload{Index: qarelease.Index{SelectedLanes: lanes, LaneRows: rows}},
+		qaFullDomainReadiness{Status: "ready"},
+		nil,
+	)
+
+	assert.Len(t, payload.Summary.SelectedLanes, len(lanes))
+	assert.Equal(t, 2, payload.Summary.JourneyPackCount, "journey_pack_count must count packs, not lanes")
 }

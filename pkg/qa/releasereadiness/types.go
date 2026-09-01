@@ -11,20 +11,37 @@
 package releasereadiness
 
 import (
+	"errors"
+
 	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 	"github.com/insajin/autopus-adk/pkg/qa/regen"
 )
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-011: SchemaVersion is the published payload envelope discriminator — bumping it is a breaking change for any consumer parsing the JSON output.
-// SchemaVersion is the release-readiness payload envelope version.
-const SchemaVersion = "qamesh.release_readiness.v1"
+// SchemaVersion is the release-readiness payload envelope version. v2 renamed
+// the diff's "removed" category to "unmatched", added approval_deletes_packs,
+// and replaced the unconditional passed verdict with VerdictNotEvaluated on
+// every phase that dispatched no lane. A v1 consumer would misread all three.
+const SchemaVersion = "qamesh.release_readiness.v2"
+
+// VerdictNotEvaluated is the verdict status reported whenever no lane was
+// dispatched. It is deliberately NOT a release.GateStatus value: no
+// deterministic gate ran, so no consumer may read the result as a pass.
+const VerdictNotEvaluated = "not_evaluated"
+
+// ErrApprovalIntentConflict rejects Approve together with Decline. Silently
+// resolving a precedence between two contradictory operator intents hides which
+// one the harness obeyed, so the run is refused instead.
+var ErrApprovalIntentConflict = errors.New("approve and decline are mutually exclusive")
 
 // PhaseStatus enumerates the distinct lifecycle phases of an orchestration run.
 type PhaseStatus string
 
 const (
-	// PhaseAnalyzed is reported when no surfaces are present, so there is
-	// nothing to regenerate and no false "regenerated" claim is made.
+	// PhaseAnalyzed is reported when the run had nothing to regenerate and
+	// nothing to dispatch, so no "regenerated" or "executed" claim is made. It
+	// covers both the unapproved no-surface case and an approved run that
+	// dispatched zero lanes.
 	PhaseAnalyzed PhaseStatus = "analyzed"
 	// PhaseDiffPresented is reported when surfaces were analyzed and a diff was
 	// produced but approval was not granted, so nothing is written or executed.
@@ -39,8 +56,8 @@ const (
 )
 
 // Options drives a single orchestration run. Approve and Decline are mutually
-// exclusive operator signals; Decline takes precedence when both are set so a
-// decline never produces side effects.
+// exclusive operator signals; setting both is refused with
+// ErrApprovalIntentConflict rather than resolved by precedence.
 type Options struct {
 	ProjectDir      string                         `json:"project_dir"`
 	Approve         bool                           `json:"approve"`
@@ -61,21 +78,29 @@ type LaneRow struct {
 	adapterID              string
 }
 
-// Verdict is the aggregated deterministic gate decision over all lane rows.
+// Verdict is the aggregated deterministic gate decision over the lane rows.
+// DeterministicAuthority is true only when at least one lane actually ran and
+// the status was derived from its exit-code evidence; a run that dispatched
+// nothing reports VerdictNotEvaluated with authority false.
 type Verdict struct {
 	Status                 string `json:"status"`
 	DeterministicAuthority bool   `json:"deterministic_authority"`
 }
 
 // Payload is the full serialized release-readiness result the CLI emits.
+//
+// ApprovalDeletesPacks is always false and is published as an explicit fact so
+// no consumer has to infer non-destructiveness from the shape of the diff:
+// approval writes accepted packs and never deletes an existing one.
 type Payload struct {
-	SchemaVersion    string     `json:"schema_version"`
-	AnalyzedSurfaces []string   `json:"analyzed_surfaces"`
-	Phase            string     `json:"phase"`
-	Diff             regen.Diff `json:"diff"`
-	FilesWritten     int        `json:"files_written"`
-	LanesExecuted    int        `json:"lanes_executed"`
-	LaneRows         []LaneRow  `json:"lane_rows"`
-	Verdict          Verdict    `json:"verdict"`
-	EvidenceSummary  string     `json:"evidence_summary,omitempty"`
+	SchemaVersion        string     `json:"schema_version"`
+	AnalyzedSurfaces     []string   `json:"analyzed_surfaces"`
+	Phase                string     `json:"phase"`
+	Diff                 regen.Diff `json:"diff"`
+	ApprovalDeletesPacks bool       `json:"approval_deletes_packs"`
+	FilesWritten         int        `json:"files_written"`
+	LanesExecuted        int        `json:"lanes_executed"`
+	LaneRows             []LaneRow  `json:"lane_rows"`
+	Verdict              Verdict    `json:"verdict"`
+	EvidenceSummary      string     `json:"evidence_summary,omitempty"`
 }

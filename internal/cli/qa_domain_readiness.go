@@ -98,19 +98,28 @@ func runQADomainReadinessInit(cmd *cobra.Command, opts qaDomainReadinessInitOpti
 	if err != nil {
 		return err
 	}
-	path, err := domainreadiness.WriteStarterCatalog(opts.ProjectDir, opts.Catalog)
+	written, err := domainreadiness.WriteStarterCatalog(opts.ProjectDir, opts.Catalog)
 	if err != nil {
 		return qaCommandError(cmd, jsonMode, err, "qa_domain_readiness_init_failed", map[string]any{"project_dir": opts.ProjectDir, "catalog": opts.Catalog})
 	}
+	created := written.Status == domainreadiness.StarterCatalogCreated
 	result := map[string]any{
 		"schema_version": domainreadiness.CatalogSchemaVersion,
-		"catalog_path":   path,
-		"created":        true,
+		"catalog_path":   written.Path,
+		"status":         written.Status,
+		"created":        created,
+	}
+	if written.Reason != "" {
+		result["reason"] = written.Reason
 	}
 	if jsonMode {
 		return writeJSONResult(cmd, jsonStatusOK, result, nil, nil)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", path)
+	if created {
+		fmt.Fprintf(cmd.OutOrStdout(), "created %s\n", written.Path)
+		return nil
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "skipped %s (%s)\n", written.Path, written.Reason)
 	return nil
 }
 
@@ -131,10 +140,16 @@ func runQADomainReadinessPlan(cmd *cobra.Command, opts qaDomainReadinessPlanOpti
 	if err != nil {
 		return qaCommandError(cmd, jsonMode, err, "qa_domain_readiness_plan_failed", map[string]any{"project_dir": opts.ProjectDir})
 	}
-	if jsonMode {
-		return writeJSONResult(cmd, jsonStatusOK, plan, nil, nil)
+	// A plan that cannot back its own journey_pack_refs is not an `ok` envelope:
+	// `.status` and `.data.valid` must not read as opposite conclusions.
+	status := jsonStatusOK
+	if !plan.Valid {
+		status = jsonStatusWarn
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "domain_readiness scenarios=%d valid=%t lane=%s executed=%t\n", plan.ScenarioCount, plan.Validation.Valid, plan.SelectedLane, plan.CommandsExecuted)
+	if jsonMode {
+		return writeJSONResult(cmd, status, plan, nil, nil)
+	}
+	writeQADomainReadinessPlanText(cmd, plan)
 	return nil
 }
 
@@ -161,4 +176,20 @@ func runQADomainReadinessReport(cmd *cobra.Command, opts qaDomainReadinessReport
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "domain_readiness_report evidence=%d suite=%s run=%s\n", report.EvidenceCount, report.SuiteID, report.RunID)
 	return nil
+}
+
+// writeQADomainReadinessPlanText prints the compile verdict and, when the
+// catalog names Journey Packs the project does not have, one line per gap. The
+// count alone would repeat the original defect in miniature: an operator needs
+// the ref that dangles, not just that something does.
+func writeQADomainReadinessPlanText(cmd *cobra.Command, plan domainreadiness.CompileSummary) {
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out, "domain_readiness scenarios=%d valid=%t lane=%s executed=%t journey_ref_gaps=%d\n",
+		plan.ScenarioCount, plan.Valid, plan.SelectedLane, plan.CommandsExecuted, len(plan.JourneyRefGaps))
+	for _, gap := range plan.JourneyRefGaps {
+		fmt.Fprintf(out, "gap: %s %s journey_pack_ref=%s\n", gap.ScenarioID, gap.Reason, gap.JourneyPackRef)
+	}
+	if len(plan.JourneyRefGaps) > 0 {
+		fmt.Fprintf(out, "next: auto qa init --format json\n")
+	}
 }

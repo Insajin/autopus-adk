@@ -6,7 +6,6 @@ import (
 	"github.com/insajin/autopus-adk/pkg/qa/desktopobserve"
 	"github.com/insajin/autopus-adk/pkg/qa/journey"
 	"github.com/insajin/autopus-adk/pkg/qa/regen"
-	"github.com/insajin/autopus-adk/pkg/qa/release"
 	qarun "github.com/insajin/autopus-adk/pkg/qa/run"
 )
 
@@ -19,6 +18,10 @@ import (
 // or execution. When approved it persists the accepted packs via
 // regen.ApplyPacks, dispatches each eligible synthesized or configured pack's
 // lane, aggregates a deterministic verdict, and attaches a sanitized v2 evidence summary.
+//
+// The verdict is derived, never assumed. Only a run that dispatched at least
+// one lane carries a gate status with deterministic authority; every other
+// outcome reports VerdictNotEvaluated with authority false.
 func Orchestrate(opts Options) (Payload, error) {
 	return orchestrateWith(opts, func(o qarun.Options) (qarun.Result, error) {
 		return qarun.Execute(o)
@@ -29,6 +32,9 @@ func Orchestrate(opts Options) (Payload, error) {
 // tests drive deterministic exit-derived statuses without the real (unexported)
 // mobile device runner.
 func orchestrateWith(opts Options, runFn runFunc) (Payload, error) {
+	if opts.Approve && opts.Decline {
+		return Payload{}, ErrApprovalIntentConflict
+	}
 	surfaces := regen.PresentSurfaces(opts.ProjectDir)
 
 	result, err := regen.BuildResult(opts.ProjectDir)
@@ -45,22 +51,15 @@ func orchestrateWith(opts Options, runFn runFunc) (Payload, error) {
 		AnalyzedSurfaces: surfaces,
 		Diff:             redacted,
 		LaneRows:         []LaneRow{},
-		Verdict:          Verdict{Status: string(release.GateStatusPassed), DeterministicAuthority: true},
+		Verdict:          Verdict{Status: VerdictNotEvaluated},
 	}
 
-	// Decline takes precedence over approve so a declined run never writes or
-	// executes anything (AC-011).
 	if opts.Decline {
 		payload.Phase = string(PhaseDeclined)
 		return payload, nil
 	}
 	if !opts.Approve {
-		payload.Phase = string(PhaseDiffPresented)
-		// No surfaces means nothing to regenerate; report analyzed and make no
-		// regenerated claim (AC-013). Diff counts are already 0 in that case.
-		if len(surfaces) == 0 {
-			payload.Phase = string(PhaseAnalyzed)
-		}
+		payload.Phase = string(pendingPhase(surfaces))
 		return payload, nil
 	}
 
@@ -82,6 +81,13 @@ func orchestrateWith(opts Options, runFn runFunc) (Payload, error) {
 	rows := dispatchAccepted(opts, dispatchPacks, surfaces, runFn)
 	payload.LaneRows = rows
 	payload.LanesExecuted = len(rows)
+	if len(rows) == 0 {
+		// Approval granted but nothing was dispatchable. Claiming "executed"
+		// here is what let a zero-lane run report a passing, authoritative
+		// verdict; the honest phase is the same one the preview reported.
+		payload.Phase = string(pendingPhase(surfaces))
+		return payload, nil
+	}
 	payload.Verdict = aggregateVerdict(rows)
 	payload.Phase = string(PhaseExecuted)
 
@@ -91,6 +97,15 @@ func orchestrateWith(opts Options, runFn runFunc) (Payload, error) {
 	}
 	payload.EvidenceSummary = summary
 	return payload, nil
+}
+
+// pendingPhase distinguishes "surfaces were analyzed and a diff is waiting on
+// approval" from "nothing was analyzed, so there is nothing to regenerate".
+func pendingPhase(surfaces []string) PhaseStatus {
+	if len(surfaces) == 0 {
+		return PhaseAnalyzed
+	}
+	return PhaseDiffPresented
 }
 
 func readinessDispatchPacks(projectDir string, accepted []journey.Pack) ([]journey.Pack, error) {

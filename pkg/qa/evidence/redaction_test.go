@@ -84,6 +84,112 @@ func TestFindUnsafeText_IgnoresHyphenatedWordsContainingFlagNames(t *testing.T) 
 	assert.Empty(t, findings)
 }
 
+func TestRedactText_MasksCredentialURLsOfEveryScheme(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		"https://admin:hunter2@host/x",
+		"http://admin:hunter2@host/x",
+		"postgres://admin:hunter2@db:5432/prod",
+		"mysql://admin:hunter2@db:3306/prod",
+		"mongodb://admin:hunter2@db:27017/prod",
+		"redis://admin:hunter2@cache:6379",
+		"amqp://admin:hunter2@mq:5672",
+		"ssh://admin:hunter2@box:22",
+		"ftp://admin:hunter2@files:21",
+		"postgresql+ssl://admin:hunter2@db:5432/prod",
+		"POSTGRES://ADMIN:HUNTER2@DB:5432/PROD",
+	} {
+		t.Run(raw, func(t *testing.T) {
+			line := "URL " + raw
+
+			redacted := RedactText(line)
+
+			assert.Contains(t, redacted, RedactedSecret)
+			assert.NotContains(t, redacted, "hunter2")
+			assert.NotContains(t, redacted, "HUNTER2")
+			assert.NotEmpty(t, FindUnsafeText(line, "artifact"), "an unredacted credential URL must be unsafe")
+			require.NoError(t, AssertSafeText(redacted, "artifact"))
+		})
+	}
+}
+
+func TestRedactText_KeepsURLsWithoutUserinfoIntact(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{"https://host/x", "https://host:8080/x", "postgres://db:5432/prod"} {
+		assert.Equal(t, raw, RedactText(raw))
+		assert.Empty(t, findingTypes(FindUnsafeText(raw, "url")))
+	}
+}
+
+// The credential URL gate must agree with the redactor: FindUnsafeText is what
+// keeps redaction_status from reporting "passed" over a surviving credential.
+func TestFindUnsafeText_FlagsNonHTTPCredentialURL(t *testing.T) {
+	t.Parallel()
+
+	findings := FindUnsafeText("db=postgres://admin:hunter2@db.internal:5432/prod", "stdout")
+
+	assert.Contains(t, findingTypes(findings), "credential_url")
+	assert.NotContains(t, FormatFindings(findings), "hunter2")
+	require.Error(t, AssertSafeText("db=postgres://admin:hunter2@db.internal:5432/prod", "stdout"))
+}
+
+func TestRedactText_KeepsHarnessProseAfterCredentialKey(t *testing.T) {
+	t.Parallel()
+
+	line := "missing_credentials: opaque credential refs are required before mobile execution"
+
+	redacted := RedactText(line)
+
+	assert.Equal(t, line, redacted)
+	assert.Empty(t, FindUnsafeText(line, "setup_gap"), "prose must not be reported as a leak either")
+}
+
+func TestRedactText_StillMasksSecretShapedAssignmentValues(t *testing.T) {
+	t.Parallel()
+
+	for name, raw := range map[string]string{
+		"mixed case and symbol": "password: hunter2SECRET!",
+		"aws secret":            "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY",
+		"github pat":            "token=github_pat_11ABCDEFG0aBcDeFgHiJkL_MnOpQrStUvWxYz0123456789abcdefghij",
+		"jwt":                   "authorization=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.abc.def",
+		"quoted prose shape":    `password: "opaque" and more prose`,
+		"bare weak password":    "password: letmein",
+		"next key follows":      "token=abcdefgh password=zyxwvuts",
+	} {
+		t.Run(name, func(t *testing.T) {
+			redacted := RedactText(raw)
+
+			assert.Contains(t, redacted, RedactedSecret)
+			require.NoError(t, AssertSafeText(redacted, "assignment"))
+			assert.NotEmpty(t, FindUnsafeText(raw, "assignment"))
+		})
+	}
+}
+
+// Redaction runs more than once on the same bytes: publish, feedback bundle
+// export, then prompt rendering. A non-idempotent pass corrupted the
+// placeholder ("[REDACTED_SECRET]]]") in published evidence.
+func TestRedactText_IsIdempotent(t *testing.T) {
+	t.Parallel()
+
+	for _, raw := range []string{
+		"AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMIK7MDENGbPxRfiCYEXAMPLEKEY",
+		"db=postgres://admin:hunter2@db.internal:5432/prod",
+		"token=sk-proj-qameshfake1234567890",
+		`{"access_token":"sk-proj-qameshfake1234567890"}`,
+		"go test ./... --password 'hunter two'",
+		"path=/Users/alice/private/notes.md",
+		"missing_credentials: opaque credential refs are required",
+	} {
+		once := RedactText(raw)
+
+		assert.Equal(t, once, RedactText(once), "second pass changed %q", raw)
+		assert.NotContains(t, once, RedactedSecret+"]")
+	}
+}
+
 func findingTypes(findings []Finding) []string {
 	out := make([]string, 0, len(findings))
 	for _, finding := range findings {

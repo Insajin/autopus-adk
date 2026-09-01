@@ -114,6 +114,17 @@ func runQAFull(cmd *cobra.Command, opts qaFullOptions) error {
 		return writeJSONResultAndExit(cmd, jsonStatusError, err, "qa_full_plan_failed", payload, nil, nil)
 	}
 	payload := buildQAFullPlanPayload(opts, plan, domain, bootstrap)
+	// A blocked plan is an error envelope, matching `qa release` and this
+	// command's own --run path: `blocked` never rides on exit 0. Mapping it to
+	// warn let `.status` say "warn" while `.data.summary.status` said "blocked".
+	if payload.Summary.Status == "blocked" {
+		err := fmt.Errorf("full qa plan blocked: %d blocking setup gap(s)", payload.Summary.BlockingSetupGaps)
+		if jsonMode {
+			return writeJSONResultAndExit(cmd, jsonStatusError, err, "qa_full_blocked", payload, nil, nil)
+		}
+		writeQAFullText(cmd, payload)
+		return err
+	}
 	status := jsonStatusOK
 	if payload.Summary.Status != "ready" {
 		status = jsonStatusWarn
@@ -136,6 +147,10 @@ func runQAFullExecution(cmd *cobra.Command, releaseOpts qarelease.Options, opts 
 		if jsonMode {
 			return writeJSONResultAndExit(cmd, jsonStatusError, err, code, payload, nil, nil)
 		}
+		// Text mode gets the same diagnosis JSON mode already carried. The bare
+		// "qa release blocked" left the operator with the root blocker lane,
+		// failed journey, and failure summary computed and then discarded.
+		writeQAFullText(cmd, payload)
 		return err
 	}
 	status := jsonStatusOK
@@ -181,10 +196,29 @@ func writeQAFullText(cmd *cobra.Command, payload qaFullPayload) {
 	if payload.Bootstrap != nil {
 		fmt.Fprintf(cmd.OutOrStdout(), "bootstrap=%s created=%d skipped=%d\n", payload.Bootstrap.Status, len(payload.Bootstrap.Created), len(payload.Bootstrap.Skipped))
 	}
+	// The root blocker is the whole reason a failed gate is worth reading. Text
+	// mode carries it verbatim from the payload JSON mode already emitted.
+	if payload.Summary.RootBlockerLane != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "blocker: lane=%s reason=%s journey=%s summary=%s\n",
+			payload.Summary.RootBlockerLane, payload.Summary.RootBlockerReason,
+			orDash(payload.Summary.RootFailedJourneyID), orDash(payload.Summary.RootFailureSummary))
+	}
+	if payload.DomainReadiness.SetupGap != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "domain_readiness=%s gap=%s\n", payload.DomainReadiness.Status, payload.DomainReadiness.SetupGap)
+	}
 	for _, candidate := range payload.ProjectCandidates {
 		fmt.Fprintf(cmd.OutOrStdout(), "candidate: %s score=%d reasons=%s\n", candidate.ProjectDir, candidate.Score, candidate.Reason)
 	}
 	for _, next := range payload.NextCommands {
 		fmt.Fprintf(cmd.OutOrStdout(), "next: %s\n", next)
 	}
+}
+
+// orDash keeps blocker lines column-stable when the release index reports a
+// blocked lane without a per-journey failure (a skipped or setup-gapped lane).
+func orDash(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "-"
+	}
+	return value
 }

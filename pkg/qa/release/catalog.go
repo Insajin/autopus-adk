@@ -1,11 +1,15 @@
 package release
 
-import "slices"
+import (
+	"slices"
+
+	qalane "github.com/insajin/autopus-adk/pkg/qa/lane"
+)
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-004: canonical release lane IDs and order drive plan, execution, roadmap, and tests.
 // @AX:REASON: BuildPlan, Execute, Roadmap, and release guidance expect these lane IDs and ordering to remain stable.
 func ReleaseLanes() []string {
-	return []string{"fast", "browser-staging", "desktop-native", "gui-explore", "mobile-readiness", "canary-explicit", "evidence-dashboard"}
+	return qalane.Release()
 }
 
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-QAMESH-004: severity ordering defines threshold comparisons in the release blocker matrix.
@@ -90,7 +94,10 @@ func laneCatalogRow(lane string) LaneCatalogRow {
 	case "canary-explicit":
 		return laneRow(lane, "SPEC-QAMESH-004", "ready", "explicit-journey-pack", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	case "evidence-dashboard":
-		return laneRow(lane, "SPEC-QAMESH-007", "ready", "sibling-readiness-contract", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
+		// No adapter in pkg/qa/adapter lists this lane and no code path executes
+		// it, so the catalog reports it as planned. Advertising "ready" is what
+		// let the gate score it as a silent pass.
+		return laneRow(lane, "SPEC-QAMESH-007", "planned", "no-adapter-executor", []string{"prelaunch", "release-candidate", "postdeploy-smoke"})
 	default:
 		return laneRow(lane, "SPEC-QAMESH-004", "planned", "unknown", nil)
 	}
@@ -111,7 +118,7 @@ func SiblingSpecs() []SiblingSpec {
 	return []SiblingSpec{
 		{SpecID: "SPEC-QAMESH-005", OwnerRepo: "autopus-adk", Lanes: []string{"browser-staging", "desktop-native"}, Status: "ready", Relationship: "sibling"},
 		{SpecID: "SPEC-QAMESH-006", OwnerRepo: "autopus-adk", Lanes: []string{"mobile-readiness"}, Status: "ready", Relationship: "sibling"},
-		{SpecID: "SPEC-QAMESH-007", OwnerRepo: "autopus-adk", Lanes: []string{"evidence-dashboard"}, Status: "ready", Relationship: "sibling"},
+		{SpecID: "SPEC-QAMESH-007", OwnerRepo: "autopus-adk", Lanes: []string{"evidence-dashboard"}, Status: "planned", Relationship: "sibling"},
 	}
 }
 

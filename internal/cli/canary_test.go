@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRootCmd_CanaryDryRunJSON_UsesStagingTargetsByDefault(t *testing.T) {
+func TestRootCmd_CanaryDryRunJSON_SuppliesNoDefaultStagingTargets(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -34,8 +34,10 @@ func TestRootCmd_CanaryDryRunJSON_UsesStagingTargetsByDefault(t *testing.T) {
 	assert.Equal(t, "SKIPPED", data["endpoint"])
 	assert.Equal(t, "SKIPPED", data["browser"])
 	flags := data["flags"].(map[string]any)
-	assert.Equal(t, defaultCanaryFrontendURL, flags["frontend_url"])
-	assert.Equal(t, defaultCanaryAPIURL, flags["api_url"])
+	// A third-party project must never inherit Autopus staging hosts: the
+	// canary-explicit lane would probe someone else's infrastructure.
+	assert.Equal(t, "", flags["frontend_url"])
+	assert.Equal(t, "", flags["api_url"])
 }
 
 func TestRootCmd_CanaryDryRunJSON_FailsWhenResultCannotBeStored(t *testing.T) {
@@ -60,11 +62,33 @@ func TestRootCmd_CanaryDryRunJSON_FailsWhenResultCannotBeStored(t *testing.T) {
 	assert.Equal(t, "FAIL", data["verdict"])
 }
 
-func TestResolveCanaryTargetsLegacyURLOverridesStagingDefaults(t *testing.T) {
+func TestResolveCanaryTargets_SharedURLOverridesBothChecks(t *testing.T) {
 	t.Parallel()
 
 	targets := resolveCanaryTargets(canaryOptions{url: "https://preview.example.com/"})
 
 	assert.Equal(t, "https://preview.example.com", targets.FrontendURL)
 	assert.Equal(t, "https://preview.example.com", targets.APIURL)
+	assert.Equal(t, []string{"/"}, targets.BrowserPaths)
+}
+
+func TestResolveCanaryTargets_UnsetURLsStayEmpty(t *testing.T) {
+	t.Parallel()
+
+	targets := resolveCanaryTargets(canaryOptions{})
+
+	assert.Empty(t, targets.FrontendURL)
+	assert.Empty(t, targets.APIURL)
+}
+
+func TestResolveCanaryTargets_NormalizesBrowserPaths(t *testing.T) {
+	t.Parallel()
+
+	targets := resolveCanaryTargets(canaryOptions{
+		frontendURL:  "https://app.example.com",
+		browserPaths: []string{"login", "  ", "/docs"},
+	})
+
+	assert.Equal(t, []string{"/login", "/docs"}, targets.BrowserPaths)
+	assert.Empty(t, targets.APIURL)
 }

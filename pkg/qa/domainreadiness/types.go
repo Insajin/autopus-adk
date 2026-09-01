@@ -163,44 +163,6 @@ type CatalogValidationReport struct {
 	ValidationResults []ScenarioValidationResult `json:"validation_results"`
 }
 
-type CompileOptions struct {
-	ProjectDir string
-	Lane       string
-}
-
-type CompileSummary struct {
-	SchemaVersion     string                     `json:"schema_version"`
-	ScenarioCount     int                        `json:"scenario_count"`
-	CommandsExecuted  bool                       `json:"commands_executed"`
-	SelectedLane      string                     `json:"selected_lane"`
-	Validation        CatalogValidationReport    `json:"validation"`
-	ScenarioPlans     []ScenarioPlan             `json:"scenario_plans"`
-	RejectedScenarios []ScenarioValidationResult `json:"rejected_scenarios,omitempty"`
-	CoveredDomains    []string                   `json:"covered_domains"`
-	MissingDomains    []string                   `json:"missing_domains,omitempty"`
-}
-
-type ScenarioPlan struct {
-	ScenarioID       string           `json:"scenario_id"`
-	Domain           string           `json:"domain"`
-	Owner            string           `json:"owner"`
-	OwningRepo       string           `json:"owning_repo"`
-	ScenarioMode     ScenarioMode     `json:"scenario_mode"`
-	MutationBoundary MutationBoundary `json:"mutation_boundary"`
-	Adapter          string           `json:"adapter,omitempty"`
-	Command          *CommandShape    `json:"command,omitempty"`
-	JourneyRefs      []string         `json:"journey_refs,omitempty"`
-	LaneRefs         []string         `json:"lane_refs,omitempty"`
-	ArtifactRefs     []string         `json:"artifact_refs,omitempty"`
-	AcceptanceRefs   []string         `json:"acceptance_refs,omitempty"`
-	SourceNeeds      []string         `json:"source_needs,omitempty"`
-	ExpectedEvidence []string         `json:"expected_evidence,omitempty"`
-	PassFailOracle   []string         `json:"pass_fail_oracle,omitempty"`
-	CanaryRefs       []string         `json:"canary_refs,omitempty"`
-	SetupGaps        []string         `json:"setup_gaps,omitempty"`
-	RejectReasons    []UnsafeReason   `json:"reject_reasons,omitempty"`
-}
-
 type EvidenceBuildInput struct {
 	SuiteID     string
 	RunID       string

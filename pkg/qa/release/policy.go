@@ -182,11 +182,13 @@ func severityForSetupGap(policy LanePolicy, class SetupGapClass) Severity {
 			return SeverityHigh
 		}
 		return SeverityLow
-	case SetupGapSiblingSpecPending:
+	case SetupGapLaneNotImplemented:
+		// Non-zero severity is required: NormalizeLaneRow quarantines a
+		// setup_gap row that claims severity=none as an invalid contract.
 		if policy == LanePolicyMust {
-			return SeverityMedium
+			return SeverityHigh
 		}
-		return SeverityLow
+		return SeverityMedium
 	default:
 		return SeverityNone
 	}

@@ -1,6 +1,7 @@
 package regen
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,10 +19,13 @@ type ApplyOutcome struct {
 	Reason    string `json:"reason,omitempty"`
 }
 
-// ApplyResult is the aggregate of an ApplyPacks call.
+// ApplyResult is the aggregate of an ApplyPacks call. Unchanged holds the packs
+// already byte-identical on disk, so len(Written) reports files whose content
+// actually changed and can be compared against the diff the operator approved.
 type ApplyResult struct {
-	Written  []ApplyOutcome `json:"written"`
-	Excluded []ApplyOutcome `json:"excluded"`
+	Written   []ApplyOutcome `json:"written"`
+	Unchanged []ApplyOutcome `json:"unchanged,omitempty"`
+	Excluded  []ApplyOutcome `json:"excluded"`
 }
 
 // ApplyPacks persists each accepted pack to
@@ -73,6 +77,12 @@ func ApplyPacks(projectDir string, packs []journey.Pack) (ApplyResult, error) {
 		body, err := yaml.Marshal(pack)
 		if err != nil {
 			return result, err
+		}
+		// Rewriting identical bytes would report a write the approved diff never
+		// proposed, and would churn the mtime downstream tooling orders by.
+		if prior, readErr := os.ReadFile(path); readErr == nil && bytes.Equal(prior, body) {
+			result.Unchanged = append(result.Unchanged, ApplyOutcome{JourneyID: pack.ID, Path: path})
+			continue
 		}
 		if err := os.WriteFile(path, body, 0o644); err != nil {
 			return result, err

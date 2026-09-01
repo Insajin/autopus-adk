@@ -77,13 +77,13 @@ func Execute(opts Options) (ExecutionPayload, error) {
 	index.EndedAt = opts.Now().Format(timeFormat)
 	index.RedactionStatus = mergeRedaction(index.RedactionStatus)
 	actualIndexPath := index.OutputPaths.ReleaseIndexPath
+	index.OutputPaths = publicOutputPaths(opts.ProjectDir, index.OutputPaths)
 	sanitizedIndex, redactionState := sanitizeIndex(index)
 	sanitizedIndex.RedactionStatus = mergeRedaction(sanitizedIndex.RedactionStatus, redactionState)
-	releaseIndexPath, pathChanged := redactReleaseString(actualIndexPath)
-	if pathChanged {
-		sanitizedIndex.RedactionStatus = mergeRedaction(sanitizedIndex.RedactionStatus, RedactionRedacted)
+	payload := ExecutionPayload{
+		Index:            sanitizedIndex,
+		ReleaseIndexPath: sanitizedIndex.OutputPaths.ReleaseIndexPath,
 	}
-	payload := ExecutionPayload{Index: sanitizedIndex, ReleaseIndexPath: releaseIndexPath}
 	if err := writeIndex(payload.Index, actualIndexPath); err != nil {
 		return payload, err
 	}

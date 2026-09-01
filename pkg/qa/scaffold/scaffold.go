@@ -86,6 +86,14 @@ func Init(opts Options) (Result, error) {
 			return Result{}, err
 		}
 	}
+	// Emitted only once the QA tree is actually being provisioned, so a project
+	// with zero QA signals still reports the "no supported QA signals" warning
+	// instead of looking provisioned by an ignore file alone.
+	if len(result.Created) > 0 || len(result.Skipped) > 0 {
+		if err := ensureStarter(projectDir, qaRuntimeGitignoreStarter(), &result); err != nil {
+			return Result{}, err
+		}
+	}
 
 	if len(result.Created) > 0 {
 		result.Status = "created"

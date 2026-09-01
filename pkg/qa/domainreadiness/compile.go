@@ -8,6 +8,7 @@ func CompileCatalog(catalog Catalog, opts CompileOptions) (CompileSummary, error
 		lane = "fast"
 	}
 	validation := ValidateCatalog(catalog)
+	packs := loadJourneyPackIndex(opts.ProjectDir)
 	summary := CompileSummary{
 		SchemaVersion:    PlanSchemaVersion,
 		ScenarioCount:    len(catalog.Scenarios),
@@ -43,6 +44,12 @@ func CompileCatalog(catalog Catalog, opts CompileOptions) (CompileSummary, error
 			SetupGaps:        append([]string(nil), result.SetupGaps...),
 			RejectReasons:    append([]UnsafeReason(nil), result.RejectReasons...),
 		}
+		// Every declared journey_pack_ref is a claim about the project's Journey
+		// Packs; hold the scenario to it instead of copying the refs through.
+		for _, gap := range packs.gapsFor(scenario.ScenarioID, scenario.JourneyPackRefs) {
+			summary.JourneyRefGaps = append(summary.JourneyRefGaps, gap)
+			plan.SetupGaps = appendUniqueString(plan.SetupGaps, journeyRefGapDetail(gap))
+		}
 		if plan.Command != nil {
 			plan.Adapter = plan.Command.Adapter
 		}
@@ -53,6 +60,7 @@ func CompileCatalog(catalog Catalog, opts CompileOptions) (CompileSummary, error
 			summary.ScenarioPlans = append(summary.ScenarioPlans, plan)
 		}
 	}
+	summary.Valid = validation.Valid && len(summary.JourneyRefGaps) == 0
 	return summary, nil
 }
 

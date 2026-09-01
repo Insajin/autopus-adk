@@ -22,7 +22,7 @@ func TestExecuteGUIExploreWritesManifestWithGUIArtifacts(t *testing.T) {
 	require.Len(t, result.ManifestPaths, 1)
 	assert.Equal(t, "gui-explore", result.AdapterResults[0].Adapter)
 
-	body, err := os.ReadFile(result.ManifestPaths[0])
+	body, err := os.ReadFile(projectPath(dir, result.ManifestPaths[0]))
 	require.NoError(t, err)
 	manifest := string(body)
 	assert.NotContains(t, manifest, dir)

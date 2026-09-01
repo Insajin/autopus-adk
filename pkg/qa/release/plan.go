@@ -26,7 +26,7 @@ func BuildPlan(opts Options) (Plan, error) {
 	journeyRows, redactionStatus := journeyPackRows(packs)
 	policy = adaptPolicyToProject(opts.ProjectDir, policy, journeyRows)
 	blockerRules := blockerRulesForPolicy(opts.Profile, policy)
-	setupGaps := releaseSetupGaps(policy, journeyRows)
+	setupGaps := releaseSetupGaps(opts.ProjectDir, policy, journeyRows)
 	redactionStatus = setupGapRedactionStatus(setupGaps, redactionStatus)
 	return Plan{
 		SchemaVersion:   PlanSchemaVersion,
@@ -38,7 +38,7 @@ func BuildPlan(opts Options) (Plan, error) {
 		JourneyPacks:    journeyRows,
 		SetupGaps:       setupGaps,
 		BlockerRules:    blockerRules,
-		OutputPaths:     planOutputPaths(opts),
+		OutputPaths:     publicOutputPaths(opts.ProjectDir, planOutputPaths(opts)),
 		SiblingSpecs:    SiblingSpecs(),
 		RedactionStatus: redactionStatus,
 		RedactionRules:  RedactionRules(),
@@ -136,7 +136,7 @@ func nonNilStrings(values []string) []string {
 	return values
 }
 
-func releaseSetupGaps(policy ProfilePolicy, journeyRows []JourneyPackRow) []SetupGapRow {
+func releaseSetupGaps(projectDir string, policy ProfilePolicy, journeyRows []JourneyPackRow) []SetupGapRow {
 	covered := map[string]bool{}
 	for _, row := range journeyRows {
 		if row.Executable {
@@ -149,10 +149,7 @@ func releaseSetupGaps(policy ProfilePolicy, journeyRows []JourneyPackRow) []Setu
 			continue
 		}
 		lanePolicy := lanePolicy(policy, lane)
-		class, reason := setupGapForLane(lane)
-		if lanePolicy == LanePolicyDeferred && class == SetupGapSiblingSpecPending {
-			continue
-		}
+		class, reason := laneSetupGap(projectDir, lane)
 		severity := severityForSetupGap(lanePolicy, class)
 		normalized := NormalizeLaneRow(LaneRow{
 			Lane:          lane,
@@ -174,17 +171,6 @@ func releaseSetupGaps(policy ProfilePolicy, journeyRows []JourneyPackRow) []Setu
 		})
 	}
 	return gaps
-}
-
-func setupGapForLane(lane string) (SetupGapClass, string) {
-	switch lane {
-	case "canary-explicit":
-		return SetupGapCanaryTemplate, "explicit safe canary command is required"
-	case "mobile-readiness", "evidence-dashboard":
-		return SetupGapSiblingSpecPending, "sibling SPEC readiness contract is pending"
-	default:
-		return SetupGapMissingJourneyPack, "project-local Journey Pack is required"
-	}
 }
 
 func planOutputPaths(opts Options) OutputPaths {

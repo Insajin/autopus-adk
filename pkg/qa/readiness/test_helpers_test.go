@@ -47,8 +47,16 @@ func assertFailClosed(t *testing.T, result readiness.Result, wantClasses, forbid
 
 func copyFixture(t *testing.T) string {
 	t.Helper()
-	src := fixtureRoot(t)
 	dst := t.TempDir()
+	copyFixtureInto(t, dst)
+	return dst
+}
+
+// copyFixtureInto materializes the portable fixture at an arbitrary root so a
+// test can choose the workspace path shape it needs.
+func copyFixtureInto(t *testing.T, dst string) {
+	t.Helper()
+	src := fixtureRoot(t)
 	if err := filepath.WalkDir(src, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -69,7 +77,6 @@ func copyFixture(t *testing.T) string {
 	}); err != nil {
 		t.Fatalf("copy fixture: %v", err)
 	}
-	return dst
 }
 
 func patchJSON(t *testing.T, path string, mutate func(map[string]any)) {

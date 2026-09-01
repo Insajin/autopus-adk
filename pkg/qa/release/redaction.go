@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	qaevidence "github.com/insajin/autopus-adk/pkg/qa/evidence"
+	qarun "github.com/insajin/autopus-adk/pkg/qa/run"
 )
 
 var (
@@ -66,7 +67,11 @@ func redactURLsAndPaths(value string) (string, bool) {
 		text = nextQuery
 		changed = true
 	}
-	next := privatePathRe.ReplaceAllString(text, "$PROJECT_ROOT")
+	// ReplaceAllLiteralString, never ReplaceAllString: a replacement that starts
+	// with `$` is otherwise expanded as a capture-group reference. "$PROJECT_ROOT"
+	// named a group that does not exist, so every private path was replaced with
+	// the empty string and the placeholder never once appeared in a release index.
+	next := privatePathRe.ReplaceAllLiteralString(text, qarun.RedactedLocalPath)
 	if next != text {
 		changed = true
 		text = next
@@ -87,8 +92,8 @@ func redactReleaseString(value string) (string, bool) {
 		changed = true
 	}
 	if strings.Contains(text, qaevidence.RedactedUser) {
-		text = strings.ReplaceAll(text, "/Users/"+qaevidence.RedactedUser, "$PROJECT_ROOT")
-		text = strings.ReplaceAll(text, "/home/"+qaevidence.RedactedUser, "$PROJECT_ROOT")
+		text = strings.ReplaceAll(text, "/Users/"+qaevidence.RedactedUser, qarun.RedactedLocalPath)
+		text = strings.ReplaceAll(text, "/home/"+qaevidence.RedactedUser, qarun.RedactedLocalPath)
 		changed = true
 	}
 	return text, changed

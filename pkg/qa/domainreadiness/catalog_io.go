@@ -2,7 +2,6 @@ package domainreadiness
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -23,28 +22,50 @@ func LoadCatalogFile(path string) (Catalog, error) {
 	return catalog, nil
 }
 
-func WriteStarterCatalog(projectDir, catalogPath string) (string, error) {
+// StarterCatalogResult reports what WriteStarterCatalog did. It mirrors the
+// created/skipped contract `auto qa init` already uses so repeated provisioning
+// runs are a no-op instead of an error.
+type StarterCatalogResult struct {
+	Status string `json:"status"`
+	Path   string `json:"path"`
+	Reason string `json:"reason,omitempty"`
+}
+
+// StarterCatalogResult.Status values.
+const (
+	StarterCatalogCreated = "created"
+	StarterCatalogSkipped = "skipped"
+)
+
+// WriteStarterCatalog seeds a project-local catalog and is idempotent: an
+// existing catalog is reported as skipped and never overwritten, because it may
+// have been authored by hand since the first run.
+func WriteStarterCatalog(projectDir, catalogPath string) (StarterCatalogResult, error) {
 	path := ResolveCatalogPath(projectDir, catalogPath)
 	if err := ValidateCatalogSource(path); err != nil {
-		return "", err
+		return StarterCatalogResult{}, err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return "", err
+		return StarterCatalogResult{}, err
 	}
 	if _, err := os.Stat(path); err == nil {
-		return path, fmt.Errorf("catalog already exists: %s", path)
+		return StarterCatalogResult{
+			Status: StarterCatalogSkipped,
+			Path:   path,
+			Reason: "existing project-local file preserved",
+		}, nil
 	} else if !os.IsNotExist(err) {
-		return "", err
+		return StarterCatalogResult{}, err
 	}
 	body, err := json.MarshalIndent(StarterCatalogForProject(projectDir), "", "  ")
 	if err != nil {
-		return "", err
+		return StarterCatalogResult{}, err
 	}
 	body = append(body, '\n')
 	if err := os.WriteFile(path, body, 0o644); err != nil {
-		return "", err
+		return StarterCatalogResult{}, err
 	}
-	return path, nil
+	return StarterCatalogResult{Status: StarterCatalogCreated, Path: path}, nil
 }
 
 func ResolveCatalogPath(projectDir, catalogPath string) string {
@@ -65,6 +86,6 @@ func StarterCatalog() Catalog {
 		SchemaVersion:   CatalogSchemaVersion,
 		SuiteID:         "project-domain-readiness",
 		RequiredDomains: []string{"core"},
-		Scenarios:       []Scenario{contractStarterScenario("project-core-readiness", "core", []string{"fast"}, []string{"fast"}, []string{"SPEC-QAMESH-002"})},
+		Scenarios:       []Scenario{contractStarterScenario("project-core-readiness", "core", []string{"fast"}, []string{"SPEC-QAMESH-002"})},
 	}
 }

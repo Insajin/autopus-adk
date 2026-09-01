@@ -36,17 +36,22 @@ func TestExecuteGoJourneyWritesManifestAndRunIndex(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "passed", result.Status)
 	require.Len(t, result.ManifestPaths, 1)
-	assert.FileExists(t, result.ManifestPaths[0])
-	assert.FileExists(t, result.RunIndexPath)
+	// Published refs are project-root-relative; resolve them the way a consumer
+	// does rather than assuming an absolute leak.
+	manifestPath := filepath.Join(dir, result.ManifestPaths[0])
+	runIndexPath := filepath.Join(dir, result.RunIndexPath)
+	assert.False(t, filepath.IsAbs(result.RunIndexPath))
+	assert.FileExists(t, manifestPath)
+	assert.FileExists(t, runIndexPath)
 	assert.Equal(t, "go-test", result.AdapterResults[0].Adapter)
 
-	body, err := os.ReadFile(result.ManifestPaths[0])
+	body, err := os.ReadFile(manifestPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(body), `"schema_version": "qamesh.evidence.v2"`)
 	assert.Contains(t, string(body), `"journey_id": "go-unit"`)
 
 	var index Index
-	indexBody, err := os.ReadFile(result.RunIndexPath)
+	indexBody, err := os.ReadFile(runIndexPath)
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(indexBody, &index))
 	assert.Equal(t, filepath.Base(dir), index.Workspace.WorkspaceID)
@@ -191,7 +196,7 @@ func TestExecutePreservesFailedCheckActualInRunIndex(t *testing.T) {
 	require.Len(t, result.Checks, 1)
 	assert.Equal(t, "go-test", result.Checks[0].ID)
 	assert.Contains(t, result.Checks[0].Actual, "exit_code=1")
-	body, readErr := os.ReadFile(result.RunIndexPath)
+	body, readErr := os.ReadFile(filepath.Join(dir, result.RunIndexPath))
 	require.NoError(t, readErr)
 	assert.Contains(t, string(body), `"actual": "exit_code=1"`)
 }
@@ -245,6 +250,15 @@ func journeyPack(adapterID, run string) journey.Pack {
 func fixtureGoProject(t *testing.T, passing bool) string {
 	t.Helper()
 	dir := t.TempDir()
+	writeGoProjectFixture(t, dir, passing)
+	return dir
+}
+
+// writeGoProjectFixture is split out so a test can place the fixture under a
+// specific parent (an absolute /Users path, /tmp, a symlinked $TMPDIR) instead
+// of always taking t.TempDir().
+func writeGoProjectFixture(t *testing.T, dir string, passing bool) {
+	t.Helper()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.test\n\ngo 1.26\n"), 0o644))
 	testBody := "package example\n\nimport \"testing\"\n\nfunc TestExample(t *testing.T) {}\n"
 	if !passing {
@@ -274,5 +288,4 @@ func fixtureGoProject(t *testing.T, passing bool) string {
 	body, err := json.Marshal(pack)
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(journeyDir, "go-unit.yaml"), body, 0o644))
-	return dir
 }

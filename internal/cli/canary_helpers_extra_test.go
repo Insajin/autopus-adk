@@ -8,42 +8,39 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestCanaryBuildTargets_ContainsExpectedIDs verifies six build targets with expected IDs.
-func TestCanaryBuildTargets_ContainsExpectedIDs(t *testing.T) {
+// TestCanaryBuildTargets_EmptyForProjectWithoutStack proves a directory that
+// declares no stack yields no build target rather than a FAIL for a directory
+// that never existed.
+func TestCanaryBuildTargets_EmptyForProjectWithoutStack(t *testing.T) {
 	t.Parallel()
 
-	targets := canaryBuildTargets("/workspace")
-	ids := make([]string, 0, len(targets))
-	for _, tgt := range targets {
-		ids = append(ids, tgt.ID)
-	}
-	assert.Contains(t, ids, "H1")
-	assert.Contains(t, ids, "H2")
-	assert.Contains(t, ids, "H4")
-	assert.Contains(t, ids, "H5a")
-	assert.Len(t, targets, 6)
+	targets, skips := canaryBuildTargets(t.TempDir())
+
+	assert.Empty(t, targets)
+	assert.Empty(t, skips)
 }
 
-// TestCanaryBuildTargets_RootDirInjected verifies projectDir is embedded in Dir paths.
-func TestCanaryBuildTargets_RootDirInjected(t *testing.T) {
+// TestCanaryBuildTargets_DerivedFromProjectRoot proves detection reads the
+// project under test, not a hardcoded Autopus sibling layout.
+func TestCanaryBuildTargets_DerivedFromProjectRoot(t *testing.T) {
 	t.Parallel()
 
-	targets := canaryBuildTargets("/myroot")
-	found := false
-	for _, tgt := range targets {
-		if strings.HasPrefix(tgt.Dir, "/myroot/") || tgt.Dir == filepath.Join("/myroot", "autopus-adk") {
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "expected at least one target with /myroot prefix")
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.test\n"), 0o644))
+
+	targets, skips := canaryBuildTargets(dir)
+
+	require.Len(t, targets, 1)
+	assert.Equal(t, "build:.:go", targets[0].ID)
+	assert.Equal(t, dir, targets[0].Dir)
+	assert.Equal(t, []string{"go", "build", "./..."}, targets[0].Args)
+	assert.Empty(t, skips)
 }
 
 // TestErrOrDefault_UseErrWhenPresent returns the existing error unchanged.

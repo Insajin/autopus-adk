@@ -17,6 +17,9 @@ func BuildPlan(opts Options) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
+	if err := validateLane(opts.Lane, packs); err != nil {
+		return Plan{}, err
+	}
 	detections := adapter.Detect(opts.ProjectDir)
 	candidates := qacompile.FromProject(opts.ProjectDir)
 	plan := Plan{
@@ -71,7 +74,11 @@ func BuildPlan(opts Options) (Plan, error) {
 	applyMobileScriptedLane(&plan, opts)
 	plan.ProjectHints = append(plan.ProjectHints, projectLocalJourneyHints(opts, packs)...)
 	plan.SetupGaps = append(plan.SetupGaps, projectLocalJourneySetupGaps(opts, packs)...)
-	if len(plan.SelectedJourneys) == 0 && opts.JourneyID == "" && allowDetectedFallback(opts) {
+	laneExecutable := laneHasExecutor(opts.Lane, packs)
+	if !laneExecutable {
+		applyLaneWithoutExecutor(&plan, opts.Lane)
+	}
+	if laneExecutable && len(plan.SelectedJourneys) == 0 && opts.JourneyID == "" && allowDetectedFallback(opts) {
 		for _, detection := range detections {
 			if opts.AdapterID != "" && opts.AdapterID != detection.AdapterID {
 				continue

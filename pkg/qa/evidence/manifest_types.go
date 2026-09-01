@@ -32,6 +32,13 @@ type Manifest struct {
 	RepairPromptRef     string          `json:"repair_prompt_ref,omitempty"`
 	RetentionClass      string          `json:"retention_class"`
 	ReproductionCommand string          `json:"reproduction_command,omitempty"`
+	// sourceDir is the directory the manifest was decoded from. It is unexported
+	// on purpose: artifact paths in a manifest file are manifest-relative, and a
+	// consumer such as the feedback bundle exporter has to resolve them, but the
+	// JSON schema is shared with browser and desktop producers and must not grow
+	// a machine-local field. Value copies (NormalizeManifest, WriteFinalManifest)
+	// carry it; anything that rebuilds a Manifest literal drops it by design.
+	sourceDir string
 }
 
 type Runner struct {

@@ -123,28 +123,25 @@ func TestQAInitCmd_DefaultScaffoldsReleaseWorkflowGate(t *testing.T) {
 	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
 }
 
-func TestQABootstrapCmd_UsesReleaseWorkflowDefaults(t *testing.T) {
+// TestQABootstrapCmd_IsRemoved guards the D26 cutover: `qa bootstrap` was a
+// hidden, byte-identical alias of bare `qa init` (same runQAInit path, same
+// created set, same next_steps). Reintroducing it would restore an undocumented
+// second name for one behavior. `auto qa init` and `auto qa full --bootstrap`
+// cover the intent; TestQAInitCmd_DefaultScaffoldsReleaseWorkflowGate above
+// already owns the release-workflow-defaults assertions this test duplicated.
+func TestQABootstrapCmd_IsRemoved(t *testing.T) {
 	t.Parallel()
 
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/app\n\ngo 1.26\n"), 0o644))
+	root := NewRootCmd()
+	sub, _, err := root.Find([]string{"qa", "bootstrap"})
+	require.NoError(t, err)
+	// cobra.Find falls back to the nearest parent it could resolve.
+	require.NotNil(t, sub)
+	assert.Equal(t, "qa", sub.Name(), "qa bootstrap must not resolve to its own command")
 
-	cmd := newQACmd()
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&errOut)
-	cmd.SetArgs([]string{"bootstrap", "--project-dir", dir, "--format", "json"})
-
-	require.NoError(t, cmd.Execute())
-	payload := decodeJSONMap(t, out.Bytes())
-	assertCommonJSONEnvelope(t, payload, "qa bootstrap")
-	data := payload["data"].(map[string]any)
-	assert.Equal(t, "created", data["status"])
-	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "go-fast.yaml"))
-	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "journeys", "canary-explicit.yaml"))
-	assert.FileExists(t, filepath.Join(dir, ".github", "workflows", "autopus-qa-release.yml"))
-	assert.FileExists(t, filepath.Join(dir, ".autopus", "qa", "domain-readiness", "catalog.json"))
+	for _, child := range sub.Commands() {
+		assert.NotEqual(t, "bootstrap", child.Name())
+	}
 }
 
 func TestQAInitCmd_PreservesExistingJourneyPack(t *testing.T) {

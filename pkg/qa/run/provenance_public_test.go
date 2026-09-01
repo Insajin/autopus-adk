@@ -63,20 +63,20 @@ func TestPackSourceRefs(t *testing.T) {
 func TestPublicProjectPath(t *testing.T) {
 	root := t.TempDir()
 
-	if got := publicProjectPath(root, ""); got != "" {
+	if got := PublicProjectPath(root, ""); got != "" {
 		t.Fatalf("empty path = %q, want empty", got)
 	}
-	if got := publicProjectPath(root, "https://x.test/a"); got != redactedPublicPath {
+	if got := PublicProjectPath(root, "https://x.test/a"); got != RedactedLocalPath {
 		t.Fatalf("scheme url = %q, want redacted", got)
 	}
 
 	inside := filepath.Join(root, "artifacts", "log.txt")
-	if got := publicProjectPath(root, inside); got != "artifacts/log.txt" {
+	if got := PublicProjectPath(root, inside); got != "artifacts/log.txt" {
 		t.Fatalf("inside path = %q, want artifacts/log.txt", got)
 	}
 
 	// An absolute path outside the project root is redacted.
-	if got := publicProjectPath(root, "/etc/passwd"); got != redactedPublicPath {
+	if got := PublicProjectPath(root, "/etc/passwd"); got != RedactedLocalPath {
 		t.Fatalf("outside abs path = %q, want redacted", got)
 	}
 }
@@ -85,7 +85,7 @@ func TestPublicProjectPath(t *testing.T) {
 // publicProjectPath.
 func TestPublicPreviewPath(t *testing.T) {
 	root := t.TempDir()
-	if got := publicPreviewPath(root, "ftp://h/x"); got != redactedPublicPath {
+	if got := publicPreviewPath(root, "ftp://h/x"); got != RedactedLocalPath {
 		t.Fatalf("scheme preview = %q, want redacted", got)
 	}
 	inside := filepath.Join(root, "preview.png")

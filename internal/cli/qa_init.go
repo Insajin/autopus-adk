@@ -27,23 +27,6 @@ func newQAInitCmd() *cobra.Command {
 	return cmd
 }
 
-func newQABootstrapCmd() *cobra.Command {
-	var opts qaInitOptions
-	cmd := &cobra.Command{
-		Use:    "bootstrap",
-		Short:  "Bootstrap Journey Packs and a release QA workflow",
-		Hidden: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.Release = true
-			opts.Workflow = "github-actions"
-			return runQAScaffold(cmd, opts, "qa_bootstrap_failed")
-		},
-	}
-	cmd.Flags().StringVar(&opts.ProjectDir, "project-dir", ".", "Project directory")
-	addJSONFlags(cmd, &opts.JSONOut, &opts.Format)
-	return cmd
-}
-
 type qaInitOptions struct {
 	ProjectDir string
 	LocalOnly  bool
@@ -63,10 +46,6 @@ func runQAInit(cmd *cobra.Command, opts qaInitOptions) error {
 			opts.Workflow = "github-actions"
 		}
 	}
-	return runQAScaffold(cmd, opts, "qa_init_failed")
-}
-
-func runQAScaffold(cmd *cobra.Command, opts qaInitOptions, errorCode string) error {
 	jsonMode, err := resolveJSONMode(opts.JSONOut, opts.Format)
 	if err != nil {
 		return err
@@ -78,7 +57,7 @@ func runQAScaffold(cmd *cobra.Command, opts qaInitOptions, errorCode string) err
 		Workflow:           opts.Workflow,
 	})
 	if err != nil {
-		return qaCommandError(cmd, jsonMode, err, errorCode, map[string]any{"project_dir": opts.ProjectDir})
+		return qaCommandError(cmd, jsonMode, err, "qa_init_failed", map[string]any{"project_dir": opts.ProjectDir})
 	}
 	if jsonMode {
 		return writeJSONResult(cmd, jsonStatusOK, result, nil, nil)

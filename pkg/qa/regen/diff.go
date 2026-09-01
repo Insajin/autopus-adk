@@ -37,19 +37,28 @@ func LoadExistingPacks(projectDir string) (map[string]journey.Pack, error) {
 // ComputeDiff classifies accepted synthesized packs against existing packs by
 // Pack.ID. A synthesized pack with no matching existing pack is added; with a
 // matching pack whose compared fields differ it is changed; an existing pack
-// with no corresponding synthesized pack is removed. Entries within each
+// that this synthesis did not produce is unmatched. Entries within each
 // category are sorted by JourneyID and categories are emitted in fixed order,
 // so json.Marshal is byte-identical across runs over identical inputs.
 //
 // Only accepted (non-excluded) synthesized packs participate: excluded packs
 // appear in neither added nor changed.
+//
+// An analysis that synthesized nothing produces an entirely empty diff. With no
+// reference set, "unmatched" would be a vacuous claim over every pack the
+// project has — which on a Go/CLI project (PresentSurfaces recognizes only
+// web/desktop/mobile) is every pack qa init scaffolded. Silence is the only
+// honest output when nothing was analyzed.
 func ComputeDiff(synthesized []SynthesizedPack, existing map[string]journey.Pack) Diff {
-	accepted := acceptedByID(synthesized)
 	diff := Diff{
-		Added:   []DiffEntry{},
-		Changed: []DiffEntry{},
-		Removed: []DiffEntry{},
+		Added:     []DiffEntry{},
+		Changed:   []DiffEntry{},
+		Unmatched: []DiffEntry{},
 	}
+	if len(synthesized) == 0 {
+		return diff
+	}
+	accepted := acceptedByID(synthesized)
 	for id, pack := range accepted {
 		prior, ok := existing[id]
 		if !ok {
@@ -66,15 +75,15 @@ func ComputeDiff(synthesized []SynthesizedPack, existing map[string]journey.Pack
 	}
 	for id := range existing {
 		if _, ok := accepted[id]; !ok {
-			diff.Removed = append(diff.Removed, DiffEntry{JourneyID: id, Category: "removed"})
+			diff.Unmatched = append(diff.Unmatched, DiffEntry{JourneyID: id, Category: "unmatched"})
 		}
 	}
 	sortEntries(diff.Added)
 	sortEntries(diff.Changed)
-	sortEntries(diff.Removed)
+	sortEntries(diff.Unmatched)
 	diff.AddedCount = len(diff.Added)
 	diff.ChangedCount = len(diff.Changed)
-	diff.RemovedCount = len(diff.Removed)
+	diff.UnmatchedCount = len(diff.Unmatched)
 	return diff
 }
 

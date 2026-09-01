@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func writeIndex(result Result, opts Options, started, ended time.Time) error {
+func writeIndex(result Result, destination string, opts Options, started, ended time.Time) error {
 	index := Index{
 		SchemaVersion:       RunIndexSchemaVersion,
 		RunID:               result.RunID,
@@ -29,10 +29,10 @@ func writeIndex(result Result, opts Options, started, ended time.Time) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(result.RunIndexPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(destination), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(result.RunIndexPath, append(body, '\n'), 0o644)
+	return os.WriteFile(destination, append(body, '\n'), 0o644)
 }
 
 func indexStatus(result Result) string {

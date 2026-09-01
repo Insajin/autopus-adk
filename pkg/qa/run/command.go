@@ -130,8 +130,7 @@ func commandTimeout(value string) time.Duration {
 }
 
 func allowedEnv(paths goCachePaths, allowlist []string) []string {
-	projectDir := paths.ProjectDir
-	home := projectDir
+	home := ensureSandboxHome(paths)
 	if envNameAllowed(allowlist, "HOME") {
 		if value := os.Getenv("HOME"); value != "" {
 			home = value

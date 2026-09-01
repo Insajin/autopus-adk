@@ -12,16 +12,23 @@ import "github.com/insajin/autopus-adk/pkg/qa/journey"
 
 // Diff is the deterministic classification of synthesized packs against the
 // existing on-disk packs, keyed by journey ID.
+//
+// There is deliberately no "removed" category. ApplyPacks only ever writes
+// accepted packs and never deletes a file, so no diff category may be read as
+// a deletion proposal. Unmatched holds the existing packs that this
+// re-synthesis did not produce; approval leaves them exactly as they are on
+// disk, as it does every other pack. The name states the observation that
+// produced the row, not a promise about the file.
 type Diff struct {
-	AddedCount   int         `json:"added_count"`
-	ChangedCount int         `json:"changed_count"`
-	RemovedCount int         `json:"removed_count"`
-	Added        []DiffEntry `json:"added"`
-	Changed      []DiffEntry `json:"changed"`
-	Removed      []DiffEntry `json:"removed"`
+	AddedCount     int         `json:"added_count"`
+	ChangedCount   int         `json:"changed_count"`
+	UnmatchedCount int         `json:"unmatched_count"`
+	Added          []DiffEntry `json:"added"`
+	Changed        []DiffEntry `json:"changed"`
+	Unmatched      []DiffEntry `json:"unmatched"`
 }
 
-// DiffEntry is one journey-level change. Category is added|changed|removed.
+// DiffEntry is one journey-level entry. Category is added|changed|unmatched.
 type DiffEntry struct {
 	JourneyID     string        `json:"journey_id"`
 	Category      string        `json:"category"`

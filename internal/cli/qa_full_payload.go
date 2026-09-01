@@ -1,10 +1,8 @@
 package cli
 
 import (
-	"os"
 	"strings"
 
-	"github.com/insajin/autopus-adk/pkg/qa/domainreadiness"
 	qarelease "github.com/insajin/autopus-adk/pkg/qa/release"
 	qascaffold "github.com/insajin/autopus-adk/pkg/qa/scaffold"
 )
@@ -50,13 +48,6 @@ type qaFullProjectCandidate struct {
 	Reason     string `json:"reason"`
 }
 
-type qaFullDomainReadiness struct {
-	Status      string                          `json:"status"`
-	CatalogPath string                          `json:"catalog_path"`
-	SetupGap    string                          `json:"setup_gap,omitempty"`
-	Plan        *domainreadiness.CompileSummary `json:"plan,omitempty"`
-}
-
 func buildQAFullPlanPayload(opts qaFullOptions, plan qarelease.Plan, domain qaFullDomainReadiness, bootstrap *qascaffold.Result) qaFullPayload {
 	summary := qaFullSummary{
 		Status:              fullPlanStatus(plan, domain),
@@ -95,7 +86,7 @@ func buildQAFullRunPayload(opts qaFullOptions, result qarelease.ExecutionPayload
 		status = "setup_gap"
 	}
 	index := result.Index
-	summary := buildQAFullRunSummary(status, result, domain)
+	summary := buildQAFullRunSummary(status, result, domain, countProjectJourneyPacks(opts.ProjectDir))
 	return qaFullPayload{
 		SchemaVersion:   qaFullSchemaVersion,
 		Mode:            "run",
@@ -149,29 +140,6 @@ func buildQAFullSelectProjectPayload(opts qaFullOptions, targets []qascaffold.Wo
 	}
 }
 
-func loadQAFullDomainReadiness(projectDir string) qaFullDomainReadiness {
-	catalogPath := domainreadiness.ResolveCatalogPath(projectDir, domainreadiness.DefaultCatalogPath)
-	catalog, err := domainreadiness.LoadCatalogFile(catalogPath)
-	if err != nil {
-		status := "error"
-		setupGap := err.Error()
-		if os.IsNotExist(err) {
-			status = "setup_gap"
-			setupGap = "domain readiness catalog is missing"
-		}
-		return qaFullDomainReadiness{Status: status, CatalogPath: catalogPath, SetupGap: setupGap}
-	}
-	plan, err := domainreadiness.CompileCatalog(catalog, domainreadiness.CompileOptions{ProjectDir: projectDir, Lane: "full"})
-	if err != nil {
-		return qaFullDomainReadiness{Status: "error", CatalogPath: catalogPath, SetupGap: err.Error()}
-	}
-	status := "ready"
-	if !plan.Validation.Valid || len(plan.MissingDomains) > 0 || len(plan.RejectedScenarios) > 0 {
-		status = "setup_gap"
-	}
-	return qaFullDomainReadiness{Status: status, CatalogPath: catalogPath, Plan: &plan}
-}
-
 func fullPlanStatus(plan qarelease.Plan, domain qaFullDomainReadiness) string {
 	if countBlockingSetupGaps(plan.SetupGaps) > 0 {
 		return "blocked"
@@ -190,13 +158,6 @@ func countBlockingSetupGaps(gaps []qarelease.SetupGapRow) int {
 		}
 	}
 	return count
-}
-
-func domainScenarioCount(domain qaFullDomainReadiness) int {
-	if domain.Plan == nil {
-		return 0
-	}
-	return domain.Plan.ScenarioCount
 }
 
 func qaFullNextCommands(opts qaFullOptions, plan qarelease.Plan, domain qaFullDomainReadiness) []string {

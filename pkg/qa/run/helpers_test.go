@@ -1,6 +1,7 @@
 package run
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -33,7 +34,11 @@ func TestHelperBranches(t *testing.T) {
 	t.Cleanup(commandCache.Cleanup)
 	env := allowedEnv(commandCache.Paths, []string{"QAMESH_ALLOWED", "QAMESH_MISSING", "GOCACHE", "GOMODCACHE", "GOPATH"})
 	assert.Contains(t, env, "QAMESH_ALLOWED=yes")
-	assert.Contains(t, env, "HOME="+commandCache.Paths.ProjectDir)
+	// A pack that does not allowlist HOME must see a harness-owned HOME, never
+	// the project directory: build tools write state into HOME.
+	assert.Contains(t, env, "HOME="+filepath.Join(commandCache.Paths.Root, sandboxHomeDirName))
+	assert.NotContains(t, env, "HOME="+commandCache.Paths.ProjectDir)
+	assert.DirExists(t, filepath.Join(commandCache.Paths.Root, sandboxHomeDirName))
 	t.Setenv("HOME", "/tmp/qamesh-real-home")
 	assert.Contains(t, allowedEnv(commandCache.Paths, []string{"HOME"}), "HOME=/tmp/qamesh-real-home")
 	assert.Contains(t, env, "GOPATH="+commandCache.Paths.GoPath)
@@ -55,7 +60,7 @@ func TestHelperBranches(t *testing.T) {
 	wdCache, err := prepareCommandGoCache(".")
 	require.NoError(t, err)
 	t.Cleanup(wdCache.Cleanup)
-	assert.Contains(t, allowedEnv(wdCache.Paths, nil), "HOME="+wdCache.Paths.ProjectDir)
+	assert.Contains(t, allowedEnv(wdCache.Paths, nil), "HOME="+filepath.Join(wdCache.Paths.Root, sandboxHomeDirName))
 	privateCache, err := prepareCommandGoCache(t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(privateCache.Cleanup)

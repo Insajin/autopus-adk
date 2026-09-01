@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -55,7 +54,7 @@ func runQAReadiness(cmd *cobra.Command, opts qaReadinessOptions) error {
 	}
 	opts, err = resolveReadinessDefaults(opts)
 	if err != nil {
-		return qaCommandError(cmd, jsonMode, err, "qa_readiness_invalid_flags", nil)
+		return qaCommandError(cmd, jsonMode, err, readinessDefaultsErrorCode(err), nil)
 	}
 	for name, value := range map[string]string{
 		"workspace-id":  opts.WorkspaceID,
@@ -83,7 +82,7 @@ func runQAReadiness(cmd *cobra.Command, opts qaReadinessOptions) error {
 	if jsonMode {
 		return writeJSONResult(cmd, jsonStatusOK, result.Projection, nil, nil)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s %s\n", result.Projection.ReleaseVerdict, result.Projection.LastRunTime)
+	writeQAReadinessText(cmd, result.Projection)
 	return nil
 }
 
@@ -93,13 +92,13 @@ func resolveReadinessDefaults(opts qaReadinessOptions) (qaReadinessOptions, erro
 	}
 	var err error
 	if opts.RunIndexPath == "" {
-		opts.RunIndexPath, err = latestIndexPath(opts.WorkspaceRoot, filepath.Join(".autopus", "qa", "runs"), "run-index.json")
+		opts.RunIndexPath, err = requiredLatestIndexPath(opts.WorkspaceRoot, readinessRunIndexSource)
 		if err != nil {
 			return opts, err
 		}
 	}
 	if opts.ReleasePath == "" {
-		opts.ReleasePath, err = latestIndexPath(opts.WorkspaceRoot, filepath.Join(".autopus", "qa", "releases"), "release-index.json")
+		opts.ReleasePath, err = requiredLatestIndexPath(opts.WorkspaceRoot, readinessReleaseIndexSource)
 		if err != nil {
 			return opts, err
 		}

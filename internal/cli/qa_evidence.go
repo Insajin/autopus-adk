@@ -45,8 +45,13 @@ func newQAEvidenceCmd() *cobra.Command {
 			})
 		},
 	}
-	cmd.Flags().StringVar(&surface, "surface", "", "Evidence surface (browser|desktop)")
-	cmd.Flags().StringVar(&lane, "lane", "", "Evidence lane (fast|golden|native|release)")
+	// Neither flag is an enum: both must equal the loaded manifest's own value.
+	// The surface set is therefore whatever pkg/qa/evidence accepts for that
+	// manifest's schema_version, and the lane set is whatever `qa run --lane`
+	// stamped. `browser` is v1-only, so it is unreachable for any manifest this
+	// CLI produced - only a hand-authored or legacy v1 manifest can carry it.
+	cmd.Flags().StringVar(&surface, "surface", "", "Evidence surface, must match the manifest (v2: cli|backend|frontend|desktop|package|custom|multi|mobile; v1: browser|desktop)")
+	cmd.Flags().StringVar(&lane, "lane", "", "Evidence lane, must match the manifest (release lanes: fast|browser-staging|desktop-native|gui-explore|mobile-readiness|canary-explicit|evidence-dashboard, or any lane a Journey Pack declares)")
 	cmd.Flags().StringVar(&scenario, "scenario", "", "Scenario reference")
 	cmd.Flags().StringVar(&input, "input", "", "Runner output or existing evidence manifest")
 	cmd.Flags().StringVar(&output, "output", "", "Final evidence output directory")

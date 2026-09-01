@@ -34,10 +34,10 @@ func TestComputeDiff_AddedOnly(t *testing.T) {
 	if diff.ChangedCount != 0 {
 		t.Fatalf("ChangedCount = %d, want 0", diff.ChangedCount)
 	}
-	if diff.RemovedCount != 0 {
-		t.Fatalf("RemovedCount = %d, want 0", diff.RemovedCount)
+	if diff.UnmatchedCount != 0 {
+		t.Fatalf("UnmatchedCount = %d, want 0", diff.UnmatchedCount)
 	}
-	for _, e := range append(append([]DiffEntry{}, diff.Added...), append(diff.Changed, diff.Removed...)...) {
+	for _, e := range append(append([]DiffEntry{}, diff.Added...), append(diff.Changed, diff.Unmatched...)...) {
 		if e.JourneyID == "existing-web" {
 			t.Fatalf("existing-web must appear in no category, found in %s", e.Category)
 		}
@@ -45,9 +45,9 @@ func TestComputeDiff_AddedOnly(t *testing.T) {
 }
 
 // AC-QAMESH11-003: changed argv on browser-staging-playwright plus one added and
-// one removed; exact counts, the changed field oracle, and byte-identical
+// one unmatched; exact counts, the changed field oracle, and byte-identical
 // json.Marshal across two runs.
-func TestComputeDiff_AddedChangedRemoved(t *testing.T) {
+func TestComputeDiff_AddedChangedUnmatched(t *testing.T) {
 	existingPlaywright := webStarterPack()
 	existingPlaywright.Command.Argv = []string{"npm", "run", "e2e:legacy"}
 
@@ -65,14 +65,17 @@ func TestComputeDiff_AddedChangedRemoved(t *testing.T) {
 
 	diff := ComputeDiff(synthesized, existing)
 
-	if diff.AddedCount != 1 || diff.ChangedCount != 1 || diff.RemovedCount != 1 {
-		t.Fatalf("counts = (%d,%d,%d), want (1,1,1)", diff.AddedCount, diff.ChangedCount, diff.RemovedCount)
+	if diff.AddedCount != 1 || diff.ChangedCount != 1 || diff.UnmatchedCount != 1 {
+		t.Fatalf("counts = (%d,%d,%d), want (1,1,1)", diff.AddedCount, diff.ChangedCount, diff.UnmatchedCount)
 	}
 	if diff.Added[0].JourneyID != "zeta-new" {
 		t.Fatalf("added id = %q, want zeta-new", diff.Added[0].JourneyID)
 	}
-	if diff.Removed[0].JourneyID != "omega-stale" {
-		t.Fatalf("removed id = %q, want omega-stale", diff.Removed[0].JourneyID)
+	if diff.Unmatched[0].JourneyID != "omega-stale" {
+		t.Fatalf("unmatched id = %q, want omega-stale", diff.Unmatched[0].JourneyID)
+	}
+	if diff.Unmatched[0].Category != "unmatched" {
+		t.Fatalf("unmatched category = %q, want unmatched", diff.Unmatched[0].Category)
 	}
 	changed := diff.Changed[0]
 	if changed.JourneyID != "browser-staging-playwright" {
@@ -116,7 +119,27 @@ func TestComputeDiff_NoSurfaces(t *testing.T) {
 		t.Fatalf("surfaces = %v, want empty", surfaces)
 	}
 	diff := ComputeDiff(nil, map[string]journey.Pack{})
-	if diff.AddedCount != 0 || diff.ChangedCount != 0 || diff.RemovedCount != 0 {
-		t.Fatalf("counts = (%d,%d,%d), want all 0", diff.AddedCount, diff.ChangedCount, diff.RemovedCount)
+	if diff.AddedCount != 0 || diff.ChangedCount != 0 || diff.UnmatchedCount != 0 {
+		t.Fatalf("counts = (%d,%d,%d), want all 0", diff.AddedCount, diff.ChangedCount, diff.UnmatchedCount)
+	}
+}
+
+// A Go/CLI project has packs on disk but no analyzable surface, so synthesis
+// produces nothing. The diff must stay empty: classifying every existing pack
+// against an empty reference set is a categorical claim about packs the run
+// never looked at.
+func TestComputeDiff_NoSynthesizedPacks_ClaimsNothingAboutExistingPacks(t *testing.T) {
+	existing := map[string]journey.Pack{
+		"go-fast":         validDesktopPack("go-fast"),
+		"canary-explicit": validDesktopPack("canary-explicit"),
+	}
+
+	diff := ComputeDiff(nil, existing)
+
+	if diff.UnmatchedCount != 0 || len(diff.Unmatched) != 0 {
+		t.Fatalf("unmatched = %d %+v, want none", diff.UnmatchedCount, diff.Unmatched)
+	}
+	if diff.AddedCount != 0 || diff.ChangedCount != 0 {
+		t.Fatalf("counts = (%d,%d), want (0,0)", diff.AddedCount, diff.ChangedCount)
 	}
 }

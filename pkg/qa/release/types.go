@@ -92,7 +92,7 @@ const (
 	SetupGapCanaryTemplate     SetupGapClass = "canary-template"
 	SetupGapToolUnavailable    SetupGapClass = "tool-unavailable"
 	SetupGapEnvMissing         SetupGapClass = "env-missing"
-	SetupGapSiblingSpecPending SetupGapClass = "sibling-spec-pending"
+	SetupGapLaneNotImplemented SetupGapClass = "lane-not-implemented"
 	SetupGapPolicyForbidden    SetupGapClass = "policy-forbidden"
 	SetupGapUnsafeCommand      SetupGapClass = "unsafe-command"
 )

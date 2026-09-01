@@ -27,29 +27,41 @@ func TestResolveCatalogPathDefaultsAndAbsolute(t *testing.T) {
 	assert.Equal(t, filepath.Clean(filepath.FromSlash("sub/catalog.json")), rel)
 }
 
-// TestWriteStarterCatalogCreatesFileThenRejectsOverwrite asserts the writer creates
-// a valid catalog file once and refuses to clobber it.
-func TestWriteStarterCatalogCreatesFileThenRejectsOverwrite(t *testing.T) {
+// TestWriteStarterCatalogIsIdempotentAndNeverOverwrites asserts the writer
+// creates a valid catalog once and then reports the existing one as skipped
+// instead of erroring, so repeated provisioning runs succeed (D24). The second
+// run must also leave the authored bytes untouched.
+func TestWriteStarterCatalogIsIdempotentAndNeverOverwrites(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	target := filepath.Join(dir, "qa-catalog.json")
 
-	path, err := WriteStarterCatalog(dir, target)
+	created, err := WriteStarterCatalog(dir, target)
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Clean(target), path)
+	assert.Equal(t, StarterCatalogCreated, created.Status)
+	assert.Equal(t, filepath.Clean(target), created.Path)
 
-	body, err := os.ReadFile(path)
+	body, err := os.ReadFile(created.Path)
 	require.NoError(t, err)
 	var catalog Catalog
 	require.NoError(t, json.Unmarshal(body, &catalog))
 	assert.Equal(t, CatalogSchemaVersion, catalog.SchemaVersion)
 	require.NotEmpty(t, catalog.Scenarios)
 
-	// Second write must error because the file already exists.
-	_, err = WriteStarterCatalog(dir, target)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
+	// Stand in for an authored catalog: the second run must preserve it.
+	authored := []byte(`{"schema_version":"` + CatalogSchemaVersion + `","scenarios":[]}` + "\n")
+	require.NoError(t, os.WriteFile(created.Path, authored, 0o644))
+
+	skipped, err := WriteStarterCatalog(dir, target)
+	require.NoError(t, err)
+	assert.Equal(t, StarterCatalogSkipped, skipped.Status)
+	assert.Equal(t, created.Path, skipped.Path)
+	assert.NotEmpty(t, skipped.Reason)
+
+	after, err := os.ReadFile(created.Path)
+	require.NoError(t, err)
+	assert.Equal(t, authored, after)
 }
 
 // TestWriteStarterCatalogRejectsGeneratedSurface asserts generated paths are denied.

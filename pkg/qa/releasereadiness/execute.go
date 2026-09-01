@@ -116,7 +116,14 @@ func firstFailureSummary(result qarun.Result) string {
 // LanePolicyMust and aggregates a deterministic gate status. With LanePolicyMust
 // any failed/blocked/setup-gap lane forces a non-passing verdict, so a setup gap
 // can never be laundered into a pass.
+//
+// With no rows there is no evidence to aggregate: release.AggregateGateStatus
+// would return passed over an empty slice, so the not-evaluated verdict is
+// returned instead of letting an empty run read as a deterministic pass.
 func aggregateVerdict(rows []LaneRow) Verdict {
+	if len(rows) == 0 {
+		return Verdict{Status: VerdictNotEvaluated}
+	}
 	releaseRows := make([]release.LaneRow, 0, len(rows))
 	for _, row := range rows {
 		rr := release.LaneRow{
@@ -160,9 +167,9 @@ func buildEvidenceSummary(payload Payload) (string, error) {
 		LaneRows:         payload.LaneRows,
 		Verdict:          payload.Verdict,
 		Diff: diffCounts{
-			Added:   payload.Diff.AddedCount,
-			Changed: payload.Diff.ChangedCount,
-			Removed: payload.Diff.RemovedCount,
+			Added:     payload.Diff.AddedCount,
+			Changed:   payload.Diff.ChangedCount,
+			Unmatched: payload.Diff.UnmatchedCount,
 		},
 	}
 	body, err := json.Marshal(summary)
@@ -177,7 +184,7 @@ func buildEvidenceSummary(payload Payload) (string, error) {
 }
 
 type diffCounts struct {
-	Added   int `json:"added"`
-	Changed int `json:"changed"`
-	Removed int `json:"removed"`
+	Added     int `json:"added"`
+	Changed   int `json:"changed"`
+	Unmatched int `json:"unmatched"`
 }

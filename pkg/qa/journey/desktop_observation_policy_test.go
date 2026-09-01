@@ -66,16 +66,34 @@ func TestDesktopObservationPolicy_UnsafeCommandArtifactOrOperationFailsClosed(t 
 			pack.DesktopObservation.Operations[0], pack.DesktopObservation.Operations[1] = pack.DesktopObservation.Operations[1], pack.DesktopObservation.Operations[0]
 		}},
 		{name: "missing app alias", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "" }},
-		{name: "noncanonical app alias", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "com.autopus.desktop" }},
+		{name: "app alias with path separator", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "../../etc/passwd" }},
+		{name: "app alias with whitespace", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "autopus desktop" }},
+		{name: "app alias with shell metacharacters", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "app$(whoami)" }},
+		{name: "app alias with control character", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "app\nref" }},
+		{name: "app alias with leading separator", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = "-app" }},
+		{name: "oversized app alias", mutate: func(pack *Pack) { pack.DesktopObservation.AppRef = strings.Repeat("a", 65) }},
 		{name: "missing window alias", mutate: func(pack *Pack) { pack.DesktopObservation.WindowRef = "" }},
-		{name: "noncanonical window alias", mutate: func(pack *Pack) { pack.DesktopObservation.WindowRef = "window-1" }},
+		{name: "window alias with path separator", mutate: func(pack *Pack) { pack.DesktopObservation.WindowRef = "main/window" }},
+		{name: "oversized window alias", mutate: func(pack *Pack) { pack.DesktopObservation.WindowRef = strings.Repeat("w", 65) }},
+		{name: "non macos platform", mutate: func(pack *Pack) { pack.DesktopObservation.Platform = "windows" }},
+		{name: "missing platform", mutate: func(pack *Pack) { pack.DesktopObservation.Platform = "" }},
 		{name: "missing landmarks", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks = nil }},
 		{name: "incomplete landmarks", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[1].RequiredState = "" }},
 		{name: "duplicate landmark", mutate: func(pack *Pack) {
 			pack.DesktopObservation.RequiredLandmarks[1] = pack.DesktopObservation.RequiredLandmarks[0]
 		}},
 		{name: "noncanonical landmark role", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].Role = "application" }},
-		{name: "noncanonical landmark name", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].Name = "Other" }},
+		{name: "empty landmark name", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].Name = "" }},
+		{name: "control character landmark name", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].Name = "Fin\x00der" }},
+		{name: "oversized landmark name", mutate: func(pack *Pack) {
+			pack.DesktopObservation.RequiredLandmarks[1].Name = strings.Repeat("n", 97)
+		}},
+		{name: "extra landmark", mutate: func(pack *Pack) {
+			pack.DesktopObservation.RequiredLandmarks = append(
+				pack.DesktopObservation.RequiredLandmarks,
+				DesktopObservationLandmark{Role: "AXWindow", Name: "Autopus", RequiredState: "focused"},
+			)
+		}},
 		{name: "noncanonical landmark state", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].RequiredState = "focused" }},
 		{name: "wrong lane", mutate: func(pack *Pack) { pack.Lanes = []string{"fast"} }},
 		{name: "wrong surface", mutate: func(pack *Pack) { pack.Surface = "frontend" }},
@@ -93,6 +111,38 @@ func TestDesktopObservationPolicy_UnsafeCommandArtifactOrOperationFailsClosed(t 
 			var validationErr *ValidationError
 			require.True(t, errors.As(err, &validationErr))
 			assert.Equal(t, "qa_journey_desktop_observation_policy_invalid", validationErr.Code)
+		})
+	}
+}
+
+// A third-party project must be able to point desktop-native at its own app.
+// The lane is a MUST lane in prelaunch and release-candidate, so pinning the
+// first-party app name made the gate unreachable for everyone else.
+func TestDesktopObservationPolicy_ThirdPartyAppShapeIsValid(t *testing.T) {
+	t.Parallel()
+
+	targets := []struct {
+		name      string
+		appRef    string
+		windowRef string
+		landmark  string
+	}{
+		{name: "finder", appRef: "finder", windowRef: "finder-main", landmark: "Finder"},
+		{name: "bundle id", appRef: "com.apple.finder", windowRef: "window_1", landmark: "Finder"},
+		{name: "spaced landmark name", appRef: "system-settings", windowRef: "main-window", landmark: "System Settings"},
+	}
+	for _, target := range targets {
+		target := target
+		t.Run(target.name, func(t *testing.T) {
+			t.Parallel()
+			pack := validDesktopObservationPack()
+			pack.ID = "desktop-" + target.name
+			pack.DesktopObservation.AppRef = target.appRef
+			pack.DesktopObservation.WindowRef = target.windowRef
+			pack.DesktopObservation.RequiredLandmarks[0].Name = target.landmark
+			pack.DesktopObservation.RequiredLandmarks[1].Name = target.landmark
+
+			require.NoError(t, Validate(pack, t.TempDir()))
 		})
 	}
 }

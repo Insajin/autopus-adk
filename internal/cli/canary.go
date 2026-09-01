@@ -2,8 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,25 +10,28 @@ import (
 )
 
 type canaryOptions struct {
-	projectDir  string
-	url         string
-	frontendURL string
-	apiURL      string
-	watch       string
-	compare     string
-	dryRun      bool
-	jsonOut     bool
-	format      string
+	projectDir   string
+	url          string
+	frontendURL  string
+	apiURL       string
+	browserPaths []string
+	watch        string
+	compare      string
+	dryRun       bool
+	jsonOut      bool
+	format       string
 }
 
-const (
-	defaultCanaryFrontendURL = "https://staging.autopus.co"
-	defaultCanaryAPIURL      = "https://autopus-staging.up.railway.app"
-)
-
+// No default endpoint or browser URL exists on purpose. A canary URL is
+// deployment state, not repository state: hardcoding the Autopus staging hosts
+// pointed every third-party project's release gate at Autopus infrastructure,
+// and `auto qa init` wires `auto canary` into the canary-explicit lane for
+// every project. With no URL supplied both checks report SKIPPED with the flag
+// to set.
 type canaryTargets struct {
-	FrontendURL string
-	APIURL      string
+	FrontendURL  string
+	APIURL       string
+	BrowserPaths []string
 }
 
 type canaryResult struct {
@@ -71,9 +72,10 @@ func newCanaryCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.projectDir, "project-dir", ".", "Project root directory")
-	cmd.Flags().StringVar(&opts.url, "url", "", "Legacy deployment URL override for both endpoint and browser checks")
-	cmd.Flags().StringVar(&opts.frontendURL, "frontend-url", defaultCanaryFrontendURL, "Frontend URL for browser checks")
-	cmd.Flags().StringVar(&opts.apiURL, "api-url", defaultCanaryAPIURL, "API URL for endpoint checks")
+	cmd.Flags().StringVar(&opts.url, "url", "", "Deployment URL used for both endpoint and browser checks")
+	cmd.Flags().StringVar(&opts.frontendURL, "frontend-url", "", "Frontend URL for browser checks; empty skips the check")
+	cmd.Flags().StringVar(&opts.apiURL, "api-url", "", "API URL for endpoint checks; empty skips the check")
+	cmd.Flags().StringArrayVar(&opts.browserPaths, "browser-path", nil, "Path to probe during the browser check; repeatable, defaults to /")
 	cmd.Flags().StringVar(&opts.watch, "watch", "", "Repeat interval such as 5m (reserved)")
 	cmd.Flags().StringVar(&opts.compare, "compare", "", "Commit SHA to compare against (reserved)")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Plan canary checks without executing project commands")
@@ -119,9 +121,9 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 		Project:   filepath.Base(projectDir),
 		Mode:      "staging-canary",
 		Verdict:   "PASS",
-		Build:     "PASS",
-		E2E:       "PASS",
-		Doctor:    "PASS",
+		Build:     "SKIPPED",
+		E2E:       "SKIPPED",
+		Doctor:    "SKIPPED",
 		Endpoint:  "SKIPPED",
 		Browser:   "SKIPPED",
 		Flags: map[string]string{
@@ -132,11 +134,18 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 			"compare":      opts.compare,
 		},
 	}
+	buildTargets, buildSkips := canaryBuildTargets(projectDir)
+	result.Skipped = append(result.Skipped, buildSkips...)
 	if opts.dryRun {
 		result.Mode = "dry-run"
 		result.Build = "SKIPPED"
 		result.E2E = "SKIPPED"
 		result.Doctor = "SKIPPED"
+		// The planned build targets are the whole point of a dry run: they show
+		// what detection resolved without paying for a build.
+		for _, target := range buildTargets {
+			result.Targets = append(result.Targets, canaryTargetResult{ID: target.ID, Command: target.Command, Status: "SKIPPED", Detail: "dry-run"})
+		}
 		result.Skipped = append(result.Skipped,
 			canarySkippedCheck{"build", "dry-run"},
 			canarySkippedCheck{"e2e", "dry-run"},
@@ -148,46 +157,23 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 		return result, writeCanaryLatest(projectDir, result)
 	}
 
-	for _, target := range canaryBuildTargets(projectDir) {
-		run := runCanaryExternal(ctx, target.ID, target.Command, target.Dir, target.Args...)
-		result.Targets = append(result.Targets, run)
-		if run.Status != "PASS" {
-			result.Build = "FAIL"
-			result.Verdict = "FAIL"
-			result.Summary = canarySummary(result)
-			_ = writeCanaryLatest(projectDir, result)
-			return result, fmt.Errorf("%s failed: %s", run.ID, run.Detail)
-		}
+	if buildErr := runCanaryBuildPhase(ctx, projectDir, buildTargets, &result); buildErr != nil {
+		result.Summary = canarySummary(result)
+		_ = writeCanaryLatest(projectDir, result)
+		return result, buildErr
+	}
+	if harnessErr := runCanaryHarnessPhase(ctx, projectDir, &result); harnessErr != nil {
+		result.Summary = canarySummary(result)
+		_ = writeCanaryLatest(projectDir, result)
+		return result, harnessErr
 	}
 
-	exe, _ := os.Executable()
-	if exe == "" {
-		exe = "auto"
+	if targets.APIURL == "" {
+		result.Skipped = append(result.Skipped, canarySkippedCheck{"endpoint", "no API URL supplied (pass --api-url or --url)"})
+	} else {
+		result.Endpoint = runCanaryEndpointChecks(ctx, targets.APIURL, &result)
 	}
-	for _, target := range []struct {
-		id   string
-		args []string
-	}{
-		{"S1", []string{"test", "run", "--project-dir", projectDir, "--scenario", "version", "--format", "json", "--timeout", "60s"}},
-		{"doctor", []string{"doctor"}},
-	} {
-		run := runCanaryExternal(ctx, target.id, exe+" "+strings.Join(target.args, " "), projectDir, append([]string{exe}, target.args...)...)
-		result.Targets = append(result.Targets, run)
-		if run.Status != "PASS" {
-			if target.id == "doctor" {
-				result.Doctor = "FAIL"
-			} else {
-				result.E2E = "FAIL"
-			}
-			result.Verdict = "FAIL"
-			result.Summary = canarySummary(result)
-			_ = writeCanaryLatest(projectDir, result)
-			return result, fmt.Errorf("%s failed: %s", run.ID, run.Detail)
-		}
-	}
-
-	result.Endpoint = runCanaryEndpointChecks(ctx, targets.APIURL, &result)
-	result.Browser = runCanaryRemoteBrowser(ctx, projectDir, targets.FrontendURL, &result)
+	result.Browser = runCanaryRemoteBrowser(ctx, projectDir, targets, &result)
 	if result.Endpoint == "FAIL" || result.Browser == "FAIL" {
 		result.Verdict = "FAIL"
 	}
@@ -195,15 +181,28 @@ func runCanary(ctx context.Context, opts canaryOptions) (canaryResult, error) {
 	return result, writeCanaryLatest(projectDir, result)
 }
 
+// resolveCanaryTargets never substitutes a default host. An unset URL means the
+// caller has not told canary where the deployment is, and probing a guessed
+// host would report someone else's uptime as this project's verdict.
 func resolveCanaryTargets(opts canaryOptions) canaryTargets {
-	frontendURL := defaultString(opts.frontendURL, defaultCanaryFrontendURL)
-	apiURL := defaultString(opts.apiURL, defaultCanaryAPIURL)
-	if legacyURL := strings.TrimSpace(opts.url); legacyURL != "" {
-		frontendURL = legacyURL
-		apiURL = legacyURL
+	frontendURL := strings.TrimSpace(opts.frontendURL)
+	apiURL := strings.TrimSpace(opts.apiURL)
+	if sharedURL := strings.TrimSpace(opts.url); sharedURL != "" {
+		frontendURL = sharedURL
+		apiURL = sharedURL
+	}
+	paths := make([]string, 0, len(opts.browserPaths))
+	for _, path := range opts.browserPaths {
+		if trimmed := strings.TrimSpace(path); trimmed != "" {
+			paths = append(paths, "/"+strings.TrimLeft(trimmed, "/"))
+		}
+	}
+	if len(paths) == 0 {
+		paths = []string{"/"}
 	}
 	return canaryTargets{
-		FrontendURL: strings.TrimRight(frontendURL, "/"),
-		APIURL:      strings.TrimRight(apiURL, "/"),
+		FrontendURL:  strings.TrimRight(frontendURL, "/"),
+		APIURL:       strings.TrimRight(apiURL, "/"),
+		BrowserPaths: paths,
 	}
 }

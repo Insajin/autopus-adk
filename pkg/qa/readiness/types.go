@@ -6,8 +6,11 @@ const (
 	ProjectionSchemaVersion = "qamesh.readiness_projection.v1"
 	ContractOwner           = "autopus-adk"
 
-	StatusPassed   Status = "passed"
-	StatusFailed   Status = "failed"
+	StatusPassed Status = "passed"
+	StatusFailed Status = "failed"
+	// StatusWarn is a release lane verdict that, like passed and failed, can
+	// only be produced by a lane that actually executed.
+	StatusWarn     Status = "warn"
 	StatusBlocked  Status = "blocked"
 	StatusSkipped  Status = "skipped"
 	StatusSetupGap Status = "setup_gap"

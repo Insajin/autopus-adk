@@ -58,6 +58,94 @@ func TestOrchestrate_Approve_ExecutesAndCountsFiles(t *testing.T) {
 	}
 }
 
+// D6/D25 regression: a Go/CLI project has packs on disk but no analyzable
+// surface. Approving must not report an executed, deterministically
+// authoritative pass over zero lanes, must not propose discarding the packs
+// qa init created, and must leave every one of them byte-identical on disk.
+func TestOrchestrate_Approve_NoSurfaces_NoFalseExecutionAndNoPackLoss(t *testing.T) {
+	root := t.TempDir()
+	writePack(t, root, customPack("go-fast", "frontend", "browser-staging", []string{"true"}))
+	writePack(t, root, customPack("canary-explicit", "frontend", "canary-explicit", []string{"true"}))
+	journeysDir := filepath.Join(root, ".autopus", "qa", "journeys")
+	before := snapshotDir(t, journeysDir)
+
+	payload, err := orchestrateWith(Options{ProjectDir: root, Approve: true}, fakeRun("passed"))
+	if err != nil {
+		t.Fatalf("orchestrate approve: %v", err)
+	}
+	if payload.Phase == string(PhaseExecuted) {
+		t.Fatalf("phase = executed with lanes_executed=%d", payload.LanesExecuted)
+	}
+	if payload.LanesExecuted != 0 || payload.FilesWritten != 0 {
+		t.Fatalf("lanes_executed=%d files_written=%d, want 0/0", payload.LanesExecuted, payload.FilesWritten)
+	}
+	if payload.Verdict.Status != VerdictNotEvaluated || payload.Verdict.DeterministicAuthority {
+		t.Fatalf("verdict = %+v, want not_evaluated without deterministic authority", payload.Verdict)
+	}
+	if payload.Diff.UnmatchedCount != 0 {
+		t.Fatalf("unmatched = %d, want 0: an empty analysis accounts for no pack", payload.Diff.UnmatchedCount)
+	}
+	if payload.EvidenceSummary != "" {
+		t.Fatalf("evidence summary attached to a run that produced no evidence")
+	}
+	if after := snapshotDir(t, journeysDir); after != before {
+		t.Fatalf("approval mutated the journeys dir:\nbefore=%q\nafter=%q", before, after)
+	}
+}
+
+// The diff must describe what approval applies. Every id the preview reports as
+// added or changed is written; nothing else on disk is touched, so an unmatched
+// row can never be read as a pending deletion.
+func TestOrchestrate_Approve_DiffMatchesWhatApprovalApplies(t *testing.T) {
+	root := t.TempDir()
+	webSignals(t, root)
+	writePack(t, root, customPack("go-fast", "frontend", "browser-staging", []string{"true"}))
+	bin := filepath.Join(root, "bin")
+	fakeBin(t, bin, "node", 0)
+	fakeBin(t, bin, "npm", 0)
+	withPATH(t, bin)
+
+	preview, err := orchestrateWith(Options{ProjectDir: root}, fakeRun("passed"))
+	if err != nil {
+		t.Fatalf("orchestrate preview: %v", err)
+	}
+	if preview.Diff.UnmatchedCount != 1 || preview.Diff.Unmatched[0].JourneyID != "go-fast" {
+		t.Fatalf("unmatched = %+v, want exactly go-fast", preview.Diff.Unmatched)
+	}
+	wantWritten := preview.Diff.AddedCount + preview.Diff.ChangedCount
+
+	approved, err := orchestrateWith(Options{ProjectDir: root, Approve: true}, fakeRun("passed"))
+	if err != nil {
+		t.Fatalf("orchestrate approve: %v", err)
+	}
+	if approved.FilesWritten != wantWritten {
+		t.Fatalf("files_written = %d, want added+changed = %d", approved.FilesWritten, wantWritten)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".autopus", "qa", "journeys", "go-fast.yaml")); err != nil {
+		t.Fatalf("unmatched pack go-fast was not left on disk: %v", err)
+	}
+	if approved.ApprovalDeletesPacks {
+		t.Fatalf("approval_deletes_packs must always be false")
+	}
+
+	// Re-approving an already-current project proposes nothing and writes
+	// nothing, so files_written keeps agreeing with the diff instead of
+	// counting byte-identical rewrites.
+	rerun, err := orchestrateWith(Options{ProjectDir: root, Approve: true}, fakeRun("passed"))
+	if err != nil {
+		t.Fatalf("orchestrate re-approve: %v", err)
+	}
+	if rerun.Diff.AddedCount != 0 || rerun.Diff.ChangedCount != 0 {
+		t.Fatalf("second preview still proposes changes: %+v", rerun.Diff)
+	}
+	if rerun.FilesWritten != 0 {
+		t.Fatalf("files_written = %d on a no-op approval, want 0", rerun.FilesWritten)
+	}
+	if rerun.LanesExecuted != 1 {
+		t.Fatalf("lanes_executed = %d, want the web lane still dispatched", rerun.LanesExecuted)
+	}
+}
+
 // AC-QAMESH11-012: regeneration where one accepted pack is valid (good-web) and
 // one is invalid (bad-mobile) -> ApplyPacks (the function orchestrate feeds with
 // AcceptedPacks) persists only the valid pack and excludes the invalid one with

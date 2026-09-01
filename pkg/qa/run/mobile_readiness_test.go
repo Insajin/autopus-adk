@@ -108,7 +108,7 @@ credentials:
 	require.NoError(t, err)
 	assert.Equal(t, "passed", result.Status)
 	require.Len(t, result.ManifestPaths, 1)
-	manifest, err := qaevidence.LoadManifest(result.ManifestPaths[0])
+	manifest, err := qaevidence.LoadManifest(filepath.Join(dir, result.ManifestPaths[0]))
 	require.NoError(t, err)
 	assert.Equal(t, "mobile", manifest.Surface)
 	require.NotNil(t, manifest.SourceRefs.Mobile)

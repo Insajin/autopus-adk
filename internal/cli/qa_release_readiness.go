@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -62,8 +64,12 @@ func runQAReleaseReadiness(cmd *cobra.Command, opts qaReleaseReadinessOptions) e
 		RuntimeProvider: runtimeProvider,
 	})
 	if err != nil {
+		code := "qa_release_readiness_failed"
+		if errors.Is(err, releasereadiness.ErrApprovalIntentConflict) {
+			code = "qa_release_readiness_conflicting_intent"
+		}
 		if jsonMode {
-			return writeJSONResultAndExit(cmd, jsonStatusError, err, "qa_release_readiness_failed", nil, nil, nil)
+			return writeJSONResultAndExit(cmd, jsonStatusError, err, code, nil, nil, nil)
 		}
 		return err
 	}
@@ -72,11 +78,64 @@ func runQAReleaseReadiness(cmd *cobra.Command, opts qaReleaseReadinessOptions) e
 	if jsonMode {
 		return writeJSONResult(cmd, status, payload, nil, nil)
 	}
-	fmt.Fprintf(cmd.OutOrStdout(),
-		"%s phase=%s added=%d changed=%d removed=%d files_written=%d lanes_executed=%d verdict=%s\n",
-		payload.SchemaVersion, payload.Phase,
-		payload.Diff.AddedCount, payload.Diff.ChangedCount, payload.Diff.RemovedCount,
-		payload.FilesWritten, payload.LanesExecuted, payload.Verdict.Status)
+	writeQAReleaseReadinessText(cmd, payload)
+	return nil
+}
+
+// writeQAReleaseReadinessText renders the human summary. added/changed are what
+// approval writes; unmatched packs are reported separately and explicitly as
+// untouched so the line can never be read as a deletion proposal.
+func writeQAReleaseReadinessText(cmd *cobra.Command, payload releasereadiness.Payload) {
+	out := cmd.OutOrStdout()
+	fmt.Fprintf(out,
+		"qa release-readiness %s phase=%s surfaces=%s added=%d changed=%d files_written=%d lanes_executed=%d\n",
+		payload.Verdict.Status, payload.Phase, surfaceList(payload.AnalyzedSurfaces),
+		payload.Diff.AddedCount, payload.Diff.ChangedCount,
+		payload.FilesWritten, payload.LanesExecuted)
+	if payload.Diff.UnmatchedCount > 0 {
+		fmt.Fprintf(out, "unmatched: %d existing pack(s) no analyzed surface accounts for; approval leaves them untouched\n",
+			payload.Diff.UnmatchedCount)
+	}
+	for _, row := range payload.LaneRows {
+		fmt.Fprintf(out, "lane: %s %s\n", row.Lane, laneRowDetail(row))
+	}
+	for _, next := range releaseReadinessNextCommands(payload) {
+		fmt.Fprintf(out, "next: %s\n", next)
+	}
+}
+
+func surfaceList(surfaces []string) string {
+	if len(surfaces) == 0 {
+		return "none"
+	}
+	return strings.Join(surfaces, ",")
+}
+
+func laneRowDetail(row releasereadiness.LaneRow) string {
+	detail := row.Status
+	if row.ReasonCode != "" {
+		detail += " (" + row.ReasonCode + ")"
+	}
+	if row.FailureSummary != "" {
+		detail += " " + row.FailureSummary
+	}
+	return detail
+}
+
+// releaseReadinessNextCommands names the one command that moves the operator
+// forward from the phase they just reached, so the gate is discoverable from
+// the output rather than only from the docs.
+func releaseReadinessNextCommands(payload releasereadiness.Payload) []string {
+	switch payload.Phase {
+	case string(releasereadiness.PhaseDiffPresented):
+		return []string{"auto qa release-readiness --approve", "auto qa release-readiness --decline"}
+	case string(releasereadiness.PhaseAnalyzed):
+		// Nothing was regenerable, so approving again changes nothing; the
+		// actionable move is to run the packs the project already has.
+		return []string{"auto qa run"}
+	case string(releasereadiness.PhaseExecuted):
+		return []string{"auto qa report"}
+	}
 	return nil
 }
 

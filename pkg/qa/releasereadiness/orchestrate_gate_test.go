@@ -1,6 +1,7 @@
 package releasereadiness
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -42,7 +43,7 @@ func TestOrchestrate_NoApprove_PresentsDiffWithoutSideEffects(t *testing.T) {
 }
 
 // AC-QAMESH11-011 (Should): declined approval reports phase declined with no
-// side effects.
+// side effects, and never reports a passing verdict for a diff nobody ran.
 func TestOrchestrate_Decline_PhaseDeclinedNoSideEffects(t *testing.T) {
 	root := t.TempDir()
 	webSignals(t, root)
@@ -50,7 +51,7 @@ func TestOrchestrate_Decline_PhaseDeclinedNoSideEffects(t *testing.T) {
 	_ = os.MkdirAll(journeysDir, 0o755)
 	before := snapshotDir(t, journeysDir)
 
-	payload, err := orchestrateWith(Options{ProjectDir: root, Approve: true, Decline: true}, fakeRun("passed"))
+	payload, err := orchestrateWith(Options{ProjectDir: root, Decline: true}, fakeRun("passed"))
 	if err != nil {
 		t.Fatalf("orchestrate: %v", err)
 	}
@@ -60,15 +61,33 @@ func TestOrchestrate_Decline_PhaseDeclinedNoSideEffects(t *testing.T) {
 	if payload.FilesWritten != 0 || payload.LanesExecuted != 0 {
 		t.Fatalf("decline produced side effects: written=%d executed=%d", payload.FilesWritten, payload.LanesExecuted)
 	}
+	if payload.Verdict.Status != VerdictNotEvaluated || payload.Verdict.DeterministicAuthority {
+		t.Fatalf("declined verdict = %+v, want not_evaluated without deterministic authority", payload.Verdict)
+	}
 	if after := snapshotDir(t, journeysDir); after != before {
 		t.Fatalf("declined run mutated journeys dir")
 	}
 }
 
+// AC-QAMESH11-011: --approve and --decline are contradictory intents. Resolving
+// a precedence silently hides which one the harness obeyed, so the run is
+// refused before anything is analyzed.
+func TestOrchestrate_ApproveAndDecline_Refused(t *testing.T) {
+	root := t.TempDir()
+	webSignals(t, root)
+
+	_, err := orchestrateWith(Options{ProjectDir: root, Approve: true, Decline: true}, fakeRun("passed"))
+	if !errors.Is(err, ErrApprovalIntentConflict) {
+		t.Fatalf("err = %v, want ErrApprovalIntentConflict", err)
+	}
+}
+
 // AC-QAMESH11-013: no surfaces yields empty analyzed_surfaces, zero diff counts,
-// no execution, and no regenerated claim (phase analyzed).
+// no execution, and no regenerated claim (phase analyzed). The verdict must not
+// claim a deterministic pass over a run that evaluated nothing.
 func TestOrchestrate_NoSurfaces_EmptyDiffNoExecution(t *testing.T) {
 	root := t.TempDir()
+	writePack(t, root, customPack("go-fast", "frontend", "browser-staging", []string{"true"}))
 
 	payload, err := orchestrateWith(Options{ProjectDir: root}, fakeRun("passed"))
 	if err != nil {
@@ -77,7 +96,7 @@ func TestOrchestrate_NoSurfaces_EmptyDiffNoExecution(t *testing.T) {
 	if len(payload.AnalyzedSurfaces) != 0 {
 		t.Fatalf("analyzed_surfaces = %v, want empty", payload.AnalyzedSurfaces)
 	}
-	if payload.Diff.AddedCount != 0 || payload.Diff.ChangedCount != 0 || payload.Diff.RemovedCount != 0 {
+	if payload.Diff.AddedCount != 0 || payload.Diff.ChangedCount != 0 || payload.Diff.UnmatchedCount != 0 {
 		t.Fatalf("diff counts non-zero: %+v", payload.Diff)
 	}
 	if payload.FilesWritten != 0 || payload.LanesExecuted != 0 {
@@ -85,6 +104,12 @@ func TestOrchestrate_NoSurfaces_EmptyDiffNoExecution(t *testing.T) {
 	}
 	if payload.Phase != string(PhaseAnalyzed) {
 		t.Fatalf("phase = %q, want analyzed", payload.Phase)
+	}
+	if payload.Verdict.Status != VerdictNotEvaluated || payload.Verdict.DeterministicAuthority {
+		t.Fatalf("verdict = %+v, want not_evaluated without deterministic authority", payload.Verdict)
+	}
+	if payload.ApprovalDeletesPacks {
+		t.Fatalf("approval_deletes_packs must always be false")
 	}
 }
 

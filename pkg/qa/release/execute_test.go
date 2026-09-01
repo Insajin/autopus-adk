@@ -1,12 +1,15 @@
 package release
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	qarun "github.com/insajin/autopus-adk/pkg/qa/run"
 )
 
 func TestExecuteWritesReleaseIndexWhenFirstLaneBlocks(t *testing.T) {
@@ -34,9 +37,13 @@ func TestExecuteWritesReleaseIndexWhenFirstLaneBlocks(t *testing.T) {
 		}),
 	})
 	require.ErrorIs(t, err, ErrReleaseBlocked)
-	require.FileExists(t, payload.ReleaseIndexPath)
+	// Published refs are project-root-relative; a consumer resolves them against
+	// the workspace root instead of receiving an absolute local path.
+	assert.False(t, filepath.IsAbs(payload.ReleaseIndexPath))
+	releaseIndexPath := filepath.Join(dir, payload.ReleaseIndexPath)
+	require.FileExists(t, releaseIndexPath)
 
-	body, readErr := os.ReadFile(payload.ReleaseIndexPath)
+	body, readErr := os.ReadFile(releaseIndexPath)
 	require.NoError(t, readErr)
 	assert.NotContains(t, string(body), "command_preview_raw")
 
@@ -90,7 +97,10 @@ func TestExecuteAggregatesOptionalSetupGapAsWarn(t *testing.T) {
 	assert.NotNil(t, canary.Blockers)
 }
 
-func TestExecuteTreatsDeferredSiblingLanesAsInformational(t *testing.T) {
+// A deferred lane must stay visible and non-blocking. Suppressing its setup gap
+// row made mobile-readiness report verdict=pass with setup_gap_class=none while
+// `auto qa run --lane mobile-readiness` fail-closed on the same project.
+func TestExecuteKeepsDeferredLaneGapsVisibleWithoutBlocking(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -118,12 +128,19 @@ func TestExecuteTreatsDeferredSiblingLanesAsInformational(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, GateStatusPassed, payload.Status)
-	assertNoReleaseGap(t, payload.SetupGaps, "mobile-readiness")
-	assertNoReleaseGap(t, payload.SetupGaps, "evidence-dashboard")
+	assert.Equal(t, GateStatusWarn, payload.Status)
+	assert.Empty(t, payload.Blockers)
+	assertReleaseGap(t, payload.SetupGaps, "mobile-readiness", SetupGapEnvMissing, false, SeverityMedium)
+	assertReleaseGap(t, payload.SetupGaps, "evidence-dashboard", SetupGapLaneNotImplemented, false, SeverityMedium)
 	mobile := findLaneRow(t, payload.LaneRows, "mobile-readiness")
 	assert.Equal(t, LaneStatusDeferred, mobile.Status)
-	assert.Equal(t, LaneVerdictPass, mobile.LaneVerdict)
+	assert.Equal(t, SetupGapEnvMissing, mobile.SetupGapClass)
+	assert.Equal(t, LaneVerdictWarn, mobile.LaneVerdict)
+	assert.Empty(t, mobile.Blockers)
+	dashboard := findLaneRow(t, payload.LaneRows, "evidence-dashboard")
+	assert.Equal(t, SetupGapLaneNotImplemented, dashboard.SetupGapClass)
+	assert.NotEqual(t, LaneVerdictPass, dashboard.LaneVerdict)
+	assert.Empty(t, dashboard.Blockers)
 }
 
 func TestExecuteKeepsAIAnalysisUntrustedForVerdict(t *testing.T) {
@@ -184,7 +201,7 @@ func TestExecuteRedactsReturnedRefsInPayloadAndReleaseIndex(t *testing.T) {
 		}),
 	})
 	require.ErrorIs(t, err, ErrReleaseBlocked)
-	body, readErr := os.ReadFile(payload.ReleaseIndexPath)
+	body, readErr := os.ReadFile(filepath.Join(dir, payload.ReleaseIndexPath))
 	require.NoError(t, readErr)
 	for _, text := range []string{string(body), payload.LaneRows[0].RunIndexPath, payload.FeedbackRefs[0], payload.AIAnalysisRefs[0].Ref} {
 		assert.NotContains(t, text, "/Users/alice")
@@ -196,6 +213,18 @@ func TestExecuteRedactsReturnedRefsInPayloadAndReleaseIndex(t *testing.T) {
 		assert.NotContains(t, text, "ai_secret_value")
 	}
 	assert.NotContains(t, string(body), "API_TOKEN=s3cr3t")
+	// A NotContains assertion also passes on "". Redaction must replace the
+	// private path with a visible placeholder, not erase the ref of a lane that
+	// actually ran. Deferred lanes legitimately carry "" and are not asserted on.
+	assert.Equal(t, qarun.RedactedLocalPath, payload.LaneRows[0].RunIndexPath)
+	require.Len(t, payload.LaneRows[0].ManifestPaths, 1)
+	assert.Equal(t, qarun.RedactedLocalPath, payload.LaneRows[0].ManifestPaths[0])
+	var persisted Index
+	require.NoError(t, json.Unmarshal(body, &persisted))
+	require.Equal(t, "fast", persisted.LaneRows[0].Lane)
+	assert.Equal(t, qarun.RedactedLocalPath, persisted.LaneRows[0].RunIndexPath)
+	require.Len(t, persisted.LaneRows[0].ManifestPaths, 1)
+	assert.Equal(t, qarun.RedactedLocalPath, persisted.LaneRows[0].ManifestPaths[0])
 	assert.Equal(t, RedactionRedacted, payload.RedactionStatus)
 }
 

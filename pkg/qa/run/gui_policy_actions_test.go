@@ -61,7 +61,7 @@ func TestExecuteGUICaptureReportsUnenforceableForbiddenActions(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "passed", result.Status, "an unenforceable label must not block a journey")
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiPolicyRuntimeCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiPolicyRuntimeCheckID)
 	assert.Equal(t, "passed", check.Status)
 	assert.Contains(t, check.Actual, "unenforceable_forbidden_actions=payment")
 }

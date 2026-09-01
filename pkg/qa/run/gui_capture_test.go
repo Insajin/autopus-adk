@@ -24,7 +24,7 @@ func TestExecuteGUICapturePublishesTypedCaptureIndex(t *testing.T) {
 	assert.Equal(t, "passed", result.Status)
 	require.Len(t, result.ManifestPaths, 1)
 
-	manifest := loadManifest(t, result.ManifestPaths[0])
+	manifest := loadManifest(t, projectPath(dir, result.ManifestPaths[0]))
 	assert.Equal(t, RetentionLocalMedia, manifest.RetentionClass,
 		"a journey that left raw media on disk must say so in its retention class")
 
@@ -46,7 +46,7 @@ func TestExecuteGUICapturePublishesTypedCaptureIndex(t *testing.T) {
 		assert.NotContains(t, kinds, forbidden)
 	}
 
-	body, err := os.ReadFile(filepath.Join(filepath.Dir(result.ManifestPaths[0]), published.Path))
+	body, err := os.ReadFile(filepath.Join(filepath.Dir(projectPath(dir, result.ManifestPaths[0])), published.Path))
 	require.NoError(t, err)
 	index, err := capture.DecodeIndex(body)
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestExecuteGUICaptureBlocksWhenProducerWritesNoIndex(t *testing.T) {
 	require.EqualError(t, err, "qa run blocked")
 	assert.Equal(t, "blocked", result.Status)
 	require.Len(t, result.ManifestPaths, 1)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiCaptureCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiCaptureCheckID)
 	assert.Equal(t, "blocked", check.Status)
 	assert.Contains(t, check.FailureSummary, "did not write capture-index.json")
 }
@@ -81,7 +81,7 @@ func TestExecuteGUICaptureBlocksOnTotalsDrift(t *testing.T) {
 	result, err := Execute(Options{ProjectDir: dir, Profile: "local", Lane: "gui-explore", Output: output})
 	require.EqualError(t, err, "qa run blocked")
 	assert.Equal(t, "blocked", result.Status)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiCaptureCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiCaptureCheckID)
 	assert.Equal(t, "blocked", check.Status)
 	assert.Contains(t, check.FailureSummary, "totals disagree with steps")
 }
@@ -97,7 +97,7 @@ func TestExecuteGUICaptureBlocksOffPolicyOrigin(t *testing.T) {
 	result, err := Execute(Options{ProjectDir: dir, Profile: "local", Lane: "gui-explore", Output: output})
 	require.EqualError(t, err, "qa run blocked")
 	assert.Equal(t, "blocked", result.Status)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiPolicyRuntimeCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiPolicyRuntimeCheckID)
 	assert.Equal(t, "blocked", check.Status)
 	assert.Contains(t, check.Actual, "origin_out_of_policy")
 	assert.Contains(t, check.FailureSummary, "off-origin network request")
@@ -115,7 +115,7 @@ func TestExecuteGUICaptureBlocksWithoutGuardReceipt(t *testing.T) {
 
 	require.EqualError(t, err, "qa run blocked")
 	assert.Equal(t, "blocked", result.Status)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiPolicyRuntimeCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiPolicyRuntimeCheckID)
 	assert.Equal(t, "blocked", check.Status)
 	assert.Contains(t, check.Actual, "missing=gui_policy_guard.receipt")
 }
@@ -127,7 +127,7 @@ func TestExecuteGUICaptureBlocksWhenDeclaredMediaIsMissing(t *testing.T) {
 	result, err := Execute(Options{ProjectDir: dir, Profile: "local", Lane: "gui-explore", Output: output})
 	require.EqualError(t, err, "qa run blocked")
 	assert.Equal(t, "blocked", result.Status)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiCaptureCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiCaptureCheckID)
 	assert.Contains(t, check.FailureSummary, "is missing from the capture directory")
 }
 

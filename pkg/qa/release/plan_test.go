@@ -62,8 +62,8 @@ func TestBuildPlanEmitsReleaseContractAndRedactsCommandPreview(t *testing.T) {
 
 	assertReleaseGap(t, plan.SetupGaps, "desktop-native", SetupGapMissingJourneyPack, true, SeverityHigh)
 	assertReleaseGap(t, plan.SetupGaps, "canary-explicit", SetupGapCanaryTemplate, false, SeverityLow)
-	assertNoReleaseGap(t, plan.SetupGaps, "mobile-readiness")
-	assertNoReleaseGap(t, plan.SetupGaps, "evidence-dashboard")
+	assertReleaseGap(t, plan.SetupGaps, "mobile-readiness", SetupGapEnvMissing, false, SeverityMedium)
+	assertReleaseGap(t, plan.SetupGaps, "evidence-dashboard", SetupGapLaneNotImplemented, false, SeverityMedium)
 	assert.Equal(t, []string{"fast", "browser-staging", "desktop-native", "gui-explore"}, plan.BlockerRules.MustLanes)
 	assert.Equal(t, []string{"canary-explicit"}, plan.BlockerRules.OptionalLanes)
 	assert.Equal(t, []string{"mobile-readiness", "evidence-dashboard"}, plan.BlockerRules.DeferredLanes)

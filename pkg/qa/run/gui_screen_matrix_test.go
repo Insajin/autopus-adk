@@ -40,7 +40,7 @@ exit 0
 	require.Error(t, err)
 	assert.Equal(t, "blocked", result.Status)
 	assert.Contains(t, result.FailedChecks, guiPolicyRuntimeCheckID)
-	manifest := loadManifest(t, result.ManifestPaths[0])
+	manifest := loadManifest(t, projectPath(dir, result.ManifestPaths[0]))
 	check := manifestCheck(t, manifest, guiPolicyRuntimeCheckID)
 	assert.Equal(t, "blocked", check.Status)
 	assert.Contains(t, check.Actual, "missing_screens=settings")

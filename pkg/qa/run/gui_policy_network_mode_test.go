@@ -86,7 +86,7 @@ func TestExecuteGUICaptureReportsStoppedRequests(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "passed", result.Status)
-	check := manifestCheck(t, loadManifest(t, result.ManifestPaths[0]), guiPolicyRuntimeCheckID)
+	check := manifestCheck(t, loadManifest(t, projectPath(dir, result.ManifestPaths[0])), guiPolicyRuntimeCheckID)
 	assert.Equal(t, "passed", check.Status)
 	assert.Contains(t, check.Actual, "network_stopped=off_origin:http://cdn.example")
 	assert.Contains(t, check.Actual, "runtime_policy_enforced=true")

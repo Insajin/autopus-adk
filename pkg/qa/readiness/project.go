@@ -17,11 +17,12 @@ func Project(ctx context.Context, input Input) (Result, error) {
 		return Result{}, ctx.Err()
 	default:
 	}
-	runDoc, err := readMap(input.RunIndexPath)
+	normalizer := newWorkspacePathNormalizer(input.WorkspaceRoot)
+	runDoc, err := readWorkspaceMap(input.RunIndexPath, normalizer)
 	if err != nil {
 		return Result{}, err
 	}
-	releaseDoc, err := readMap(input.ReleasePath)
+	releaseDoc, err := readWorkspaceMap(input.ReleasePath, normalizer)
 	if err != nil {
 		return Result{}, err
 	}
@@ -33,18 +34,22 @@ func Project(ctx context.Context, input Input) (Result, error) {
 			return failClosed(class)
 		}
 	}
-	manifestPaths, blocker := safeManifestRefs(input.WorkspaceRoot, stringList(runDoc["manifest_paths"]))
+	runDocs, blocker := loadReleaseRunDocs(input, normalizer, runDoc, releaseDoc)
 	if blocker != "" {
 		return failClosed(blocker)
 	}
-	manifestDocs, blocker, err := loadManifestDocs(input.WorkspaceRoot, manifestPaths)
+	manifestPaths, blocker := safeManifestRefs(input.WorkspaceRoot, manifestRefsOf(runDocs))
+	if blocker != "" {
+		return failClosed(blocker)
+	}
+	manifestDocs, blocker, err := loadManifestDocs(input.WorkspaceRoot, normalizer, manifestPaths)
 	if err != nil {
 		return Result{}, err
 	}
 	if blocker != "" {
 		return failClosed(blocker)
 	}
-	projection := buildProjection(runDoc, releaseDoc, manifestDocs)
+	projection := buildProjection(runDocs, releaseDoc, manifestPaths, manifestDocs)
 	return Result{
 		Projection:           projection,
 		Rendered:             renderFields(append([]map[string]any{runDoc, releaseDoc}, manifestDocs...)...),
@@ -71,10 +76,10 @@ func validateIndexes(input Input, runDoc, releaseDoc map[string]any) string {
 	return ""
 }
 
-func loadManifestDocs(root string, paths []string) ([]map[string]any, string, error) {
+func loadManifestDocs(root string, normalizer workspacePathNormalizer, paths []string) ([]map[string]any, string, error) {
 	out := make([]map[string]any, 0, len(paths))
 	for _, ref := range paths {
-		doc, err := readMap(filepath.Join(root, ref))
+		doc, err := readWorkspaceMap(filepath.Join(root, ref), normalizer)
 		if err != nil {
 			return nil, "", err
 		}
@@ -93,10 +98,16 @@ func loadManifestDocs(root string, paths []string) ([]map[string]any, string, er
 	return out, "", nil
 }
 
-func buildProjection(runDoc, releaseDoc map[string]any, manifests []map[string]any) *Projection {
+// buildProjection describes the release, not just its newest run index.
+// runDocs holds every run index the release references, primary first;
+// manifestPaths is the ordered union of their manifest refs and pairs
+// positionally with manifests.
+func buildProjection(runDocs []map[string]any, releaseDoc map[string]any, manifestPaths []string, manifests []map[string]any) *Projection {
+	primary := runDocs[0]
 	lanes, laneStatuses := collectLanes(releaseDoc)
 	feedbackRefs := collectFeedbackRefs(releaseDoc)
-	evidenceRefs := collectEvidenceRefs(runDoc, manifests)
+	evidenceRefs := collectEvidenceRefs(manifestPaths, manifests)
+	counts := countChecks(runDocs)
 	return &Projection{
 		SchemaVersion:     ProjectionSchemaVersion,
 		ContractOwner:     ContractOwner,
@@ -105,17 +116,17 @@ func buildProjection(runDoc, releaseDoc map[string]any, manifests []map[string]a
 		RawPayloadPresent: false,
 		LaneStatuses:      laneStatuses,
 		Lanes:             lanes,
-		CheckCounts:       countChecks(runDoc),
+		CheckCounts:       counts,
 		SetupGaps:         collectSetupGaps(releaseDoc),
 		DeferredLanes:     collectDeferredLanes(lanes),
 		EvidenceRefs:      evidenceRefs,
 		FeedbackRefs:      feedbackRefs,
-		FeedbackActions:   collectFeedbackActions(runDoc, releaseDoc, manifests, evidenceRefs),
+		FeedbackActions:   collectFeedbackActions(primary, releaseDoc, manifests, evidenceRefs),
 		SafeActions:       canonicalActions(),
 		AuditRefs:         stringList(releaseDoc["audit_refs"]),
 		SourceChains:      collectSourceChains(releaseDoc),
-		LastRunTime:       stringValue(runDoc["ended_at"]),
-		TrendSummary:      trendSummary(releaseDoc, lanes, countChecks(runDoc)),
+		LastRunTime:       stringValue(primary["ended_at"]),
+		TrendSummary:      trendSummary(releaseDoc, lanes, counts),
 	}
 }
 
@@ -132,19 +143,24 @@ func collectLanes(releaseDoc map[string]any) ([]LaneStatus, map[string]Status) {
 	return lanes, statuses
 }
 
-func countChecks(runDoc map[string]any) CheckCounts {
+// countChecks totals the deterministic checks of every run index the release
+// covers. Counting only the newest index reported one lane's checks as the
+// whole release, directly contradicting the lane_statuses beside it.
+func countChecks(runDocs []map[string]any) CheckCounts {
 	counts := CheckCounts{}
-	for _, check := range listOfMaps(runDoc["checks"]) {
-		counts.Total++
-		switch stringValue(check["status"]) {
-		case "passed":
-			counts.Passed++
-		case "failed":
-			counts.Failed++
-		case "skipped":
-			counts.Skipped++
-		case "blocked":
-			counts.Blocked++
+	for _, runDoc := range runDocs {
+		for _, check := range listOfMaps(runDoc["checks"]) {
+			counts.Total++
+			switch stringValue(check["status"]) {
+			case "passed":
+				counts.Passed++
+			case "failed":
+				counts.Failed++
+			case "skipped":
+				counts.Skipped++
+			case "blocked":
+				counts.Blocked++
+			}
 		}
 	}
 	return counts
@@ -168,18 +184,15 @@ func collectDeferredLanes(lanes []LaneStatus) []string {
 	return out
 }
 
-func collectEvidenceRefs(runDoc map[string]any, manifests []map[string]any) []EvidenceRef {
-	refs := []EvidenceRef{}
-	manifestByPath := map[string]map[string]any{}
-	for _, doc := range manifests {
-		manifestByPath[stringValue(doc["manifest_path"])] = doc
-	}
-	for i, path := range stringList(runDoc["manifest_paths"]) {
+// collectEvidenceRefs pairs each safe manifest ref with the manifest loaded
+// from it. loadManifestDocs walks paths in order and fails closed on the first
+// unreadable one, so index i always names manifests[i].
+func collectEvidenceRefs(paths []string, manifests []map[string]any) []EvidenceRef {
+	refs := make([]EvidenceRef, 0, len(paths))
+	for i, path := range paths {
 		qaID := ""
 		if i < len(manifests) {
 			qaID = stringValue(manifests[i]["qa_result_id"])
-		} else if doc := manifestByPath[path]; doc != nil {
-			qaID = stringValue(doc["qa_result_id"])
 		}
 		refs = append(refs, EvidenceRef{ManifestPath: path, QAResultID: qaID})
 	}
@@ -210,6 +223,23 @@ func trendSummary(releaseDoc map[string]any, lanes []LaneStatus, counts CheckCou
 		return value
 	}
 	return fmt.Sprintf("%d failed deterministic check across %d lanes", counts.Failed, len(lanes))
+}
+
+// readWorkspaceMap decodes an evidence index and normalizes its in-workspace
+// absolute paths before any caller inspects or classifies it, so a producer
+// that ran with an absolute project dir does not poison the projection.
+func readWorkspaceMap(path string, normalizer workspacePathNormalizer) (map[string]any, error) {
+	doc, err := readMap(path)
+	if err != nil {
+		return nil, err
+	}
+	normalizer.normalizeDoc(doc)
+	return doc, nil
+}
+
+// joinWorkspace resolves a workspace-relative ref against the workspace root.
+func joinWorkspace(root, ref string) string {
+	return filepath.Join(root, filepath.FromSlash(ref))
 }
 
 func failClosed(class string) (Result, error) {

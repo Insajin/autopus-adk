@@ -43,49 +43,45 @@ func TestLoadJourneyCoverageWarnsOnInvalidYAML(t *testing.T) {
 	assert.Contains(t, warnings[0], "existing Journey Pack ignored")
 }
 
-// TestFastStarterCoversAllStacks asserts fastStarter returns a starter for each
-// supported stack and returns false for an unknown stack.
-func TestFastStarterCoversAllStacks(t *testing.T) {
+// TestFastStartersCoverAllStacks asserts fastStarters emits the expected starter
+// for each supported stack and nothing for an unrecognised stack.
+func TestFastStartersCoverAllStacks(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name      string
-		signals   projectSignals
-		wantID    string
-		wantFound bool
+		name    string
+		signals projectSignals
+		wantIDs []string
 	}{
 		{
-			name:      "go",
-			signals:   projectSignals{Stack: "go"},
-			wantID:    "go-fast",
-			wantFound: true,
+			name:    "go",
+			signals: projectSignals{Stacks: []string{"go"}},
+			wantIDs: []string{"go-fast"},
 		},
 		{
-			name:      "python",
-			signals:   projectSignals{Stack: "python"},
-			wantID:    "python-fast",
-			wantFound: true,
+			name:    "python",
+			signals: projectSignals{Stacks: []string{"python"}},
+			wantIDs: []string{"python-fast"},
 		},
 		{
-			name:      "rust",
-			signals:   projectSignals{Stack: "rust"},
-			wantID:    "rust-fast",
-			wantFound: true,
+			name:    "rust",
+			signals: projectSignals{Stacks: []string{"rust"}},
+			wantIDs: []string{"rust-fast"},
 		},
 		{
-			name:      "unknown stack",
-			signals:   projectSignals{Stack: "unknown"},
-			wantFound: false,
+			name:    "unknown stack",
+			signals: projectSignals{Stacks: []string{"unknown"}},
+			wantIDs: []string{},
+		},
+		{
+			name:    "no stack",
+			signals: projectSignals{},
+			wantIDs: []string{},
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			starter, ok := fastStarter(tc.signals)
-			assert.Equal(t, tc.wantFound, ok)
-			if tc.wantFound {
-				assert.Equal(t, tc.wantID, starter.ID)
-				assert.NotEmpty(t, starter.Body)
-			}
+			assert.Equal(t, tc.wantIDs, starterIDs(fastStarters(tc.signals)))
 		})
 	}
 }
@@ -96,7 +92,7 @@ func TestNodeFastStarterPicksJestWhenNoTestScript(t *testing.T) {
 	t.Parallel()
 
 	signals := projectSignals{
-		Stack:          "node",
+		Stacks:         []string{"node"},
 		PackageManager: "npm",
 		Package: packageManifest{
 			Scripts:         map[string]string{},
@@ -115,7 +111,7 @@ func TestNodeFastStarterPicksVitestSignal(t *testing.T) {
 	t.Parallel()
 
 	signals := projectSignals{
-		Stack:          "node",
+		Stacks:         []string{"node"},
 		PackageManager: "npm",
 		Package: packageManifest{
 			Scripts:         map[string]string{},
@@ -134,7 +130,7 @@ func TestNodeFastStarterFallsBackToBuildScript(t *testing.T) {
 	t.Parallel()
 
 	signals := projectSignals{
-		Stack:          "node",
+		Stacks:         []string{"node"},
 		PackageManager: "npm",
 		Package: packageManifest{
 			Scripts:         map[string]string{"build": "vite build"},
@@ -153,7 +149,7 @@ func TestNodeFastStarterReturnsFalseWithNoSignals(t *testing.T) {
 	t.Parallel()
 
 	signals := projectSignals{
-		Stack:          "node",
+		Stacks:         []string{"node"},
 		PackageManager: "npm",
 		Package: packageManifest{
 			Scripts:         map[string]string{},

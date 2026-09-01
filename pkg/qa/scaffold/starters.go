@@ -25,7 +25,11 @@ type starterFile struct {
 }
 
 type projectSignals struct {
+	// Stack is the dominant stack, for consumers that can only act on one answer.
+	// Stacks carries every stack detected, because a polyglot repo needs a fast
+	// lane per stack rather than a single arbitrary winner.
 	Stack             string
+	Stacks            []string
 	Package           packageManifest
 	HasPackage        bool
 	HasBrowser        bool
@@ -50,9 +54,7 @@ type packageManifest struct {
 func detectJourneyStarters(projectDir string, release bool) []starterFile {
 	signals := detectSignals(projectDir)
 	starters := []starterFile{}
-	if fast, ok := fastStarter(signals); ok {
-		starters = append(starters, fast)
-	}
+	starters = append(starters, fastStarters(signals)...)
 	browserLane := signals.HasPlaywright || (release && signals.HasBrowser)
 	if browserLane {
 		starters = append(starters, browserStagingStarter(signals))
@@ -110,19 +112,11 @@ func detectSignals(projectDir string) projectSignals {
 		HasTauriRust:   exists(projectDir, "src-tauri/Cargo.toml"),
 		PackageManager: detectPackageManager(projectDir),
 	}
-	if exists(projectDir, "go.mod") {
-		signals.Stack = "go"
-	}
-	if exists(projectDir, "package.json") {
-		signals.Stack = "node"
+	signals.Stacks = detectStacks(projectDir)
+	signals.Stack = dominantStack(signals.Stacks)
+	if containsStack(signals.Stacks, "node") {
 		signals.HasPackage = true
 		signals.Package = readPackage(projectDir)
-	}
-	if signals.Stack == "" && (exists(projectDir, "pyproject.toml") || exists(projectDir, "requirements.txt") || exists(projectDir, "pytest.ini")) {
-		signals.Stack = "python"
-	}
-	if signals.Stack == "" && exists(projectDir, "Cargo.toml") {
-		signals.Stack = "rust"
 	}
 	signals.HasBrowser = qaproject.HasBrowserSignals(projectDir)
 	signals.HasPlaywright = hasPlaywright(projectDir, signals.Package)
@@ -132,38 +126,6 @@ func detectSignals(projectDir string) projectSignals {
 	signals.HasAndroidSignals = qaproject.HasAndroidSignals(projectDir)
 	signals.HasIOSSignals = qaproject.HasIOSSignals(projectDir)
 	return signals
-}
-
-func fastStarter(signals projectSignals) (starterFile, bool) {
-	switch signals.Stack {
-	case "go":
-		return journeyStarter("go-fast", "Go fast test lane", "cli", []string{"fast"}, "go-test", []string{"go", "test", "./..."}, "Go module detected"), true
-	case "node":
-		return nodeFastStarter(signals)
-	case "python":
-		return journeyStarter("python-fast", "Python fast test lane", "cli", []string{"fast"}, "pytest", []string{"python", "-m", "pytest"}, "Python test signals detected"), true
-	case "rust":
-		return journeyStarter("rust-fast", "Rust fast test lane", "cli", []string{"fast"}, "cargo-test", []string{"cargo", "test"}, "Cargo project detected"), true
-	default:
-		return starterFile{}, false
-	}
-}
-
-func nodeFastStarter(signals projectSignals) (starterFile, bool) {
-	pm := nodeCommand(signals.PackageManager)
-	if hasScript(signals.Package, "test") {
-		return journeyStarter("node-fast", "Node fast test lane", "package", []string{"fast"}, "node-script", []string{pm, "test"}, "package.json test script detected"), true
-	}
-	if hasFileSignal("vitest", signals.Package) {
-		return journeyStarter("vitest-fast", "Vitest fast test lane", "frontend", []string{"fast"}, "vitest", jsRunnerArgv(pm, "vitest", "run"), "Vitest signals detected"), true
-	}
-	if hasDependency(signals.Package, "jest") {
-		return journeyStarter("jest-fast", "Jest fast test lane", "frontend", []string{"fast"}, "jest", jsRunnerArgv(pm, "jest"), "Jest dependency detected"), true
-	}
-	if hasScript(signals.Package, "build") {
-		return journeyStarter("node-build-fast", "Node build fast lane", "package", []string{"fast"}, "node-script", []string{pm, "run", "build"}, "package.json build script detected"), true
-	}
-	return starterFile{}, false
 }
 
 func browserStagingStarter(signals projectSignals) starterFile {

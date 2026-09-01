@@ -32,19 +32,36 @@ func StarterCatalogForProject(projectDir string) Catalog {
 		SchemaVersion:   CatalogSchemaVersion,
 		SuiteID:         "project-domain-readiness",
 		RequiredDomains: starterRequiredDomains(scenarios),
-		Scenarios:       scenarios,
+		Scenarios:       bindStarterJourneyRefs(projectDir, scenarios),
 	}
 }
 
+// bindStarterJourneyRefs points each starter scenario at the Journey Packs the
+// project really declares for that scenario's lanes.
+//
+// The refs used to be hardcoded ("fast", "node-build-fast") and were mostly
+// lane ids or packs `qa init` never generates for the stack at hand, so the
+// starter shipped permanently dangling. Leaving the list empty when the project
+// has no matching pack is the point: `qa init` writes this catalog before it
+// writes the Journey Packs, and a scenario that promises nothing beats one that
+// promises a pack nobody will create.
+func bindStarterJourneyRefs(projectDir string, scenarios []Scenario) []Scenario {
+	packs := loadJourneyPackIndex(projectDir)
+	for i := range scenarios {
+		scenarios[i].JourneyPackRefs = packs.idsForLanes(scenarios[i].QAMESHLaneRefs)
+	}
+	return scenarios
+}
+
 func coreStarterScenario() Scenario {
-	return contractStarterScenario("project-core-readiness", "core", []string{"fast", "full"}, []string{"fast"}, []string{"SPEC-QAMESH-002"})
+	return contractStarterScenario("project-core-readiness", "core", []string{"fast", "full"}, []string{"SPEC-QAMESH-002"})
 }
 
 func buildStarterScenario() Scenario {
-	return contractStarterScenario("project-build-readiness", "build", []string{"fast", "full"}, []string{"node-build-fast", "fast"}, []string{"SPEC-QAMESH-002", "SPEC-QAMESH-004"})
+	return contractStarterScenario("project-build-readiness", "build", []string{"fast", "full"}, []string{"SPEC-QAMESH-002", "SPEC-QAMESH-004"})
 }
 
-func contractStarterScenario(id, domain string, lanes, journeys, specs []string) Scenario {
+func contractStarterScenario(id, domain string, lanes, specs []string) Scenario {
 	return Scenario{
 		SchemaVersion:           ScenarioSchemaVersion,
 		ScenarioID:              id,
@@ -55,7 +72,6 @@ func contractStarterScenario(id, domain string, lanes, journeys, specs []string)
 		ScenarioMode:            ScenarioModeContractTest,
 		MutationBoundary:        MutationBoundaryReadOnly,
 		FixtureOrSourceNeed:     []string{"project-owned deterministic test evidence"},
-		JourneyPackRefs:         journeys,
 		QAMESHLaneRefs:          lanes,
 		ExpectedEvidence:        []string{"deterministic_check_result"},
 		PassFailOracle:          []string{"exit_code == 0"},
@@ -73,11 +89,11 @@ func contractStarterScenario(id, domain string, lanes, journeys, specs []string)
 }
 
 func browserStarterScenario() Scenario {
-	return guiStarterScenario("project-browser-gui-readiness", "browser", []string{"browser-staging", "gui-explore", "full"}, []string{"browser-staging-playwright", "gui-explore"})
+	return guiStarterScenario("project-browser-gui-readiness", "browser", []string{"browser-staging", "gui-explore", "full"})
 }
 
 func authStarterScenario() Scenario {
-	scenario := guiStarterScenario("project-auth-safe-shell-readiness", "auth", []string{"browser-staging", "gui-explore", "full"}, []string{"browser-auth-safe-shell-gui-explore", "gui-explore"})
+	scenario := guiStarterScenario("project-auth-safe-shell-readiness", "auth", []string{"browser-staging", "gui-explore", "full"})
 	scenario.FixtureOrSourceNeed = []string{"seeded non-production auth state or safe-shell auth route evidence"}
 	scenario.ForbiddenActions = appendUniqueString(scenario.ForbiddenActions, "account_creation")
 	scenario.ForbiddenActions = appendUniqueString(scenario.ForbiddenActions, "email_send")
@@ -85,13 +101,13 @@ func authStarterScenario() Scenario {
 }
 
 func desktopStarterScenario() Scenario {
-	scenario := guiStarterScenario("project-desktop-gui-readiness", "desktop", []string{"desktop-native", "gui-explore", "full"}, []string{"desktop-gui-explore"})
+	scenario := guiStarterScenario("project-desktop-gui-readiness", "desktop", []string{"desktop-native", "gui-explore", "full"})
 	scenario.SafeExecutionEnvironment.AllowedOrigins = []string{"http://127.0.0.1:1420", "http://localhost:1420"}
 	scenario.DesktopTypedCardTestRefs = []string{"desktop-card:app-shell"}
 	return scenario
 }
 
-func guiStarterScenario(id, domain string, lanes, journeys []string) Scenario {
+func guiStarterScenario(id, domain string, lanes []string) Scenario {
 	return Scenario{
 		SchemaVersion:             ScenarioSchemaVersion,
 		ScenarioID:                id,
@@ -102,7 +118,6 @@ func guiStarterScenario(id, domain string, lanes, journeys []string) Scenario {
 		ScenarioMode:              ScenarioModeGUISafeShell,
 		MutationBoundary:          MutationBoundaryReadOnly,
 		FixtureOrSourceNeed:       []string{"project-owned route map and redacted GUI journey evidence"},
-		JourneyPackRefs:           journeys,
 		QAMESHLaneRefs:            lanes,
 		FrontendTypedCardTestRefs: []string{"frontend-card:app-shell"},
 		ExpectedEvidence:          []string{"qamesh_manifest_ref", "gui_journey_graph_ref", "redacted_screenshot_ref"},

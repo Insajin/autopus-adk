@@ -7,17 +7,21 @@ import (
 	qaevidence "github.com/insajin/autopus-adk/pkg/qa/evidence"
 )
 
-const redactedPublicPath = "[REDACTED_LOCAL_PATH]"
+// RedactedLocalPath replaces a filesystem path that cannot be expressed
+// relative to the project root. It is a bracketed sentinel, matching the
+// pkg/qa/evidence family, and deliberately free of the shell metacharacters
+// (`$`, `<`, `>`) that downstream ref validation rejects.
+const RedactedLocalPath = "[REDACTED_LOCAL_PATH]"
 
 // @AX:NOTE [AUTO] [downgraded from ANCHOR - fan_in < 3] @AX:SPEC: SPEC-QAMESH-006: public plan previews must not expose absolute project, manifest, or artifact paths.
 // @AX:REASON: Dry-run JSON and cross-agent feedback can persist these previews, so roots and artifact refs must stay project-relative or redacted.
 func publicPlan(plan Plan, projectDir string) Plan {
-	plan.OutputRoot = publicProjectPath(projectDir, plan.OutputRoot)
-	plan.RunIndexPreviewPath = publicProjectPath(projectDir, plan.RunIndexPreviewPath)
-	plan.HarnessContract.JourneyPackRoot = publicProjectPath(projectDir, plan.HarnessContract.JourneyPackRoot)
-	plan.HarnessContract.RuntimeArtifactRoot = publicProjectPath(projectDir, plan.HarnessContract.RuntimeArtifactRoot)
+	plan.OutputRoot = PublicProjectPath(projectDir, plan.OutputRoot)
+	plan.RunIndexPreviewPath = PublicProjectPath(projectDir, plan.RunIndexPreviewPath)
+	plan.HarnessContract.JourneyPackRoot = PublicProjectPath(projectDir, plan.HarnessContract.JourneyPackRoot)
+	plan.HarnessContract.RuntimeArtifactRoot = PublicProjectPath(projectDir, plan.HarnessContract.RuntimeArtifactRoot)
 	for i := range plan.ManifestOutputPreviewPaths {
-		plan.ManifestOutputPreviewPaths[i] = publicProjectPath(projectDir, plan.ManifestOutputPreviewPaths[i])
+		plan.ManifestOutputPreviewPaths[i] = PublicProjectPath(projectDir, plan.ManifestOutputPreviewPaths[i])
 	}
 	for i := range plan.ArtifactPreviewRefs {
 		plan.ArtifactPreviewRefs[i].Path = publicPreviewPath(projectDir, plan.ArtifactPreviewRefs[i].Path)
@@ -25,13 +29,17 @@ func publicPlan(plan Plan, projectDir string) Plan {
 	return plan
 }
 
-func publicProjectPath(projectDir, path string) string {
+// PublicProjectPath renders a path as a project-root-relative ref. Publishing
+// refs relative to the project root is what keeps an absolute --project-dir
+// from producing paths that later redaction has to destroy; a path genuinely
+// outside the project collapses to RedactedLocalPath rather than to "".
+func PublicProjectPath(projectDir, path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return ""
 	}
 	if strings.Contains(path, "://") {
-		return redactedPublicPath
+		return RedactedLocalPath
 	}
 	root, rootErr := filepath.Abs(projectDir)
 	target, targetErr := filepath.Abs(path)
@@ -40,7 +48,7 @@ func publicProjectPath(projectDir, path string) string {
 			return filepath.ToSlash(filepath.Clean(rel))
 		}
 		if filepath.IsAbs(path) {
-			return redactedPublicPath
+			return RedactedLocalPath
 		}
 	}
 	return filepath.ToSlash(filepath.Clean(qaevidence.RedactText(path)))
@@ -48,7 +56,7 @@ func publicProjectPath(projectDir, path string) string {
 
 func publicPreviewPath(projectDir, path string) string {
 	if strings.Contains(path, "://") {
-		return redactedPublicPath
+		return RedactedLocalPath
 	}
-	return publicProjectPath(projectDir, path)
+	return PublicProjectPath(projectDir, path)
 }

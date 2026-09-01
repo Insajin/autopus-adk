@@ -29,12 +29,16 @@ var (
 	sensitiveAssignmentRe = regexp.MustCompile(`(?i)\b([A-Z0-9_.-]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH)[A-Z0-9_.-]*)(\s*[:=]\s*)(["']?)([^\s"',}\]]{3,})(["']?)`)
 	sensitiveFlagValueRe  = regexp.MustCompile(`(?i)(^|[\s"'({\[])(--?[A-Z0-9_.-]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[A-Z0-9_.-]*(?:=|\s+))("[^"]*"|'[^']*'|[^\s"',}\]]{3,})`)
 	jsonSensitiveRe       = regexp.MustCompile(`(?i)("[^"]*(token|secret|password|passwd|pwd|api[_-]?key|apikey|private[_-]?key|access[_-]?key|credential|cookie|session|authorization|auth)[^"]*"\s*:\s*)("[^"]*"|[^",\n}\]]+)`)
-	credentialURLRe       = regexp.MustCompile(`(?i)(https?://)[^/\s:@]+:[^/\s@]+@`)
-	secretQueryRe         = regexp.MustCompile(`(?i)([?&][^=\s&]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[^=\s&]*=)[^&\s"']+`)
-	privateNoteRe         = regexp.MustCompile(`(?im)\b((local[_ -]?vault[_ -]?note|vault[_ -]?note|private[_ -]?note|private_note_body|note[_ -]?body|localNoteBody|vaultNoteBody|vaultNoteContent)[^:=\n"{}]*\s*[:=]\s*)([^,\n\r}]*)`)
-	jsonPrivateNoteRe     = regexp.MustCompile(`(?i)("[^"]*(localNote|vaultNote|privateNote|noteBody|note_body|noteContent|note_content)[^"]*"\s*:\s*)("[^"]*"|[^",\n}\]]+)`)
-	userPathRe            = regexp.MustCompile(`(file://)?/(Users|home)/([^/\s:"']+)(/[^\s"',)]*)?`)
-	windowsUserPathRe     = regexp.MustCompile(`([A-Za-z]:\\+Users\\+)([^\\\s:"']+)((?:\\+[^\s"',)]*)?)`)
+	// Any URL scheme can carry userinfo. Matching only http/https let
+	// postgres://, mysql://, mongodb://, redis://, amqp://, ssh:// and ftp://
+	// credentials reach publishable evidence verbatim, so the scheme is matched
+	// generically and only the userinfo is replaced.
+	credentialURLRe   = regexp.MustCompile(`(?i)\b([a-z][a-z0-9+.\-]*://)[^/\s:@]+:[^/\s@]+@`)
+	secretQueryRe     = regexp.MustCompile(`(?i)([?&][^=\s&]*(TOKEN|SECRET|PASSWORD|PASSWD|PWD|API[_-]?KEY|PRIVATE[_-]?KEY|ACCESS[_-]?KEY|CREDENTIAL|COOKIE|SESSION|AUTH|KEY|PASS)[^=\s&]*=)[^&\s"']+`)
+	privateNoteRe     = regexp.MustCompile(`(?im)\b((local[_ -]?vault[_ -]?note|vault[_ -]?note|private[_ -]?note|private_note_body|note[_ -]?body|localNoteBody|vaultNoteBody|vaultNoteContent)[^:=\n"{}]*\s*[:=]\s*)([^,\n\r}]*)`)
+	jsonPrivateNoteRe = regexp.MustCompile(`(?i)("[^"]*(localNote|vaultNote|privateNote|noteBody|note_body|noteContent|note_content)[^"]*"\s*:\s*)("[^"]*"|[^",\n}\]]+)`)
+	userPathRe        = regexp.MustCompile(`(file://)?/(Users|home)/([^/\s:"']+)(/[^\s"',)]*)?`)
+	windowsUserPathRe = regexp.MustCompile(`([A-Za-z]:\\+Users\\+)([^\\\s:"']+)((?:\\+[^\s"',)]*)?)`)
 )
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-QAMESH-001: redaction API protects publishable QA evidence from provider tokens, private notes, and local user paths.
@@ -52,8 +56,8 @@ func RedactText(value string) string {
 			return RedactedSecret
 		})
 	}
-	text = sensitiveAssignmentRe.ReplaceAllString(text, `${1}${3}${4}`+RedactedSecret+`${6}`)
-	text = sensitiveFlagValueRe.ReplaceAllString(text, `${1}${2}`+RedactedSecret)
+	text = redactSensitiveAssignments(text)
+	text = redactSensitiveFlagValues(text)
 	text = jsonSensitiveRe.ReplaceAllString(text, `${1}"`+RedactedSecret+`"`)
 	text = credentialURLRe.ReplaceAllString(text, `${1}`+RedactedSecret+`@`)
 	text = secretQueryRe.ReplaceAllString(text, `${1}`+RedactedSecret)
@@ -80,10 +84,11 @@ func FindUnsafeText(value, source string) []Finding {
 			}
 		}
 	}
-	for _, match := range sensitiveAssignmentRe.FindAllStringSubmatch(text, -1) {
-		if len(match) > 5 && !strings.Contains(match[5], "[REDACTED") {
-			findings = append(findings, Finding{Type: "sensitive_assignment", Source: source, Sample: RedactText(compactSample(match[0]))})
+	for _, match := range sensitiveAssignmentRe.FindAllStringSubmatchIndex(text, -1) {
+		if strings.Contains(assignmentValue(text, match), "[REDACTED") || isProseAssignment(text, match) {
+			continue
 		}
+		findings = append(findings, Finding{Type: "sensitive_assignment", Source: source, Sample: RedactText(compactSample(text[match[0]:match[1]]))})
 	}
 	for _, match := range sensitiveFlagValueRe.FindAllStringSubmatch(text, -1) {
 		if len(match) > 4 && !strings.Contains(match[4], "[REDACTED") {
