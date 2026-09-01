@@ -48,9 +48,23 @@ type desktopTree struct {
 	Nodes            []desktopTreeNode
 }
 
+// Observation bounds, aligned to what the provider itself renders: Orca reports
+// maxNodes 1200 and maxDepth 64 in every snapshot's truncation block, so a larger
+// tree cannot reach us and a smaller ceiling would refuse trees the provider was
+// willing to describe.
+//
+// These bound PARSE cost, not published evidence. The published projection is
+// bounded by the pack's declared landmarks (SPEC-QAMESH-013 REQ-4), so it does
+// not grow with the app; the 256-node and depth-32 limits in
+// pkg/qa/desktopobserve/canonical.go still guard that, and the 8 KiB typed
+// evidence bound remains the privacy-relevant one.
+//
+// The previous 256 predates real observation, when the projection was three
+// synthesized nodes. Measured element counts: Autopus Desktop 7-22 by load
+// state, Finder 152, Slack 378 - so 256 refused a mainstream app.
 const (
-	desktopTreeMaxNodes = 256
-	desktopTreeMaxDepth = 32
+	desktopTreeMaxNodes = 1200
+	desktopTreeMaxDepth = 64
 )
 
 // treeParseError names the malformed condition. A bare "malformed" gives an
@@ -170,11 +184,25 @@ func splitDesktopTreeBody(lines []string) ([]string, string, error) {
 	return lines[3 : last-1], focusLine, nil
 }
 
-// parseDesktopTreeFocusLine reads `The focused UI element is <id> ...`.
+// desktopTreeNoFocusID marks a tree whose window holds no focused element. It is
+// not a valid element id, so no node can match it and treeReportsFocus is false.
+const desktopTreeNoFocusID = -1
+
+// parseDesktopTreeFocusLine reads the trailing focus sentence.
+//
+// The provider renders two forms and both are legitimate: an app holding keyboard
+// focus reports "The focused UI element is <id> ...", and one that does not
+// reports "No UI element is currently focused." Measured on Slack while the
+// terminal held focus. Refusing the second form rejected a correctly observed
+// unfocused app as a malformed envelope, which is a real state reported as a
+// protocol fault.
 func parseDesktopTreeFocusLine(line string) (int, error) {
+	if strings.TrimSpace(line) == "No UI element is currently focused." {
+		return desktopTreeNoFocusID, nil
+	}
 	rest, ok := strings.CutPrefix(line, "The focused UI element is ")
 	if !ok {
-		return 0, treeError(0, "expected a `The focused UI element is <id>` line")
+		return 0, treeError(0, "expected a focus line naming the focused element or stating that none is focused")
 	}
 	digits, _, _ := strings.Cut(rest, " ")
 	id, convErr := strconv.Atoi(digits)

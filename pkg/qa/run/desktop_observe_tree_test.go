@@ -129,9 +129,48 @@ func TestParseDesktopTree_AcceptsMinimalShape(t *testing.T) {
 	assert.False(t, tree.Nodes[1].matchesDeclaredName("Cancel"))
 }
 
-// Every structural surprise must be named. A dropped node would let an
-// undeclared element escape the count REQ-4 depends on, so silence is not an
-// option.
+// A third real capture, from Slack while the terminal held keyboard focus. The
+// provider renders "No UI element is currently focused." instead of naming an
+// element, and 378 nodes - both of which the first implementation refused: the
+// focus sentence as a malformed envelope, and the node count against a 256 bound
+// that predated real observation.
+func TestParseDesktopTree_RealUnfocusedThirdPartyTree(t *testing.T) {
+	t.Parallel()
+
+	tree, err := parseDesktopTree(readDesktopTreeFixture(t, "slack-unfocused.txt"))
+	require.NoError(t, err)
+
+	assert.Equal(t, "com.tinyspeck.slackmacgap", tree.AppIdentifier)
+	assert.Equal(t, "Slack", tree.AppName)
+	assert.Equal(t, "maker-v2(채널) - Aligo - Slack", tree.WindowTitle,
+		"a real window title carries parentheses, a hyphen, and non-ASCII text")
+	assert.Len(t, tree.Nodes, 378, "well past the 256 bound the fixture era assumed")
+	assert.Equal(t, desktopTreeNoFocusID, tree.FocusedElementID)
+	assert.False(t, treeReportsFocus(tree),
+		"an unfocused app must report no focus, not a phantom focused node")
+}
+
+// The focused form and the unfocused form must both parse, and only the focused
+// one may report focus. Getting this backwards would let an unfocused window
+// satisfy a pack that declared required_state: focused.
+func TestParseDesktopTreeFocusLine_BothProviderForms(t *testing.T) {
+	t.Parallel()
+
+	id, err := parseDesktopTreeFocusLine("The focused UI element is 7 button Save.")
+	require.NoError(t, err)
+	assert.Equal(t, 7, id)
+
+	id, err = parseDesktopTreeFocusLine("No UI element is currently focused.")
+	require.NoError(t, err)
+	assert.Equal(t, desktopTreeNoFocusID, id)
+
+	_, err = parseDesktopTreeFocusLine("Something else entirely.")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "focus line")
+}
+
+// Every structural surprise must be named. A dropped node would let an undeclared
+// element escape the count REQ-4 depends on, so silence is not an option.
 func TestParseDesktopTree_FailsClosedOnMalformedInput(t *testing.T) {
 	t.Parallel()
 

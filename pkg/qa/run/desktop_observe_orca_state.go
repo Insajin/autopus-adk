@@ -121,15 +121,19 @@ func decodeOrcaState(
 	return projection, nil
 }
 
-// orcaTreeMaxBytes bounds the rendered tree text. It is derived from the tree
-// parser's node bound - desktopTreeMaxNodes = 256 and desktopTreeMaxDepth = 32
-// live in desktop_observe_tree.go, which enforces them - at 128 bytes per
-// rendered line, the widest measured real line being a localized ~100-byte
-// content node. Deriving it is what keeps the byte bound from shadowing the node
-// bound: an app with 255 real nodes has to be refused by the node bound, not by
-// an incidental byte cap. Do not flatten this to a literal. It stays under the
-// 64 KiB orcaMaxOutputBytes envelope cap, so the refusal is reachable.
-const orcaTreeMaxBytes = desktopTreeMaxNodes * 128
+// orcaTreeMaxBytes bounds the rendered tree text. It sits below the envelope cap
+// so the named refusal stays reachable: orcaMaxOutputBytes is 64 KiB and a larger
+// tree is rejected earlier as ErrEnvelopeTooLarge, which would make a byte bound
+// above it dead code.
+//
+// It is deliberately NOT derived from desktopTreeMaxNodes any more. At the current
+// node bound of 1200 - aligned to Orca's own maxNodes, see
+// desktop_observe_tree.go - times the ~57 bytes per rendered line measured on
+// Slack, a full-size tree is about 68 KiB, past the envelope. So near the node
+// bound the envelope is the binding constraint and the node bound refuses a large
+// tree that does fit. Both refuse by name, and neither shadows the other because
+// they now measure different things.
+const orcaTreeMaxBytes = orcaMaxOutputBytes - 8*1024
 
 // orcaSnapshotFault reports why an Orca state envelope is unusable, or nil when
 // it is sound. It returns an error rather than a bool because SPEC-QAMESH-013

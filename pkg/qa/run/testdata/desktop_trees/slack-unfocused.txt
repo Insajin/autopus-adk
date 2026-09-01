@@ -1,0 +1,383 @@
+App=com.tinyspeck.slackmacgap (pid 31568)
+Window: "maker-v2(채널) - Aligo - Slack", App: Slack.
+
+0 표준 윈도우 maker-v2(채널) - Aligo - Slack
+	1 container maker-v2(채널) - Aligo - Slack
+		2 HTML 콘텐츠 maker-v2(채널) - Aligo - Slack
+			3 container
+				4 container
+					5 툴바 내역 탐색
+						6 container
+							7 버튼 내역으로 돌아가기
+							8 버튼 (disabled) 내역에서 앞으로 가기
+							9 팝업 버튼 내역 표시
+						10 버튼 검색
+						11 버튼 Slackbot AI와 채팅
+						12 버튼 Hermes 열기
+						13 팝업 버튼 더 많은 에이전트
+						14 버튼 도움말
+					15 container Aligo
+						16 container
+							17 팝업 버튼 워크스페이스 전환...(Aligo)
+							18 탭 그룹 Aligo
+								19 tab (selected) 홈, Value: 1
+								20 tab (settable) DM, Value: 0
+								21 tab (settable) 내 활동, Value: 0
+								22 tab (settable) 파일, Value: 0
+								23 tab (settable) 나중에, Value: 0
+								24 tab (settable) 더 보기..., Value: 0
+						25 container
+							26 container 홈
+								27 container 홈
+									28 툴바 작업
+										29 팝업 버튼 Aligo 작업
+										30 팝업 버튼 내 사이드바 관리
+										31 버튼 새 메시지
+									32 텍스트, Value: ✨ 한동안 방문하지 않은 채널들이 있는데 정리할 준비가 되셨나요? ✨
+									33 버튼 닫기
+									34 버튼 나중에
+									35 버튼 정리하세요
+									36 검색어 입력란 (settable) 채널 또는 사용자 이름, Placeholder: 대화 찾기…
+									37 container
+										38 버튼 읽지 않은 항목 더 보기
+										39 윤곽체 채널 및 다이렉트 메시지
+											40 윤곽체 행 Slackbot
+												41 텍스트, Value: Slackbot
+											42 윤곽체 행 스레드
+												43 텍스트, Value: 스레드
+											44 윤곽체 행 허들
+												45 텍스트, Value: 허들
+											46 윤곽체 행 초안 및 전송됨 9, Description: 초안 및 보냄 (전송되지 않은 메시지가 있음)
+												47 container, Text: 초안 및 전송됨 9
+											48 윤곽체 행 디렉터리
+												49 텍스트, Value: 디렉터리
+											50 윤곽체 행 (expanded), Description: 채널
+												51 container
+													52 윤곽체 행 문자_cs메일, Description: 문자_cs메일(초안 메시지 있음)
+														53 텍스트, Value: 문자_cs메일
+													54 윤곽체 행 센드온_고객_관리
+														55 텍스트, Value: 센드온_고객_관리
+													56 윤곽체 행 센드온_고객문의, Description: 센드온_고객문의(읽지 않은 메시지 있음)
+														57 텍스트, Value: 센드온_고객문의
+													58 윤곽체 행 센드온_뉴스, Description: 센드온_뉴스(읽지 않은 메시지 있음)
+														59 텍스트, Value: 센드온_뉴스
+													60 윤곽체 행 센드온_대량문자_고객_행동_이벤트, Description: 센드온_대량문자_고객_행동_이벤트(읽지 않은 메시지 있음, 초안 메시지 있음)
+														61 텍스트, Value: 센드온_대량문자_고객_행동_이벤트
+													62 윤곽체 행 센드온_대량발송문의
+														63 텍스트, Value: 센드온_대량발송문의
+													64 윤곽체 행 센드온_소통_운영
+														65 텍스트, Value: 센드온_소통_운영
+													66 윤곽체 행 센드온_운영배포
+														67 텍스트, Value: 센드온_운영배포
+													68 윤곽체 행 센드온_이런기능_만들어주세요
+														69 텍스트, Value: 센드온_이런기능_만들어주세요
+													70 윤곽체 행 센드온_이상감지_모니터링, Description: 센드온_이상감지_모니터링(읽지 않은 메시지 있음)
+														71 텍스트, Value: 센드온_이상감지_모니터링
+													72 윤곽체 행 센드온_입금내역
+														73 텍스트, Value: 센드온_입금내역
+													74 윤곽체 행 센드온_장애_모니터링, Description: 센드온_장애_모니터링(읽지 않은 메시지 있음)
+														75 텍스트, Value: 센드온_장애_모니터링
+													76 윤곽체 행 센드온_테크_리포트
+														77 텍스트, Value: 센드온_테크_리포트
+													78 윤곽체 행 소통채널_점심메뉴
+														79 텍스트, Value: 소통채널_점심메뉴
+													80 윤곽체 행 소통채널_질문공유
+														81 텍스트, Value: 소통채널_질문공유
+													82 윤곽체 행 시스템_인증메시지, Description: 시스템_인증메시지(읽지 않은 메시지 있음)
+														83 텍스트, Value: 시스템_인증메시지
+													84 윤곽체 행 아이템리뷰_프로덕트, Description: 아이템리뷰_프로덕트(비공개, 멤버임, 전체 6명의 멤버, undefined)
+														85 텍스트, Value: 아이템리뷰_프로덕트
+													86 윤곽체 행 알리고_고객_관리
+														87 텍스트, Value: 알리고_고객_관리
+													88 윤곽체 행 알리고_뉴스
+														89 텍스트, Value: 알리고_뉴스
+													90 윤곽체 행 알리고_불법스팸_스미싱_감지문자, Description: 알리고_불법스팸_스미싱_감지문자(읽지 않은 메시지 있음)
+														91 텍스트, Value: 알리고_불법스팸_스미싱_감지문자
+													92 윤곽체 행 알리고_요구사항
+														93 텍스트, Value: 알리고_요구사항
+													94 윤곽체 행 알리고_운영배포
+														95 텍스트, Value: 알리고_운영배포
+													96 윤곽체 행 알리고_점검회의, Description: 알리고_점검회의(비공개, 멤버임, 전체 6명의 멤버, undefined)
+														97 텍스트, Value: 알리고_점검회의
+													98 윤곽체 행 헤이고래수족관
+														99 텍스트, Value: 헤이고래수족관
+													100 윤곽체 행 ai-정보공유
+														101 텍스트, Value: ai-정보공유
+													102 윤곽체 행 ali-leadership, Description: ali-leadership(비공개, 멤버임, 전체 6명의 멤버, 대표님을 포함한 리더십 전체가 필요에 따라 논의하는 내용을 쌓기 위해 채널 생성했습니다, undefined)
+														103 텍스트, Value: ali-leadership
+													104 윤곽체 행 aligo-squard, Description: aligo-squard(비공개, 멤버임, 전체 7명의 멤버, undefined)
+														105 텍스트, Value: aligo-squard
+													106 윤곽체 행 alipeople-전체알림
+														107 텍스트, Value: alipeople-전체알림
+													108 윤곽체 행 cto-x-po, Description: cto-x-po(비공개, 멤버임, 전체 2명의 멤버, undefined)
+														109 텍스트, Value: cto-x-po
+													110 윤곽체 행 general
+														111 텍스트, Value: general
+													112 윤곽체 행 maker-product
+														113 텍스트, Value: maker-product
+													114 윤곽체 행 maker-scrum
+														115 텍스트, Value: maker-scrum
+													116 윤곽체 행 maker-v2
+														117 텍스트, Value: maker-v2
+													118 윤곽체 행 tech-news, Description: tech-news(읽지 않은 메시지 있음, 초안 메시지 있음)
+														119 텍스트, Value: tech-news
+											120 윤곽체 행 문자_cs메일, Description: 문자_cs메일(초안 메시지 있음)
+												121 텍스트, Value: 문자_cs메일
+											122 윤곽체 행 센드온_고객_관리
+												123 텍스트, Value: 센드온_고객_관리
+											124 윤곽체 행 센드온_고객문의, Description: 센드온_고객문의(읽지 않은 메시지 있음)
+												125 텍스트, Value: 센드온_고객문의
+											126 윤곽체 행 센드온_뉴스, Description: 센드온_뉴스(읽지 않은 메시지 있음)
+												127 텍스트, Value: 센드온_뉴스
+											128 윤곽체 행 센드온_대량문자_고객_행동_이벤트, Description: 센드온_대량문자_고객_행동_이벤트(읽지 않은 메시지 있음, 초안 메시지 있음)
+												129 텍스트, Value: 센드온_대량문자_고객_행동_이벤트
+											130 윤곽체 행 센드온_대량발송문의
+												131 텍스트, Value: 센드온_대량발송문의
+											132 윤곽체 행 센드온_소통_운영
+												133 텍스트, Value: 센드온_소통_운영
+											134 윤곽체 행 센드온_운영배포
+												135 텍스트, Value: 센드온_운영배포
+											136 윤곽체 행 센드온_이런기능_만들어주세요
+												137 텍스트, Value: 센드온_이런기능_만들어주세요
+											138 윤곽체 행 센드온_이상감지_모니터링, Description: 센드온_이상감지_모니터링(읽지 않은 메시지 있음)
+												139 텍스트, Value: 센드온_이상감지_모니터링
+											140 윤곽체 행 센드온_입금내역
+												141 텍스트, Value: 센드온_입금내역
+											142 윤곽체 행 센드온_장애_모니터링, Description: 센드온_장애_모니터링(읽지 않은 메시지 있음)
+												143 텍스트, Value: 센드온_장애_모니터링
+											144 윤곽체 행 센드온_테크_리포트
+												145 텍스트, Value: 센드온_테크_리포트
+											146 윤곽체 행 소통채널_점심메뉴
+												147 텍스트, Value: 소통채널_점심메뉴
+								148 슬라이더 (settable) 사이드바 너비, Value: 248, Secondary Actions: increment, decrement
+								149 container maker-v2 채널
+									150 툴바 기본 보기 작업
+										151 버튼 채널 이동
+										152 버튼 #maker-v2에 대한 채널 세부정보
+										153 버튼 모든 18 멤버 보기. 김지민(PM), 강태호(개발) 및 고객님 포함.
+										154 container
+											155 버튼 maker-v2 채널에서 허들 시작
+											156 팝업 버튼 허들 옵션 더 보기
+										157 팝업 버튼 알림 편집
+										158 버튼 채널 내에서 검색
+										159 팝업 버튼 채널 작업 더 보기
+									160 탭 그룹 #maker-v2 보기
+										161 tab (selected) 메시지, Value: 1
+										162 tab (settable) 고정, Value: 0
+										163 tab (settable) 파일 및 링크, Value: 0
+										164 tab (settable) 제목 없음, Value: 0
+										165 팝업 버튼 채널 탭 추가 및 편집
+									166 텍스트, Value: 캔버스
+									167 텍스트, Value: 리스트
+									168 텍스트, Value: 폴더
+									169 container
+										170 container
+											171 내용 목록 maker-v2 (채널)
+												172 팝업 버튼 날짜로 이동
+												173 container
+													174 버튼 강태호(개발)
+													175 텍스트
+													176 link [어제, 오후 2:54:52](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788155692727169)
+													177 link [.](https://10fastfingers.com/typing-test/korean)
+													178 container
+														179 텍스트, Value: 10FastFingers
+														180 link [Korean Typing Test (한국어) - Check Your Typing Speed | 10FastFingers](https://10fastfingers.com/typing-test/korean)
+														181 container
+															182 텍스트, Value: Free Korean typing test: type for one minute and get your words per minute (WPM) and accuracy instantly. Compare your speed with Korean typists worldwide.
+															183 텍스트
+															184 텍스트, Value: (615kB)
+															185 버튼 (expanded) 개의 이미지
+														186 container
+															187 이미지 10FastFingers
+															188 텍스트, Value: 10FastFingers
+														189 container
+															190 link [Korean Typing Test (한국어) - Check Your Typing Speed | 10FastFingers](https://10fastfingers.com/typing-test/korean)
+															191 container
+																192 link [새 창에서 열기](https://10fastfingers.com/typing-test/korean)
+																193 팝업 버튼 추가 작업
+													194 버튼 4개의 댓글
+													195 container, Text: 15시간 전 마지막 댓글 스레드 보기
+												196 container
+													197 텍스트, Value: 허들이 진행됨
+													198 텍스트
+													199 link [어제, 오후 3:02:57](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788156177449849?thread_ts=1788150676.909709&cid=C06P3GT5K9Q)
+													200 텍스트, Value: 다음 스레드에서 시작됨:
+													201 버튼 @김지희(QA) 테스트 자동화
+													202 버튼 최근 댓글 보기
+												203 container
+													204 버튼 김지민(PM)
+													205 텍스트
+													206 link [어제, 오후 3:53:04](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788159184613699)
+													207 container, Text: figma 프로플랜 변경 @product
+													208 버튼 1개의 댓글
+													209 container, Text: 15시간 전 스레드 보기
+												210 container
+													211 버튼 김지민(PM)
+													212 텍스트
+													213 link [어제, 오후 4:01:31](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788159691619509)
+													214 container, Text: [정비기간] PRD 작성 룰 업데이트 @product @김종원(개발) (편집됨)
+													215 버튼 2개의 댓글
+													216 container, Text: 13시간 전 마지막 댓글 스레드 보기
+												217 container
+													218 버튼 김지민(PM)
+													219 텍스트
+													220 link [어제, 오후 4:28:29](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788161309960009)
+													221 container, Text: @전현성(개발) (휴가) 주소록 다운로드시 수신거부 여부 컬럼 표시
+													222 버튼 8개의 댓글
+													223 container, Text: 오늘 마지막 댓글이 달린 시간: 오전 10:24 스레드 보기
+												224 container
+													225 버튼 이선미(PD)
+													226 텍스트
+													227 link [어제, 오후 5:50:29](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788166229409989)
+													228 link [@김지희(QA)](https://aligo.slack.com/team/U06SSH1QAJC)
+													229 버튼 3개의 댓글
+													230 container, Text: 13시간 전 마지막 댓글 스레드 보기
+												231 팝업 버튼 날짜로 이동
+												232 container
+													233 버튼 전현성(개발)
+													234 텍스트
+													235 link [오늘, 오전 8:58:27](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788220707367999)
+													236 container, Text: 버스가 너무 늦게와서 급히 시차 사용했습니다 ..
+													237 container 반응
+														238 전환 버튼 2개의 반응, 웃으며 눈물을 흘리는 얼굴 이모티콘(으)로 반응, Value: 0
+														239 전환 버튼 2개의 반응, 넵 이모티콘(으)로 반응, Value: 0
+														240 버튼 반응 추가...
+												241 container
+													242 버튼 makernews
+													243 텍스트, Value: 앱
+													244 텍스트
+													245 link [오늘, 오전 9:01:04](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788220864102539)
+													246 항목 신문 이모티콘 메이커 데일리 뉴스 — 2026년 8월 31일 (월), Value: 2
+													247 container, Text: 메시지 143건 · 참여 11명 · 스레드 23개 | 어제의 요약은 스레드에서 확인하세요
+													248 버튼 1개의 댓글
+													249 container, Text: 오늘 오전 9:01에 스레드 보기
+												250 container
+													251 버튼 김종원(개발)
+													252 텍스트
+													253 link [오늘, 오전 9:22:31](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788222151964739)
+													254 container, Text: @sendon 정비기간 - Today 오늘은 정비기간 활동보다는 일반 업무에 포커스해서 진행하겠습니다.
+													255 내용 목록
+														256 container, Text:  운영 배포 준비 ( @강태호(개발) @김지희(QA) )
+														257 container, Text:  KISA 전송자격인증 업무 - 기획/개발 (개발 시작할 수 있는 항목 있다면 바로 시작해 주세요)
+													258 container 반응
+														259 전환 버튼 5개의 반응, ne 이모티콘(으)로 반응, Value: 0
+														260 버튼 반응 추가...
+													261 버튼 2개의 댓글
+													262 container, Text: 오늘 마지막 댓글이 달린 시간: 오전 11:38 스레드 보기
+												263 container
+													264 버튼 김지민(PM)
+													265 텍스트
+													266 link [오늘, 오전 9:57:58](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788224278889259)
+													267 container, Text: 세금계산서 이메일주소 문의 @김지희(QA) @전현성(개발)
+													268 버튼 6개의 댓글
+													269 container, Text: 오늘 마지막 댓글이 달린 시간: 오전 10:08 스레드 보기
+												270 container
+													271 버튼 강태호(개발)
+													272 텍스트
+													273 link [오늘, 오전 10:10:55](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788225055413689)
+													274 container, Text: @sendon v20260831.001 dev 배포 완료
+													275 버튼 6개의 댓글
+													276 container, Text: 오늘 마지막 댓글이 달린 시간: 오전 10:23 스레드 보기
+												277 container 김지민(PM): 더블어스 수신거부 마이그레이션 @전현성(개발) @김종원(개발) 오전 11:02. 17개의 댓글.
+													278 container
+														279 버튼 김지민(PM)
+														280 텍스트
+														281 link [오늘, 오전 11:02:54](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788228174972829)
+														282 container, Text: 더블어스 수신거부 마이그레이션 @전현성(개발) @김종원(개발)
+														283 버튼 17개의 댓글
+														284 container, Text: 오늘 마지막 댓글이 달린 시간: 오전 11:37 스레드 보기
+										285 container
+											286 container 작성기
+												287 container
+													288 툴바 서식
+														289 container
+															290 전환 버튼 굵게, Value: 0
+															291 전환 버튼 기울임꼴, Value: 0
+															292 전환 버튼 밑줄, Value: 0
+															293 전환 버튼 취소선, Value: 0
+															294 전환 버튼 링크, Value: 0
+															295 전환 버튼 순서가 지정된 목록, Value: 0
+															296 전환 버튼 글머리 기호 목록, Value: 0
+															297 전환 버튼 인용구, Value: 0
+															298 전환 버튼 코드, Value: 0
+															299 전환 버튼 코드 블록, Value: 0
+													300 텍스트 엔트리 영역 (settable) maker-v2 님에게 메시지 보내기
+													301 툴바 작성기 작업
+														302 팝업 버튼 첨부
+														303 container
+															304 전환 버튼 서식 표시, Value: 1
+															305 버튼 이모티콘
+															306 버튼 다른 사람에게 멘션
+															307 버튼 비디오 클립 기록
+															308 버튼 오디오 클립 기록
+															309 버튼 단축키 실행
+														310 버튼 (disabled) 지금 보내기
+														311 팝업 버튼 (disabled) 나중에 예약
+								312 container maker-v2 채널의 스레드
+									313 툴바 보조 보기 작업
+										314 텍스트, Value: 스레드
+										315 버튼 스레드 요약
+										316 팝업 버튼 채널 작업 더 보기
+										317 버튼 닫기
+									318 container
+										319 내용 목록 maker-v2의 스레드 (채널, 3개의 댓글)
+											320 container
+												321 버튼 이선미(PD)
+												322 텍스트
+												323 link [어제, 오후 5:50:29. 채널에서 열기](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788166229409989)
+												324 link [@김지희(QA)](https://aligo.slack.com/team/U06SSH1QAJC)
+											325 container
+												326 텍스트, Value: 3개의 댓글
+												327 분할선
+											328 container
+												329 버튼 이선미(PD)
+												330 텍스트
+												331 link [어제, 오후 5:50:32. 채널에서 열기](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788166232783149?thread_ts=1788166229.409989&cid=C06P3GT5K9Q)
+												332 link [lab-console.sendon.io](https://lab-console.sendon.io/)
+											333 container, Text: 어제, 오후 5:50:38. 채널에서 열기 5:50 지희님 여기 링크요!
+											334 container
+												335 버튼 김지희(QA)
+												336 텍스트
+												337 link [어제, 오후 5:51:22. 채널에서 열기](https://aligo.slack.com/archives/C06P3GT5K9Q/p1788166282725839?thread_ts=1788166229.409989&cid=C06P3GT5K9Q)
+												338 container
+													339 텍스트, Value: 감사합니다 선미님
+													340 이미지 감사함다 이모티콘
+											341 container 작성기
+												342 container
+													343 툴바 서식
+														344 container
+															345 전환 버튼 굵게, Value: 0
+															346 전환 버튼 기울임꼴, Value: 0
+															347 전환 버튼 밑줄, Value: 0
+															348 전환 버튼 취소선, Value: 0
+															349 전환 버튼 링크, Value: 0
+															350 전환 버튼 순서가 지정된 목록, Value: 0
+															351 전환 버튼 글머리 기호 목록, Value: 0
+															352 전환 버튼 인용구, Value: 0
+															353 전환 버튼 코드, Value: 0
+															354 전환 버튼 코드 블록, Value: 0
+													355 텍스트 엔트리 영역 (settable) maker-v2 스레드에 댓글 남기기
+													356 container
+														357 텍스트, Value: maker-v2
+														358 텍스트, Value: (으)로도 전송
+														359 체크박스 (settable) maker-v2(으)로도 전송, Value: 0
+													360 툴바 작성기 작업
+														361 팝업 버튼 첨부
+														362 container
+															363 전환 버튼 서식 표시, Value: 1
+															364 버튼 이모티콘
+															365 버튼 다른 사람에게 멘션
+															366 팝업 버튼 추가 옵션
+														367 버튼 (disabled) 지금 보내기
+														368 팝업 버튼 (disabled) 나중에 예약
+								369 슬라이더 (settable) 보조 패널 너비, Value: 592, Secondary Actions: increment, decrement
+							370 툴바 제어 스트립
+								371 팝업 버튼 새로 만들기
+								372 버튼 집중 모드 켜기
+								373 팝업 버튼 사용자: 공경남(PO)
+				374 container, Text: 스레드 로드 중... 강태호(개발) 님이 입력 중입니다.
+	375 닫기 버튼
+	376 전체 화면 버튼, Secondary Actions: zoom the window
+	377 최소화 버튼
+
+No UI element is currently focused.

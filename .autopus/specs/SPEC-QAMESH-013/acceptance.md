@@ -148,11 +148,20 @@ AC-QAMESH13-011 (**live**, Autopus Desktop): BLOCKED, not failed. The installed
 `/Applications/Autopus Desktop.app` is a stale build, being rebuilt in a separate
 session. Precondition: a current build with an open window.
 
-AC-QAMESH13-012 (**live**, a second app): NOT MET. The live path was driven as far
-as publication and produced two real defects, recorded here rather than left for
-someone to rediscover.
+AC-QAMESH13-012 (**live**, a second app): **MET** after fixing the two gaps below.
+Target Slack (`com.tinyspeck.slackmacgap`), an app we do not own, 378 nodes /
+22760 bytes, window title `maker-v2(채널) - Aligo - Slack`.
 
-### Gap 1 — the node bound is too small for real applications
+    envelope: ok | run: passed
+    check desktop-semantic-landmarks passed
+    root:  AXApplication 'Slack' {'enabled': True}
+     child: AXWindow 'maker-v2(채널) - Aligo - Slack' {'focused': True}
+
+AC-QAMESH13-007 confirmed on that live evidence: 311 distinct undeclared tokens in
+the observed tree, zero in the published manifest and artifact. Only the two
+declared names appear. `provider_app_id` appears nowhere.
+
+### Gap 1 — the node bound was too small for real applications (FIXED)
 
 `desktopTreeMaxNodes = 256`. Measured element counts on this machine: Finder 152,
 Slack 378, Autopus Desktop 7 to 22 depending on load state. A mainstream app
@@ -164,15 +173,17 @@ landmarks rather than by the app, so this bound now protects only parse cost. It
 should be raised to cover real apps; the 8 KiB published bound stays as is,
 because that is the privacy-relevant one.
 
-### Gap 2 — the node-bound refusal is misreported through the live path
+### Gap 2 — a real provider focus-line variant was refused (FIXED)
 
-Observed with a Slack-sized tree: reason code `provider_protocol_mismatch`, not
-`observed_tree_bound_exceeded`. The unit path reports the bound by name, so the
-code is lost between `parseDesktopTree` and the receipt — most likely the
-per-operation reason clamp at `pkg/qa/run/desktop_observe_transport.go:225-249`.
+The `provider_protocol_mismatch` first attributed to the node bound was actually
+the focus line. The provider renders two legitimate forms, and only one was
+accepted: `The focused UI element is <id> ...` when the app holds keyboard focus,
+and `No UI element is currently focused.` when it does not. Refusing the second
+reported a correctly observed unfocused app as a protocol fault.
 
-Same misreport class REQ-5 and REQ-6 exist to remove, surviving one layer further
-out than the taxonomy fix reached.
+Both forms now parse; the unfocused form yields no focus, so a pack declaring
+`required_state: focused` legitimately fails rather than passing on a phantom.
+Pinned by `slack-unfocused.txt`, a third real capture.
 
 ### Live path reach, for the record
 
