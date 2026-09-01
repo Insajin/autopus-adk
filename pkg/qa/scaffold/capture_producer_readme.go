@@ -8,6 +8,7 @@ func captureReadmeBody(signals projectSignals) string {
 	rows := captureReadmeIntro()
 	rows = append(rows, captureReadmeJourneyPack(signals)...)
 	rows = append(rows, captureReadmeRuntime()...)
+	rows = append(rows, desktopObservationReadme(signals)...)
 	return strings.Join(rows, "\n") + "\n"
 }
 
