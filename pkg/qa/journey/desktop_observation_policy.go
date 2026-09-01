@@ -15,6 +15,10 @@ const (
 	// through a field that ends up in evidence, logs, and provider requests.
 	desktopObservationRefMaxLen  = 64
 	desktopObservationNameMaxLen = 96
+	// desktopObservationLandmarkMax bounds how many landmarks a pack may declare.
+	// The published projection is one node per declared landmark, so this is what
+	// keeps it under the 8 KiB typed evidence bound regardless of app size.
+	desktopObservationLandmarkMax = 24
 
 	// provider_app_id is never published, so it is not bounded by the evidence
 	// budget the refs answer to. It is bounded anyway because it is
@@ -109,16 +113,32 @@ func validateDesktopObservationTarget(
 	return validateDesktopObservationLandmarks(policy.RequiredLandmarks, invalid)
 }
 
-// validateDesktopObservationLandmarks keeps the canonical landmark structure:
-// exactly one application landmark that must be enabled followed by one window
-// landmark that must be focused. Only the names are project-supplied.
+// desktopObservationExtraLandmarkStates are the states an additional landmark may
+// require. They are the states the provider's rendered tree actually reports, so a
+// pack cannot declare a state the harness has no way to observe.
+var desktopObservationExtraLandmarkStates = []string{"enabled", "focused", "selected", "expanded"}
+
+// validateDesktopObservationLandmarks requires the canonical pair first - one
+// application landmark that must be enabled, then one window landmark that must be
+// focused - and permits additional landmarks after them.
+//
+// The pair is what the app and window identity are derived from, so it stays
+// mandatory and positional. Additional landmarks are how a project states what it
+// actually cares about inside the window; without them the oracle can only assert
+// "the app is running and its window is focused", and SPEC-QAMESH-013 REQ-4's
+// selective publication would have nothing to select. Exactly two was inherited
+// from the fixture era, when the projection was three synthesized nodes.
 func validateDesktopObservationLandmarks(
 	landmarks []DesktopObservationLandmark,
 	invalid func(string) error,
 ) error {
-	if len(landmarks) != len(desktopObservationLandmarkShape) {
-		return invalid("desktop observation required_landmarks must declare " +
-			"exactly one application landmark and one window landmark")
+	if len(landmarks) < len(desktopObservationLandmarkShape) {
+		return invalid("desktop observation required_landmarks must begin with " +
+			"one application landmark and one window landmark")
+	}
+	if len(landmarks) > desktopObservationLandmarkMax {
+		return invalid("desktop observation required_landmarks must declare at most " +
+			strconv.Itoa(desktopObservationLandmarkMax) + " landmarks")
 	}
 	for index, want := range desktopObservationLandmarkShape {
 		got := landmarks[index]
@@ -127,6 +147,20 @@ func validateDesktopObservationLandmarks(
 				"] must require state " + want.RequiredState)
 		}
 		if !safeDesktopObservationName(got.Name) {
+			return invalid("desktop observation landmark name must be a short " +
+				"printable single-line label")
+		}
+	}
+	for _, extra := range landmarks[len(desktopObservationLandmarkShape):] {
+		if !safeDesktopObservationRef(extra.Role) {
+			return invalid("desktop observation landmark role must be a short alias of " +
+				"letters, digits, dot, underscore, or hyphen")
+		}
+		if !slices.Contains(desktopObservationExtraLandmarkStates, extra.RequiredState) {
+			return invalid("desktop observation landmark required_state must be one of: " +
+				strings.Join(desktopObservationExtraLandmarkStates, ", "))
+		}
+		if !safeDesktopObservationName(extra.Name) {
 			return invalid("desktop observation landmark name must be a short " +
 				"printable single-line label")
 		}

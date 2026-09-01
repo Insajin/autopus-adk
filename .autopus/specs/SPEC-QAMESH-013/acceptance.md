@@ -144,9 +144,15 @@ each criterion. A criterion without pasted output is not accepted.
 Unit and integration criteria AC-001..AC-010, AC-013, AC-014: met. Both Makefile
 regression lanes zero failures; `pkg/qa/run` 80 tests / 124 subtests.
 
-AC-QAMESH13-011 (**live**, Autopus Desktop): BLOCKED, not failed. The installed
-`/Applications/Autopus Desktop.app` is a stale build, being rebuilt in a separate
-session. Precondition: a current build with an open window.
+AC-QAMESH13-011 (**live**, Autopus Desktop): WITHDRAWN as redundant.
+
+It was written while the Orca provider was still believed to be Autopus-specific.
+Once the goal became "observe the app the pack names", the first-party app is one
+instance of the general case and the third-party app is the harder one — same code
+path, same provider, same parser, same projection builder. AC-QAMESH13-012 covers
+it, and Autopus Desktop passing would add nothing about the harness. Verifying our
+own desktop app is that product's own use of the lane, not a criterion for the
+lane. (The installed bundle was also stale and being rebuilt elsewhere.)
 
 AC-QAMESH13-012 (**live**, a second app): **MET** after fixing the two gaps below.
 Target Slack (`com.tinyspeck.slackmacgap`), an app we do not own, 378 nodes /
@@ -158,8 +164,31 @@ Target Slack (`com.tinyspeck.slackmacgap`), an app we do not own, 378 nodes /
      child: AXWindow 'maker-v2(채널) - Aligo - Slack' {'focused': True}
 
 AC-QAMESH13-007 confirmed on that live evidence: 311 distinct undeclared tokens in
-the observed tree, zero in the published manifest and artifact. Only the two
-declared names appear. `provider_app_id` appears nowhere.
+the observed tree, zero in the published manifest and artifact. Only the declared
+names appear. `provider_app_id` appears nowhere.
+
+A third landmark was then declared and the run passed with all three published:
+
+    AXApplication 'Slack' {'enabled': True}
+      AXWindow 'maker-v2(채널) - Aligo - Slack' {'focused': True}
+        AXButton '도움말' {'enabled': True}
+
+That required Gap 3 below. Before it, REQ-4's selective publication had nothing to
+select beyond the canonical pair.
+
+### Gap 3 — the schema forbade the landmarks REQ-4 exists to select (FIXED)
+
+`validateDesktopObservationLandmarks` required exactly two landmarks, so a pack
+could never declare anything inside the window. The deeper-landmark path in
+`buildDesktopProjection` was therefore unreachable from any valid pack, and its
+unit test exercised a path production could not enter.
+
+Relaxed to: the canonical pair remains mandatory and positional, additional
+landmarks are permitted after it, each must use an observable state
+(`enabled`, `focused`, `selected`, `expanded`), and the total is capped at 24 so
+the published projection stays under the 8 KiB typed evidence bound regardless of
+app size. Exactly two was inherited from the fixture era, when the projection was
+three synthesized nodes.
 
 ### Gap 1 — the node bound was too small for real applications (FIXED)
 

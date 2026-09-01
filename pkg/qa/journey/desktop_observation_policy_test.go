@@ -88,10 +88,14 @@ func TestDesktopObservationPolicy_UnsafeCommandArtifactOrOperationFailsClosed(t 
 		{name: "oversized landmark name", mutate: func(pack *Pack) {
 			pack.DesktopObservation.RequiredLandmarks[1].Name = strings.Repeat("n", 97)
 		}},
-		{name: "extra landmark", mutate: func(pack *Pack) {
+		// A well-formed extra landmark is accepted now that SPEC-QAMESH-013 REQ-4
+		// selects published nodes by declaration; see
+		// desktop_observation_landmarks_test.go. A malformed one must still fail
+		// closed, so this case asserts the boundary instead of the old count rule.
+		{name: "extra landmark with unobservable state", mutate: func(pack *Pack) {
 			pack.DesktopObservation.RequiredLandmarks = append(
 				pack.DesktopObservation.RequiredLandmarks,
-				DesktopObservationLandmark{Role: "AXWindow", Name: "Autopus", RequiredState: "focused"},
+				DesktopObservationLandmark{Role: "AXButton", Name: "Help", RequiredState: "pressed"},
 			)
 		}},
 		{name: "noncanonical landmark state", mutate: func(pack *Pack) { pack.DesktopObservation.RequiredLandmarks[0].RequiredState = "focused" }},
