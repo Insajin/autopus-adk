@@ -138,3 +138,44 @@ touched or created Go source file is under 300 lines.
 
 To be filled during implementation with the exact command and its output for
 each criterion. A criterion without pasted output is not accepted.
+
+## Verification log — 2026-09-01
+
+Unit and integration criteria AC-001..AC-010, AC-013, AC-014: met. Both Makefile
+regression lanes zero failures; `pkg/qa/run` 80 tests / 124 subtests.
+
+AC-QAMESH13-011 (**live**, Autopus Desktop): BLOCKED, not failed. The installed
+`/Applications/Autopus Desktop.app` is a stale build, being rebuilt in a separate
+session. Precondition: a current build with an open window.
+
+AC-QAMESH13-012 (**live**, a second app): NOT MET. The live path was driven as far
+as publication and produced two real defects, recorded here rather than left for
+someone to rediscover.
+
+### Gap 1 — the node bound is too small for real applications
+
+`desktopTreeMaxNodes = 256`. Measured element counts on this machine: Finder 152,
+Slack 378, Autopus Desktop 7 to 22 depending on load state. A mainstream app
+exceeds the bound, so the lane refuses it correctly but unusably.
+
+The bound predates real observation, when the projection was three synthesized
+nodes. Under REQ-4 the PUBLISHED projection is bounded by the pack's declared
+landmarks rather than by the app, so this bound now protects only parse cost. It
+should be raised to cover real apps; the 8 KiB published bound stays as is,
+because that is the privacy-relevant one.
+
+### Gap 2 — the node-bound refusal is misreported through the live path
+
+Observed with a Slack-sized tree: reason code `provider_protocol_mismatch`, not
+`observed_tree_bound_exceeded`. The unit path reports the bound by name, so the
+code is lost between `parseDesktopTree` and the receipt — most likely the
+per-operation reason clamp at `pkg/qa/run/desktop_observe_transport.go:225-249`.
+
+Same misreport class REQ-5 and REQ-6 exist to remove, surviving one layer further
+out than the taxonomy fix reached.
+
+### Live path reach, for the record
+
+pack validates -> provider resolves (`orca-computer-use-macos` v1.0.0, protocol 1)
+-> envelope accepted -> tree parsed -> node bound refused. Every layer up to the
+bound is exercised by a real provider against a real third-party app.
