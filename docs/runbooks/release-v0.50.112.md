@@ -28,13 +28,15 @@ A24 is the first phase whose direct predecessor is a *successful* release since 
 
 The A24 source commit and tree are not filled in here. Freeze them from the exact clean `origin/main` used for the release. All later coordinates must bind those observed values.
 
-Observed candidate at the time of writing, for orientation only — re-freeze at execution:
+The candidate is deliberately not pinned here. An earlier draft named a commit, and the next commit to this very file made that value stale — a pinned candidate in a living document is a value that invalidates itself and then misleads whoever reads it next. Derive it instead, on a clean tree:
 
-| Observation | Value |
-|---|---|
-| `origin/main` commit | `fb5c281347bf9a5d4414cc0441305694f8c00366` |
-| `origin/main` tree | `4ba6a3daedfdca248fc058e3115de0db93c9536d` |
-| Commits since v0.50.111 | 17 |
+```sh
+git fetch origin && git status --short   # must be empty
+git rev-parse origin/main origin/main^{tree}
+git log v0.50.111..origin/main --oneline | wc -l
+```
+
+Freeze that commit and tree into the workflow inputs and every later coordinate. The predecessor pins in the next section are the opposite case: they describe immutable published history, so they are written down.
 
 ## Immutable v0.50.111 predecessor
 
@@ -65,7 +67,7 @@ The companion manifest and signature digests are not restated here. Read them fr
 | Input | Source |
 |---|---|
 | `release-lineage-v1.json` + `release-lineage-v1.sig` | published v0.50.111 assets |
-| A0 receipt bundle: receipt bytes + signature | operator-held local bundle, opened through the fd-pinned transaction in `pkg/companionmanifest/public_key_receipt_bundle_unix.go` |
+| A0 receipt bundle: receipt bytes + signature | produced by release prep from the operator's Ed25519 key, then opened through the fd-pinned transaction in `pkg/companionmanifest/public_key_receipt_bundle_unix.go` |
 | A0 anchor pins | committed at `pkg/companionmanifest/public_key_receipt_trust.go:15-18` |
 
 The anchor is four committed SHA-256 pins over the receipt, its signature, the public key, and the record. They are immutable source, so the gate cannot be satisfied by substituting a different receipt.
@@ -147,14 +149,16 @@ Ruleset `21986875` was created in the open shape and field-compared against the 
 
 ### Operator-held material, and why the procedure stops without it
 
-Four inputs exist only on the release operator's machine. None can be reconstructed from the repository, and substituting any of them changes the trust chain the release claims.
+Everything the operator must bring reduces to key material. Two key sets, and the rest is generated from them — so this is one blocker wearing four hats, not four hunts.
 
-| Input | Checked how | State observed while writing this runbook |
+| Input | Origin | State observed while writing this runbook |
 |---|---|---|
-| R2 tag signing private key | `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, extracted from the v0.50.111 tag signature and matching `scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint` | absent; the only local key is `SHA256:GIa3VFVWeCqBJamdDCJdxDzXE+XxQBC1xsx/iZ9XlF8` and `ssh-add -l` reports no identities |
-| Nine `COMPANION_*` variables | `bash scripts/companion-release/validate-environment.sh` | absent; fails at `COMPANION_BUILD_PROVENANCE` |
-| `COMPANION_SIGNING_KEY_FILE` | same validator, plus its `secure_regular_file` check | absent |
-| A0 receipt bundle | required by the lineage gate above | not located |
+| R2 tag signing private key | operator-held SSH key; `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, extracted from the v0.50.111 tag signature and matching `scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint` | absent; the only local key is `SHA256:GIa3VFVWeCqBJamdDCJdxDzXE+XxQBC1xsx/iZ9XlF8` and `ssh-add -l` reports no identities |
+| `COMPANION_SIGNING_KEY_FILE` | operator-held Ed25519 private key, mode 0600 | absent |
+| Nine `COMPANION_*` variables | operator-supplied; validated by `bash scripts/companion-release/validate-environment.sh` | absent; fails at `COMPANION_BUILD_PROVENANCE` |
+| A0 receipt bundle | **generated, not located.** `auto companion-manifest public-key-receipt --key-file … --bundle-output …`, driven by `produce_public_key_receipt_bundle` in `scripts/companion-release/produce-public-key-receipt.sh` | cannot be produced here; no key file |
+
+The last row was worth checking rather than assuming. An earlier draft of this runbook told the operator to locate the A0 bundle, which would have sent them looking for a file that release prep creates. Nothing is missing from disk; the key that signs it is missing.
 
 Signing the tag with a different key is not a smaller version of this release. The v0.50.109 rotation established R2 through a signed sidecar, and every consumer that checks a v0.50.112 tag will check it against R2. A tag signed by another key is a tag that fails verification for everyone downstream while looking finished locally.
 
@@ -193,7 +197,7 @@ Two findings came out of that run and are fixed on the candidate: the `adk-go-fa
 
 ## Release content
 
-A24 carries seventeen commits: QAMESH work plus this release's own runbook and preflight fixes. Enumerate with `git log v0.50.111..HEAD`.
+A24 carries the QAMESH work landed after v0.50.111, plus this release's own runbook and the two preflight fixes it produced. Enumerate with `git log v0.50.111..origin/main --oneline`; the count is not written down here for the same reason the candidate commit is not.
 
 Derive the scope from that range, not from `CHANGELOG.md` `[Unreleased]`. The changelog's released sections stop at `[v0.50.10]`, so `[Unreleased]` accumulates roughly two hundred entries spanning versions that already shipped. It is the right place to read *wording* for an entry and the wrong place to read *scope*. Cross-check that every commit in the range has a matching changelog entry; a commit with no entry is a stop, because the release description is the only place a user learns what changed.
 
@@ -215,8 +219,8 @@ Sections "Static remote coordinates" through "Reconciliation and rollback bounda
 
 Stop and escalate rather than improvising if any of these hold.
 
-1. `autopus-v0.50.112-release-authority` does not exist at tag-push time.
-2. The A0 receipt bundle is unavailable, or the lineage verifier does not identify A24 → A23 with every predecessor pin above. An unavailable bundle is a stop, not a skip: shipping without the lineage gate is the failure mode the gate exists to catch.
+1. `autopus-v0.50.112-release-authority` (ruleset `21986875`) is missing at tag-push time, or still carries the operator bypass after the tag exists. An unsealed release tag is mutable by the operator, which is the property the ruleset removes.
+2. The A0 receipt bundle cannot be produced, or the lineage verifier does not identify A24 → A23 with every predecessor pin above. Skipping the gate is not the smaller option: shipping without it is the failure mode the gate exists to catch.
 3. The freshly generated evidence reuses any A22, A23, or v0.50.110 identifier.
 4. Either test lane fails for a reason other than the confirmed port-1455 collision.
 5. `git status --short` is non-empty after `go run ./cmd/generate-templates`.
