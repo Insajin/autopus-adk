@@ -20,12 +20,13 @@ type statusHygieneReport struct {
 }
 
 type statusHygienePayload struct {
-	Available         bool                       `json:"available"`
-	Status            string                     `json:"status"`
-	GeneratedDrift    statusHygieneMetricPayload `json:"generated_drift"`
-	TrackedButIgnored statusHygieneMetricPayload `json:"tracked_but_ignored"`
-	RuntimeUnignored  statusHygieneMetricPayload `json:"runtime_unignored"`
-	Diagnostic        string                     `json:"diagnostic,omitempty"`
+	Available              bool                         `json:"available"`
+	Status                 string                       `json:"status"`
+	GeneratedDrift         statusHygieneMetricPayload   `json:"generated_drift"`
+	TrackedButIgnored      statusHygieneMetricPayload   `json:"tracked_but_ignored"`
+	TrackedIgnoredFamilies []statusHygieneFamilyPayload `json:"tracked_but_ignored_families,omitempty"`
+	RuntimeUnignored       statusHygieneMetricPayload   `json:"runtime_unignored"`
+	Diagnostic             string                       `json:"diagnostic,omitempty"`
 }
 
 type statusHygieneMetricPayload struct {
@@ -33,6 +34,15 @@ type statusHygieneMetricPayload struct {
 	Count   int      `json:"count"`
 	Paths   []string `json:"paths,omitempty"`
 	Message string   `json:"message,omitempty"`
+}
+
+// statusHygieneFamilyPayload carries the per-family split so `--json` consumers
+// get the same actionable grouping the text renderer shows.
+type statusHygieneFamilyPayload struct {
+	Label       string   `json:"label"`
+	Disposition string   `json:"disposition"`
+	Count       int      `json:"count"`
+	Paths       []string `json:"paths"`
 }
 
 var runtimeUnignoredExtraPrefixes = []string{

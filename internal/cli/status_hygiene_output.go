@@ -13,13 +13,31 @@ const maxHygieneCheckPaths = 10
 
 func (r statusHygieneReport) payload() statusHygienePayload {
 	return statusHygienePayload{
-		Available:         r.Available,
-		Status:            r.Status,
-		GeneratedDrift:    r.metricPayload(r.GeneratedDrift, "generated/runtime working tree drift candidates"),
-		TrackedButIgnored: r.metricPayload(r.TrackedButIgnored, "tracked files matched by .gitignore"),
-		RuntimeUnignored:  r.metricPayload(r.RuntimeUnignored, "untracked runtime/generated paths visible to git"),
-		Diagnostic:        r.Diagnostic,
+		Available:              r.Available,
+		Status:                 r.Status,
+		GeneratedDrift:         r.metricPayload(r.GeneratedDrift, "generated/runtime working tree drift candidates"),
+		TrackedButIgnored:      r.metricPayload(r.TrackedButIgnored, "tracked files matched by .gitignore"),
+		TrackedIgnoredFamilies: r.familyPayload(),
+		RuntimeUnignored:       r.metricPayload(r.RuntimeUnignored, "untracked runtime/generated paths visible to git"),
+		Diagnostic:             r.Diagnostic,
 	}
+}
+
+func (r statusHygieneReport) familyPayload() []statusHygieneFamilyPayload {
+	if !r.Available || len(r.TrackedButIgnored) == 0 {
+		return nil
+	}
+	families := classifyTrackedIgnored(r.TrackedButIgnored)
+	payloads := make([]statusHygieneFamilyPayload, 0, len(families))
+	for _, family := range families {
+		payloads = append(payloads, statusHygieneFamilyPayload{
+			Label:       family.Label,
+			Disposition: family.Disposition,
+			Count:       len(family.Paths),
+			Paths:       family.Paths,
+		})
+	}
+	return payloads
 }
 
 func (r statusHygieneReport) metricPayload(paths []string, label string) statusHygieneMetricPayload {
@@ -59,9 +77,11 @@ func hygieneJSONWarnings(report statusHygieneReport) []jsonMessage {
 		})
 	}
 	if len(report.TrackedButIgnored) > 0 {
+		families := classifyTrackedIgnored(report.TrackedButIgnored)
 		warnings = append(warnings, jsonMessage{
-			Code:    "hygiene_tracked_but_ignored",
-			Message: fmt.Sprintf("%d tracked file(s) are matched by .gitignore.", len(report.TrackedButIgnored)),
+			Code: "hygiene_tracked_but_ignored",
+			Message: fmt.Sprintf("%d tracked file(s) are matched by .gitignore across %d family(s); %s.",
+				len(report.TrackedButIgnored), len(families), trackedIgnoredRemediation(families)),
 		})
 	}
 	if len(report.RuntimeUnignored) > 0 {
@@ -76,9 +96,32 @@ func hygieneJSONWarnings(report statusHygieneReport) []jsonMessage {
 func hygieneJSONChecks(scope string, report statusHygieneReport) []jsonCheck {
 	return []jsonCheck{
 		hygieneMetricCheck(scope, "generated_drift", "generated/runtime working tree drift", report.Available, report.Diagnostic, report.GeneratedDrift),
-		hygieneMetricCheck(scope, "tracked_but_ignored", "tracked-but-ignored files", report.Available, report.Diagnostic, report.TrackedButIgnored),
+		trackedIgnoredCheck(scope, report),
 		hygieneMetricCheck(scope, "runtime_unignored", "runtime/generated unignored files", report.Available, report.Diagnostic, report.RuntimeUnignored),
 	}
+}
+
+// trackedIgnoredCheck reports the family split instead of the first ten paths.
+// A raw prefix of a 177-path inventory names no family and hides whether a
+// canonical document is caught, which is the one case that must not be
+// untracked.
+func trackedIgnoredCheck(scope string, report statusHygieneReport) jsonCheck {
+	const label = "tracked-but-ignored files"
+	check := hygieneMetricCheck(scope, "tracked_but_ignored", label,
+		report.Available, report.Diagnostic, report.TrackedButIgnored)
+	if !report.Available || len(report.TrackedButIgnored) == 0 {
+		return check
+	}
+
+	families := classifyTrackedIgnored(report.TrackedButIgnored)
+	summaries := make([]string, 0, len(families))
+	for _, family := range families {
+		summaries = append(summaries, family.summary())
+	}
+	check.Detail = fmt.Sprintf("%s: %d candidate(s) in %d family(s): %s; %s",
+		label, len(report.TrackedButIgnored), len(families),
+		strings.Join(summaries, "; "), trackedIgnoredRemediation(families))
+	return check
 }
 
 func hygieneMetricCheck(scope, key, label string, available bool, diagnostic string, paths []string) jsonCheck {
@@ -124,7 +167,7 @@ func renderHygieneText(out io.Writer, report statusHygieneReport) {
 	}
 
 	renderHygieneMetric(out, "generated/runtime working tree drift", report.GeneratedDrift)
-	renderHygieneMetric(out, "tracked-but-ignored files", report.TrackedButIgnored)
+	renderTrackedIgnored(out, report.TrackedButIgnored)
 	renderHygieneMetric(out, "runtime/generated unignored files", report.RuntimeUnignored)
 }
 
@@ -140,6 +183,27 @@ func renderHygieneMetric(out io.Writer, label string, paths []string) {
 	if len(paths) > maxHygieneTextPaths {
 		tui.Bullet(out, fmt.Sprintf("... and %d more", len(paths)-maxHygieneTextPaths))
 	}
+}
+
+// renderTrackedIgnored prints one line per family plus the remediation, instead
+// of the five alphabetically-first paths. Those five were a fixed window onto a
+// sorted inventory: on a 177-path repo they were an audit log and four
+// brainstorms every run, naming no family and never revealing whether a
+// canonical SPEC document had been swallowed by a rule.
+func renderTrackedIgnored(out io.Writer, paths []string) {
+	const label = "tracked-but-ignored files"
+	if len(paths) == 0 {
+		tui.OK(out, fmt.Sprintf("%s: none observed", label))
+		return
+	}
+
+	families := classifyTrackedIgnored(paths)
+	tui.SKIP(out, fmt.Sprintf("%s: %d candidate(s) in %d family(s)",
+		label, len(paths), len(families)))
+	for _, family := range families {
+		tui.Bullet(out, family.summary())
+	}
+	tui.Bullet(out, trackedIgnoredRemediation(families))
 }
 
 func limitHygieneTextPaths(paths []string) []string {
