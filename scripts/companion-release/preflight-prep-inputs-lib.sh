@@ -98,6 +98,16 @@ check_release_prep_inputs() {
     warn 'no credential source: bring up the gateway or export AUTOPUS_OMP_CONTEXT_PROVIDER_*'
   fi
 
+  # --apply creates an isolated macOS user for the release canary through dscl,
+  # so it demands noninteractive root and then refreshes the timestamp every 30
+  # seconds. It checks with `sudo -n -v`, which fails rather than prompting, so a
+  # stale timestamp stops apply seconds after it starts.
+  if /usr/bin/sudo -n -v 2>/dev/null; then
+    pass 'noninteractive root authorization is available for --apply'
+  else
+    warn 'no noninteractive root; run `sudo -v` before --apply or it stops immediately'
+  fi
+
   # Resident launchd agents are the intended setup, so their absence is worth
   # naming even when a gateway URL happens to be exported by hand.
   if launchctl list 2>/dev/null | grep -q 'co\.autopus\.omp-auth-gateway'; then

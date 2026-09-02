@@ -294,6 +294,19 @@ Where each resolved value came from, so none of them is a guess:
 
 `MODEL` is the one value worth a second look before applying. A23's report pins a `model_scope_digest` but does not name the model, so a different model produces different evidence rather than a failure. The current model is the deliberate choice here, consistent with advancing the OMP oracle; if that is wrong, change it before prep rather than after.
 
+### Root authorization for --apply
+
+`--apply` builds the release canary as an isolated macOS user through `dscl`, so it requires noninteractive root and then refreshes the timestamp every 30 seconds while it runs. The check is `sudo -n -v`, which fails instead of prompting, so a stale timestamp stops apply about two seconds in.
+
+Authorize immediately before, in a terminal where you can type:
+
+```bash
+sudo -v
+scripts/companion-release/release-prep.sh --apply
+```
+
+`preflight-release.sh` reports this, so it surfaces before the 40-call cohort rather than after. `--preflight` itself does not need root, which is why the gap only appears at apply time.
+
 ### Content gates
 
 Freeze `origin/main` only after all of these pass on the exact release commit.
