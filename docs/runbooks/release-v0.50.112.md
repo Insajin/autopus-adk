@@ -20,7 +20,7 @@ A24 is the first phase whose direct predecessor is a *successful* release since 
 | Release tag ruleset | `autopus-v0.50.112-release-authority` |
 | Protected environment | `adk-companion-release` |
 | Release operator user ID | `204883817` |
-| Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` |
+| Tag signer | none; annotated unsigned tag, see `release-key-custody-loss.md` |
 | Active promotion signer | `omp-context-promotion-2026-q3-k3` |
 | Active policy ID | `omp-context-active-v1` |
 | Go toolchain | `1.26.6` |
@@ -177,7 +177,18 @@ The single blocker is the tag signature. `verify_tag_signing_authority` in `scri
 
 Signing the tag with a different key is not a smaller version of this release. The published v0.50.109 rotation sidecar names R2 as the authorized signer, so another key contradicts immutable published history. Consumers are unaffected either way — nothing a consumer runs verifies a git tag signature — which is exactly why the decision must be recorded rather than absorbed silently.
 
-Resolve it through `release-key-custody-loss.md` before returning here. That document holds the two options and their costs.
+**Resolved 2026-09-02, option A.** The precondition was retired on the record: release tags from v0.50.112 onward are annotated and unsigned, and artifact trust rests on the K1 envelope over `checksums.txt` plus the sigstore bundle. `release-key-custody-loss.md` carries the change list and the cost.
+
+Two consequences for this runbook's own coordinates:
+
+| Coordinate | Was | Now |
+|---|---|---|
+| Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` | none; annotated unsigned tag |
+| Release phase registration | absent | `v0.50.112` is phase `A24` in `validate-source.sh`, ancestor `954f60a77acb59fd4106537020693fdcadb3d640` |
+
+The phase registration was a hidden blocker worth naming: `validate-source.sh` maps tag to phase with a fail-closed default, so v0.50.112 would have been rejected as "outside the frozen policy" no matter what else was correct. It fails closed rather than misvalidating, which is the right behaviour and also easy to miss until the workflow runs.
+
+State plainly in the release description that the tag is unsigned and why. A release that quietly stops carrying a guarantee is worse than one that says it stopped.
 
 ### Generating a new key on the release machine
 

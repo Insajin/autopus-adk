@@ -29,35 +29,11 @@ sign_promotion_report() {
   "$policy_tool" companion-manifest omp-context-promotion-attestation \
     --report "$report" --valid-for 24h --output "$output" <"$promotion_signing_key"
 }
-verify_tag_signing_authority() {
-  local derived_public expected_public derived_value expected_fingerprint signing_probe
-  derived_public="$temp_dir/release-tag-signing.pub"
-  ssh-keygen -y -f "$tag_signing_key" >"$derived_public"
-  chmod 0600 "$derived_public"
-  expected_public=$(awk 'NF >= 2 { print $1 " " $2; exit }' "$tag_public_key_file")
-  derived_value=$(awk 'NF >= 2 { print $1 " " $2; exit }' "$derived_public")
-  expected_fingerprint=$(<"$tag_fingerprint_file")
-  [[ -n "$expected_public" && "$derived_value" == "$expected_public" ]] ||
-    fail 'release tag signing key differs from R2 public pin'
-  [[ "$expected_fingerprint" == 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ' &&
-     "$(ssh-keygen -lf "$derived_public" -E sha256 | awk '{print $2}')" == "$expected_fingerprint" ]] ||
-    fail 'release tag signing key differs from R2 fingerprint'
-  allowed_signers="$temp_dir/release-tag.allowed-signers"
-  printf 'autopus-adk-release-tag %s\n' "$derived_value" >"$allowed_signers"
-  chmod 0600 "$allowed_signers"
-  tag_git_config=(
-    GIT_CONFIG_COUNT=5
-    GIT_CONFIG_KEY_0=gpg.format GIT_CONFIG_VALUE_0=ssh
-    GIT_CONFIG_KEY_1=user.signingkey GIT_CONFIG_VALUE_1="$tag_signing_key"
-    GIT_CONFIG_KEY_2=gpg.ssh.allowedSignersFile GIT_CONFIG_VALUE_2="$allowed_signers"
-    GIT_CONFIG_KEY_3=user.name GIT_CONFIG_VALUE_3='Joseph'
-    GIT_CONFIG_KEY_4=user.email GIT_CONFIG_VALUE_4='joseph@Josephui-MacBookPro.local'
-  )
-  signing_probe="$temp_dir/signing-probe"
-  git clone --quiet --no-checkout --shared . "$signing_probe"
-  env "${tag_git_config[@]}" git -C "$signing_probe" tag -s release-signing-probe HEAD -m 'release signing probe'
-  env "${tag_git_config[@]}" git -C "$signing_probe" verify-tag refs/tags/release-signing-probe >/dev/null
-}
+# verify_tag_signing_authority was removed with the R2 tag signer. It proved the
+# operator held the key pinned by the v0.50.109 rotation sidecar before prep
+# continued. R2 was destroyed and the channel key that could have authorized a
+# replacement was destroyed with it, so the check could only ever fail. See
+# docs/runbooks/release-key-custody-loss.md for the decision and its cost.
 credential_free_public_git() {
   local isolated_home=$1
   shift

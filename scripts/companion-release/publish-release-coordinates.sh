@@ -3,14 +3,14 @@ set -euo pipefail
 umask 077
 fail() { printf 'release coordinate publish: %s\n' "$1" >&2; exit 1; }
 usage() {
-  printf '%s\n' 'usage: publish-release-coordinates.sh REPOSITORY ENVIRONMENT RELEASE_TAG SOURCE_COMMIT SOURCE_TREE STATIC_POLICY_FILE EVIDENCE_TAG_OBJECT EVIDENCE_COMMIT EVIDENCE_TREE REPORT_SHA256 ATTESTATION_SHA256 fresh:COMMIT|retained:COMMIT|reconcile TAG_SIGNING_KEY' >&2
+  printf '%s\n' 'usage: publish-release-coordinates.sh REPOSITORY ENVIRONMENT RELEASE_TAG SOURCE_COMMIT SOURCE_TREE STATIC_POLICY_FILE EVIDENCE_TAG_OBJECT EVIDENCE_COMMIT EVIDENCE_TREE REPORT_SHA256 ATTESTATION_SHA256 fresh:COMMIT|retained:COMMIT|reconcile' >&2
   exit 64
 }
-[[ $# -eq 13 ]] || usage
+[[ $# -eq 12 ]] || usage
 readonly repository=$1 environment_name=$2 release_tag=$3 source_commit=$4 source_tree=$5
 readonly static_policy_file=$6 evidence_tag_object=$7 evidence_commit=$8 evidence_tree=$9
 shift 9
-readonly report_sha256=$1 attestation_sha256=$2 prep_lock_argument=$3 tag_signing_key=$4
+readonly report_sha256=$1 attestation_sha256=$2 prep_lock_argument=$3
 readonly release_mode='canonical' promotion_key_id='omp-context-promotion-2026-q3-k3'
 prep_lock_commit='' transaction_kind=''
 case "$prep_lock_argument" in
@@ -39,14 +39,8 @@ policy_base64=$(printf '%s' "$static_policy_b64" | tr '_-' '/+')
 case $((${#policy_base64} % 4)) in 0) ;; 2) policy_base64+='==' ;; 3) policy_base64+='=' ;; *) fail 'static policy base64url length is invalid' ;; esac
 policy_signing_key_id=$(jq -Rer '@base64d | fromjson | .promotion_signing_key_id' <<<"$policy_base64") || fail 'static policy cannot be decoded'
 [[ "$policy_signing_key_id" == "$promotion_key_id" ]] || fail 'static policy does not own the exact K3 signer'
-[[ -f "$tag_signing_key" && ! -L "$tag_signing_key" ]] || fail 'release tag signing key is unsafe'
-for tool in awk cmp gh git jq mktemp shasum ssh-keygen stat tr uname wc; do command -v "$tool" >/dev/null || fail "$tool is unavailable"; done
-case "$(uname -s)" in
-  Darwin) key_owner_mode=$(/usr/bin/stat -f '%u:%Lp' "$tag_signing_key") ;;
-  Linux) key_owner_mode=$(stat -c '%u:%a' "$tag_signing_key") ;;
-  *) fail 'release tag signing platform is unsupported' ;;
-esac
-[[ "$key_owner_mode" == "$(id -u):600" ]] || fail 'release tag signing key ownership or mode is unsafe'
+for tool in awk cmp gh git jq mktemp shasum stat tr uname wc; do command -v "$tool" >/dev/null || fail "$tool is unavailable"; done
+case "$(uname -s)" in Darwin|Linux) ;; *) fail 'release tag platform is unsupported' ;; esac
 repo_root=$(git rev-parse --show-toplevel)
 [[ "$(pwd -P)" == "$repo_root" ]] || fail 'publisher must run at the repository root'
 readonly repo_root
@@ -69,23 +63,15 @@ expected_evidence_names=$'omp-context-promotion-attestation.v2.json\nomp-context
 bootstrap_cleanup() { rm -rf -- "$temp_dir"; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/release-coordinate-publish.XXXXXX"); readonly temp_dir
 chmod 0700 "$temp_dir"; trap bootstrap_cleanup EXIT
-r2_public="$repo_root/scripts/companion-release/release-tag-signing-2026-q3-r2.pub"
-r2_fingerprint="$repo_root/scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint"
-[[ -f "$r2_public" && ! -L "$r2_public" && -f "$r2_fingerprint" && ! -L "$r2_fingerprint" ]] || fail 'R2 release tag signer pins are missing or unsafe'
-derived_public="$temp_dir/release-tag-signing.pub"; allowed_signers="$temp_dir/release-tag.allowed-signers"
-ssh-keygen -y -f "$tag_signing_key" >"$derived_public"
-expected_public=$(awk 'NF >= 2 { print $1 " " $2; exit }' "$r2_public")
-derived_public_value=$(awk 'NF >= 2 { print $1 " " $2; exit }' "$derived_public")
-expected_fingerprint=$(<"$r2_fingerprint")
-[[ -n "$expected_public" && "$derived_public_value" == "$expected_public" ]] || fail 'tag private key differs from R2 public pin'
-[[ "$expected_fingerprint" == 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ' &&
-   "$(ssh-keygen -lf "$derived_public" -E sha256 | awk '{print $2}')" == "$expected_fingerprint" ]] || fail 'tag private key differs from R2 fingerprint'
-printf 'autopus-adk-release-tag %s\n' "$derived_public_value" >"$allowed_signers"; chmod 0600 "$derived_public" "$allowed_signers"
-tag_git_config=(GIT_CONFIG_COUNT=5 GIT_CONFIG_KEY_0=gpg.format GIT_CONFIG_VALUE_0=ssh
-  GIT_CONFIG_KEY_1=user.signingkey GIT_CONFIG_VALUE_1="$tag_signing_key"
-  GIT_CONFIG_KEY_2=gpg.ssh.allowedSignersFile GIT_CONFIG_VALUE_2="$allowed_signers"
-  GIT_CONFIG_KEY_3=user.name GIT_CONFIG_VALUE_3='Joseph'
-  GIT_CONFIG_KEY_4=user.email GIT_CONFIG_VALUE_4='joseph@Josephui-MacBookPro.local')
+# Release tags are annotated and unsigned from v0.50.112 onward. R2 and the
+# channel key that could have replaced it were destroyed, so a signature here
+# would either fail or be made by a key the published v0.50.109 rotation sidecar
+# does not name. Artifact trust rests on the K1 envelope over checksums.txt and
+# the sigstore bundle, neither of which involves this key. The decision and its
+# cost are recorded in docs/runbooks/release-key-custody-loss.md.
+tag_git_config=(GIT_CONFIG_COUNT=2
+  GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0='Joseph'
+  GIT_CONFIG_KEY_1=user.email GIT_CONFIG_VALUE_1='joseph@Josephui-MacBookPro.local')
 static_policy_sha256=$(printf '%s' "$static_policy_b64" | shasum -a 256 | awk '{print $1}')
 [[ "$static_policy_sha256" =~ $hex64 ]] || fail 'static policy digest is malformed'
 readonly reservation_name="$release_tag"
@@ -195,17 +181,17 @@ environment_json=$(gh api "repos/${repository}/environments/${environment_name}"
 jq -e '.deployment_branch_policy.custom_branch_policies == true and .deployment_branch_policy.protected_branches == false' <<<"$environment_json" >/dev/null || fail 'environment deployment policy mode is unsafe'
 local_tag_preexisting=0
 if git show-ref --verify --quiet "$release_ref"; then
-  env "${tag_git_config[@]}" git verify-tag "$release_ref" >/dev/null ||
-    fail 'preexisting local release tag signature is invalid'
+  # An unsigned tag cannot be verify-tag'd, so what is asserted instead is that
+  # the ref is a real annotated tag object aimed at the frozen source. A
+  # lightweight tag would silently drop the message and tagger.
+  [[ "$(git cat-file -t "$release_ref")" == 'tag' ]] ||
+    fail 'preexisting local release tag is not an annotated tag object'
   [[ "$(git rev-parse --verify "${release_ref}^{commit}")" == "$source_commit" ]] ||
     fail 'preexisting local release tag targets another source'
   [[ "$transaction_kind" == 'retained' ]] ||
     fail 'preexisting local release tag requires retained reconciliation'
   local_tag_preexisting=1
 fi
-signing_probe="$temp_dir/signing-probe"; git clone --quiet --no-checkout --shared . "$signing_probe"
-env "${tag_git_config[@]}" git -C "$signing_probe" tag -s release-signing-probe "$source_commit" -m 'release signing probe'
-env "${tag_git_config[@]}" git -C "$signing_probe" verify-tag refs/tags/release-signing-probe >/dev/null
 scope_json --repo "$repository" >"$repository_snapshot"
 scope_json --repo "$repository" --env "$environment_name" >"$environment_snapshot"
 gh api "repos/${repository}/environments/${environment_name}/deployment-branch-policies" >"$policy_snapshot"
@@ -236,13 +222,17 @@ scripts/companion-release/verify-release-tag-ruleset.sh --armed ||
 git fetch --no-tags origin main
 [[ "$(git rev-parse --verify origin/main)" == "$source_commit" ]] || fail 'origin/main advanced before release commit'
 [[ "$(git rev-parse --verify 'HEAD^{tree}')" == "$source_tree" && -z "$(git status --porcelain)" ]] || fail 'source changed before release commit'
-# The R2 annotated tag is the immutable commit point; only one-way ruleset sealing follows.
+# The annotated tag is the immutable commit point; only one-way ruleset sealing
+# follows. The message carries no release phase: the previous literal said "A23"
+# and would have mislabelled every later release.
 if [[ "$local_tag_preexisting" -eq 0 ]]; then
-  env "${tag_git_config[@]}" git tag -s "$release_tag" "$source_commit" \
-    -m "${release_tag} - A23 companion release"
+  env "${tag_git_config[@]}" git tag -a "$release_tag" "$source_commit" \
+    -m "${release_tag} - companion release"
   created_release_tag=1
 fi
-env "${tag_git_config[@]}" git verify-tag "$release_ref" >/dev/null
+[[ "$(git cat-file -t "$release_ref")" == 'tag' ]] || fail 'release tag is not an annotated tag object'
+[[ "$(git rev-parse --verify "${release_ref}^{commit}")" == "$source_commit" ]] ||
+  fail 'release tag targets another source'
 local_tag_object=$(git rev-parse --verify "$release_ref"); rollback_enabled=0; push_status=0
 git push --atomic --force-with-lease="${prep_lock_ref}:${prep_lock_commit}" origin "$release_ref:$release_ref" ":$prep_lock_ref" || push_status=$?
 remote_state=''

@@ -24,6 +24,7 @@ readonly A20_A19_ANCESTOR_SHA='5bc41dccc72f8244943fd9e862cba07a36bf09d3'
 readonly A21_A20_ANCESTOR_SHA='7f44e4f143b2348c02553bab2209088c966f81ae'
 readonly A22_A21_ANCESTOR_SHA='b86fab067599f457261287552c5a9dd86460d7f4'
 readonly A23_A22_ANCESTOR_SHA='67f3def5d4a0a11aadd9e103389de6cc1cafc34e'
+readonly A24_A23_ANCESTOR_SHA='954f60a77acb59fd4106537020693fdcadb3d640'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -59,7 +60,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.92) release_phase='A21' ;;
   v0.50.109) release_phase='A22' ;;
   v0.50.111) release_phase='A23' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23 policy' ;;
+  v0.50.112) release_phase='A24' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -163,10 +165,17 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A22' ]]; then
     git merge-base --is-ancestor "$A22_A21_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A22 source does not contain the immutable A21 release'
-  else
+  elif [[ "$release_phase" == 'A23' ]]; then
     git merge-base --is-ancestor "$A23_A22_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A23 source does not contain the immutable A22 release'
+  else
+    git merge-base --is-ancestor "$A24_A23_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A24 source does not contain the immutable A23 release'
   fi
+  # A24 is deliberately absent from the tag-signature list below. Its tags are
+  # annotated and unsigned because R2 and the channel key that could have
+  # replaced it were destroyed; see docs/runbooks/release-key-custody-loss.md.
+  # Adding A24 here would gate the release on a key that cannot exist.
   if [[ "$release_phase" == 'A22' || "$release_phase" == 'A23' ]]; then
     if [[ "$release_phase" == 'A22' &&
           "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" == '1' ]]; then

@@ -100,11 +100,27 @@ Ordered by what it protects, not by convenience.
 3. **Decide the fate of the tag-signature link.** This is the whole remaining decision. Two honest options, below.
 4. **Re-establish off-repository custody going forward, whichever option is chosen.** Every surviving signing key now lives in GitHub. That is why the release chain still works, and also why the property the channel key provided — that repository access alone cannot authorize a release — is currently not held by anything. Restoring it needs a new key in custody outside GitHub, held by someone who can refuse.
 
-### Option A: retire the tag-signature precondition, on the record
+### Option A: retire the tag-signature precondition, on the record — CHOSEN, applied 2026-09-02
 
 Amend `verify_tag_signing_authority` so the procedure no longer requires a key that cannot exist, and state in the runbook and the release notes that release tags from v0.50.112 onward are not signed by R2 and that verification rests on the K1 envelope and the sigstore bundle.
 
 Cost: the audit trail loses a link, permanently and visibly. Consumers are unaffected. This is reversible in the sense that a future signer can be introduced, but the gap in history stays.
+
+Applied as follows. Every change is a removal of a check that could no longer pass, plus an assertion of what remains true.
+
+| Location | Change |
+|---|---|
+| `prepare-release-local-lib.sh` | `verify_tag_signing_authority` deleted; it existed to prove the operator held R2 before prep continued |
+| `prepare-release.sh` | `--tag-signing-key` flag, its mode/ownership validation, and its staging removed; `release_tag` advanced to `v0.50.112` |
+| `prepare-release-runtime-lib.sh` | tag key argument dropped from the publisher call |
+| `publish-release-coordinates.sh` | parameter count 13 to 12; R2 derivation and fingerprint comparison removed; `git tag -s` becomes `git tag -a`; `git verify-tag` replaced by an annotated-tag-object plus target-commit assertion |
+| `release-coordinate-transaction-lib.sh` | signature verification removed from `verify_remote_release`; the object-type and target-commit checks above it already carried the load |
+| `validate-source.sh` | `v0.50.112` registered as phase `A24` with ancestor `954f60a77acb59fd4106537020693fdcadb3d640`; the A23 fallback branch split so A23 and A24 each check their own ancestor; A24 deliberately absent from the tag-signature list, with a comment saying why |
+| `release-prep-hardening-test.sh` | R2 fixture machinery and the signer-mismatch case removed; replaced by assertions that the committed tag is an annotated object and carries no signature |
+
+The R2 `.pub` and `.fingerprint` files stay in the tree. `verify-key-rotation-sidecar.sh` and `rotation-authority-test.sh` still need them to verify the published v0.50.109 sidecar, which is immutable history and must remain checkable.
+
+One unrelated defect surfaced while editing and was fixed rather than shipped past: the tag message literal read `"${release_tag} - A23 companion release"`, so every release after v0.50.111 would have carried the wrong phase. The phase is now omitted instead of guessed.
 
 ### Option B: re-anchor the tag signer through a new ceremony
 
