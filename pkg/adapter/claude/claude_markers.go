@@ -113,6 +113,9 @@ func (a *Adapter) Validate(_ context.Context) ([]adapter.ValidationError, error)
 		}
 	}
 
+	if err := a.validateObsoleteClaudeSurface(&errs); err != nil {
+		return nil, err
+	}
 	return errs, nil
 }
 

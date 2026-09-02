@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 const minProjectDocMaxBytes = 262144
@@ -154,6 +155,21 @@ func (a *Adapter) openCodeOwnsRootDoc() bool {
 	}
 	_, statErr := os.Stat(filepath.Join(a.root, ".autopus", "opencode-manifest.json"))
 	return statErr == nil
+}
+
+// openCodeOwnsSharedSkills reports whether `.agents/skills/<workflow>` belongs
+// to the OpenCode adapter (opencode_skills.go emits it) rather than being a
+// retired Codex leftover.
+//
+// openCodeOwnsRootDoc alone is not enough on the delete path. It reads
+// `.autopus/opencode-manifest.json`, which is gitignored, so a freshly cloned
+// workspace with OpenCode installed answers "no" and the obsolete-surface
+// prune would delete a live OpenCode surface. The configured platform list is
+// the manifest-independent half, so ownership is claimed when either source
+// claims it: a false negative here destroys another platform's files, while a
+// false positive only leaves a retired directory for the doctor to report.
+func (a *Adapter) openCodeOwnsSharedSkills(cfg *config.HarnessConfig) bool {
+	return a.openCodeOwnsRootDoc() || !codexOwnsRootDoc(cfg)
 }
 
 func (a *Adapter) cleanRootDocMarker() error {

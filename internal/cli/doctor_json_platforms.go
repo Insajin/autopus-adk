@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -47,31 +48,69 @@ func (r *doctorJSONReport) collectPlatformChecks(ctx context.Context, dir string
 		}
 
 		for _, validationErr := range validationErrs {
-			level := strings.ToLower(strings.TrimSpace(validationErr.Level))
-			if level == "" {
-				level = "info"
-			}
-			payload.Messages = append(payload.Messages, doctorMessagePayload{
-				Level:   level,
-				Message: validationErr.Message,
-			})
-			checkStatus := "pass"
-			if level == "error" {
-				checkStatus = "fail"
-				r.status = jsonStatusWarn
-			} else if level == "warn" {
-				checkStatus = "warn"
-				r.status = jsonStatusWarn
-			}
-			r.checks = append(r.checks, jsonCheck{
-				ID:       "doctor.platform." + platformName,
-				Severity: level,
-				Status:   checkStatus,
-				Detail:   fmt.Sprintf("%s: %s", platformName, validationErr.Message),
-			})
+			r.appendPlatformValidationFinding(platformName, &payload, validationErr)
 		}
 		r.data.Platforms = append(r.data.Platforms, payload)
 	}
+}
+
+// appendPlatformValidationFinding projects one platform validation finding into
+// the JSON message payload and into the operator-facing check list. The
+// finding's File travels to both surfaces so repeated findings (obsolete
+// managed surface reports one per stale file) name the path they refer to
+// instead of emitting an identical message N times.
+func (r *doctorJSONReport) appendPlatformValidationFinding(
+	platformName string,
+	payload *doctorPlatformPayload,
+	validationErr adapter.ValidationError,
+) {
+	level := strings.ToLower(strings.TrimSpace(validationErr.Level))
+	if level == "" {
+		level = "info"
+	}
+	file := doctorValidationFile(validationErr.File)
+	payload.Messages = append(payload.Messages, doctorMessagePayload{
+		Level:   level,
+		Message: validationErr.Message,
+		File:    file,
+	})
+	checkStatus := "pass"
+	switch level {
+	case "error":
+		checkStatus = "fail"
+		r.status = jsonStatusWarn
+	case "warn":
+		checkStatus = "warn"
+		r.status = jsonStatusWarn
+	}
+	r.checks = append(r.checks, jsonCheck{
+		ID:       "doctor.platform." + platformName,
+		Severity: level,
+		Status:   checkStatus,
+		Detail:   doctorPlatformValidationDetail(platformName, validationErr.Message, file),
+	})
+}
+
+// doctorValidationFile normalizes a finding path to the repo-relative slash
+// form the rest of doctor output uses. An empty path stays empty: findings such
+// as the unknown-platform report carry no file, and callers must render no
+// separator for them.
+func doctorValidationFile(path string) string {
+	trimmed := strings.TrimSpace(path)
+	if trimmed == "" {
+		return ""
+	}
+	return filepath.ToSlash(filepath.Clean(trimmed))
+}
+
+// doctorPlatformValidationDetail appends the path only when the finding carries
+// one, so pathless findings keep their historical "<platform>: <message>"
+// wording with no dangling separator.
+func doctorPlatformValidationDetail(platformName, message, file string) string {
+	if file == "" {
+		return fmt.Sprintf("%s: %s", platformName, message)
+	}
+	return fmt.Sprintf("%s: %s (%s)", platformName, message, file)
 }
 
 func (r *doctorJSONReport) collectRuleConflictChecks(dir string, cfg *config.HarnessConfig) {

@@ -101,7 +101,7 @@ Question selection:
 
 Question transport:
 - Use the current platform's native interactive question transport when available instead of rendering a numbered text menu.
-- OMP surfaces must preload and use `ask the user directly` for interactive clarification; see `content/rules/deferred-tools.md`.
+- OMP surfaces must preload and use `ask the user directly` for interactive clarification; see `.omp/rules/autopus-deferred-tools.md`.
 - OMP surfaces must use `ask the user directly` when it is present in the active tool list; OMP App Server clients should map the same question contract to `tool/requestUserInput`. Fall back to one concise plain-text question only when no OMP question tool is exposed.
 - OMP surfaces use `question` when available, otherwise ask one concise plain-text question.
 - Record `question_transport`, `question_count`, and unresolved ledger fields in the BS file or final handoff notes.

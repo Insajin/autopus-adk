@@ -68,6 +68,9 @@ type doctorCLIPayload struct {
 type doctorMessagePayload struct {
 	Level   string `json:"level"`
 	Message string `json:"message"`
+	// File is the repo-relative path the finding refers to. Findings without a
+	// path (e.g. unknown platform) omit the key entirely.
+	File string `json:"file,omitempty"`
 }
 
 func runDoctorJSON(cmd *cobra.Command, opts doctorOptions) error {

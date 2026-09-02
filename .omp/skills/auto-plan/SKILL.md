@@ -149,7 +149,7 @@ auto orchestra plan '{SHELL_ESCAPED_FROZEN_CONTEXT}' --subprocess --no-detach --
 - `spec-writer`는 `research.md`에 `## Minimality Decision Matrix`를 작성합니다. Matrix rows are `actual need`, `existing code/helper/pattern`, `stdlib/native`, `existing dependency`, `new dependency or abstraction`, and `minimum sufficient verification`; each row records evidence, decision, and receipt item.
 - 새 dependency 또는 새 abstraction은 `actual need` → `existing code/helper/pattern` → `stdlib/native` → `existing dependency` → `new dependency or abstraction` 순서의 근거를 요구합니다. 앞선 대안 확인 근거가 없으면 `revise-target` 또는 risk로 기록하고, 명시적 사용자 요청이면 intent, alternatives, justification, verification obligation을 함께 보존합니다.
 - `minimum sufficient verification`은 Outcome Lock을 닫는 focused verification set을 고르되 security, validation, accessibility, data-loss, deterministic-oracle, generated-surface-hygiene gate를 줄이지 않습니다.
-- 신규 프로젝트/스캐폴드/greenfield 요청이면 `content/rules/techstack-freshness.md`와 `pkg/techstack` 정책을 적용해 `research.md` 또는 `prd.md`에 `## Technology Stack Decision`을 작성합니다.
+- 신규 프로젝트/스캐폴드/greenfield 요청이면 `.omp/rules/autopus-techstack-freshness.md`와 `pkg/techstack` 정책을 적용해 `research.md` 또는 `prd.md`에 `## Technology Stack Decision`을 작성합니다.
 - greenfield Technology Stack Decision은 선택한 런타임/프레임워크/주요 의존성의 concrete stable version, official source refs, checked_at, rejected alternatives를 포함해야 하며 prerelease는 명시 근거 없이는 선택하지 않습니다.
 - brownfield 작업이면 기존 manifest major version을 compatibility constraint로 보존하고, migration이 요구될 때만 동일한 version evidence를 기록합니다.
 - UI 관련 SPEC(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이면 `research.md`에 `## Design Source Pack`과 `## Design Discovery Matrix`를 작성합니다. 먼저 `auto design pack --format markdown` 결과 또는 동일한 local evidence를 사용하고, source refs, surface type, core job, density, risk, required primitives, required states, accessibility checks, responsive checks, anti-patterns를 기록합니다. Figma/Code Connect가 없으면 setup gap으로 기록하고 새 디자인 시스템을 임의로 만들지 않습니다.
@@ -165,7 +165,7 @@ auto orchestra plan '{SHELL_ESCAPED_FROZEN_CONTEXT}' --subprocess --no-detach --
 - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 intent-confirmation wireframe을 이어받고, 사용자가 confirm or adjust 했는지와 `wireframe intent: assumed` / `wireframe intent: deferred` 리스크를 기록합니다.
 - Wireframe은 intent probe이자 communication aid이며 final design이 아닙니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 required scope입니다.
 - 최종 사용자 응답도 Visual Planning Brief의 핵심 플로우차트 또는 wireframe 요지를 포함해 SPEC 범위를 설명합니다.
-- `content/rules/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용합니다.
+- `.omp/rules/autopus-spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용합니다.
 - 기본값은 하나의 Outcome Lock당 하나의 Primary SPEC입니다. sibling SPEC는 예외이며 최대 2개, 재귀 sibling 금지입니다.
 - sibling SPEC 허용 사유는 독립 사용자 결과, 별도 배포 repo/module ownership, migration/compat sequencing, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우뿐입니다.
 - Completion Debt는 sync completion을 막는 필수 누락 작업이고, Evolution Ideas는 완료를 막지 않는 선택 개선입니다. Evolution Ideas에서 후속 SPEC을 만들지 않습니다.

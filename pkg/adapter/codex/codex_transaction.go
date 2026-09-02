@@ -33,7 +33,7 @@ func (a *Adapter) buildUpdateTransactionPlan(
 		})
 	}
 
-	removes, err := a.buildUpdateTransactionRemoves(oldManifest, newFiles)
+	removes, err := a.buildUpdateTransactionRemoves(cfg, oldManifest, newFiles)
 	if err != nil {
 		return adapter.TransactionPlan{}, nil, err
 	}
@@ -58,21 +58,46 @@ func (a *Adapter) buildUpdateTransactionPlan(
 	return plan, pf, nil
 }
 
+// buildUpdateTransactionRemoves plans every deletion an update performs.
+//
+// Two complementary sources feed it. The manifest diff catches any managed file
+// the previous install recorded and this one no longer emits, which is the wide
+// net but only exists when a manifest survives. The obsolete-surface detector
+// catches a closed, hardcoded set of retired layouts regardless of the manifest,
+// which is what makes a fresh clone converge: `.autopus/*-manifest.json` is
+// gitignored, so a cloned workspace has generated files with no ownership record
+// and a manifest-only prune is structurally blind to them — it would rewrite the
+// manifest without the orphans and never see them again.
 func (a *Adapter) buildUpdateTransactionRemoves(
+	cfg *config.HarnessConfig,
 	oldManifest *adapter.Manifest,
 	files []adapter.FileMapping,
 ) ([]adapter.TransactionRemove, error) {
 	var removes []adapter.TransactionRemove
+	planned := make(map[string]bool)
+	add := func(remove adapter.TransactionRemove) {
+		key := filepath.ToSlash(filepath.Clean(remove.Path))
+		if planned[key] {
+			return
+		}
+		planned[key] = true
+		removes = append(removes, remove)
+	}
+
 	if oldManifest != nil {
 		diff := adapter.BuildManifestDiff(oldManifest, files, PruneRoots())
 		for _, entry := range diff.Prune {
-			removes = append(removes, adapter.TransactionRemove{Path: entry.Path})
+			add(adapter.TransactionRemove{Path: entry.Path})
 		}
 	}
-	removes = append(removes, a.pluginWorkflowShimRemoves()...)
-
+	for _, remove := range a.pluginWorkflowShimRemoves() {
+		add(remove)
+	}
+	for _, path := range obsoleteCodexSurfacePaths(a.root, a.openCodeOwnsSharedSkills(cfg)) {
+		add(adapter.TransactionRemove{Path: path, Recursive: true})
+	}
 	if remove, ok := a.legacyRootConfigRemove(); ok {
-		removes = append(removes, remove)
+		add(remove)
 	}
 	return adapter.FilterUnsupportedRootGitHookRemoves(a.root, removes), nil
 }

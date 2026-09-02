@@ -51,7 +51,7 @@ func checkHygiene(dir string, out io.Writer, quiet bool) bool {
 		return true
 	}
 
-	drift := blockedGeneratedDrift(staged)
+	drift := blockedGeneratedDrift(dir, staged)
 	if len(drift) == 0 {
 		if !quiet {
 			tui.OK(out, "staged generated/runtime drift clear")
@@ -65,15 +65,40 @@ func checkHygiene(dir string, out io.Writer, quiet bool) bool {
 	return false
 }
 
-func blockedGeneratedDrift(staged []string) []string {
+func blockedGeneratedDrift(dir string, staged []string) []string {
 	candidates := workflow.DetectGeneratedDrift(staged, false)
 	var blocked []string
+	var claims map[string]string
+	claimsLoaded := false
 	for _, rel := range candidates {
-		if !hasMatchingStagedSourceOfTruth(rel, staged) {
-			blocked = append(blocked, rel)
+		if hasMatchingStagedSourceOfTruth(rel, staged) {
+			continue
 		}
+		if isAlwaysBlockedGenerated(rel) {
+			blocked = append(blocked, rel)
+			continue
+		}
+		if !claimsLoaded {
+			claims = installedManifestClaims(dir)
+			claimsLoaded = true
+		}
+		if stagedMatchesInstalledClaim(dir, rel, claims) {
+			continue
+		}
+		blocked = append(blocked, rel)
 	}
 	return blocked
+}
+
+// isAlwaysBlockedGenerated names the paths no evidence can clear. They are
+// runtime state rather than installer output, so a matching manifest claim must
+// not become a way to commit them.
+func isAlwaysBlockedGenerated(rel string) bool {
+	clean := normalizeGitRel(rel)
+	if hygieneAlwaysBlockExactPaths[clean] {
+		return true
+	}
+	return hasAnyPrefix(clean, hygieneAlwaysBlockPrefixes)
 }
 
 func stagedGitPaths(dir, diffFilter string) ([]string, error) {

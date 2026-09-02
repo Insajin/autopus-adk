@@ -164,8 +164,14 @@ func TestStickySourceFiles_KeepHeadroomUnderThePerBodyCap(t *testing.T) {
 		total += len(injectableBody(t, name))
 	}
 
-	assert.LessOrEqual(t, total, 4492,
-		"REQ-STICKYRULE-FIRE-05 pins the shipped pair at 4492 injectable bytes or less")
+	// The pin moved 4492 -> 4628 when language-policy.md gained its "Enforcement"
+	// section, which replaced a claim of strict enforcement with the fact that
+	// nothing in the harness inspects language. That content is the point of the
+	// rule, so the pin absorbed it rather than the rule being trimmed back to a
+	// false claim. The tripwire still bites: 4628 leaves 1372 bytes under
+	// MaxStickyContextBytes, and the next growth has to justify itself here too.
+	assert.LessOrEqual(t, total, 4628,
+		"REQ-STICKYRULE-FIRE-05 pins the shipped pair at 4628 injectable bytes or less")
 	assert.LessOrEqual(t, total, rulecond.MaxStickyContextBytes,
 		"the shipped pair must inject whole, with no truncation notice")
 }

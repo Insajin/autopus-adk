@@ -3,6 +3,7 @@ package claude
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -54,7 +55,10 @@ func (a *Adapter) Update(_ context.Context, cfg *config.HarnessConfig) (*adapter
 	}
 	newFiles = append(newFiles, hookFiles...)
 
-	plan, pf := a.buildUpdateTransactionPlan(oldManifest, newFiles)
+	plan, pf, err := a.buildUpdateTransactionPlan(oldManifest, newFiles)
+	if err != nil {
+		return nil, err
+	}
 	if _, err := adapter.ApplyTransaction(a.root, adapterName, plan); err != nil {
 		return nil, err
 	}
@@ -65,7 +69,7 @@ func (a *Adapter) Update(_ context.Context, cfg *config.HarnessConfig) (*adapter
 func (a *Adapter) buildUpdateTransactionPlan(
 	oldManifest *adapter.Manifest,
 	newFiles []adapter.FileMapping,
-) (adapter.TransactionPlan, *adapter.PlatformFiles) {
+) (adapter.TransactionPlan, *adapter.PlatformFiles, error) {
 	finalFiles := make([]adapter.FileMapping, 0, len(newFiles))
 	skippedPaths := make([]string, 0)
 
@@ -91,10 +95,48 @@ func (a *Adapter) buildUpdateTransactionPlan(
 		}
 	}
 	diff := adapter.BuildManifestDiff(oldManifest, newFiles, PruneRoots())
+	removes, err := a.buildUpdateTransactionRemoves(diff)
+	if err != nil {
+		return adapter.TransactionPlan{}, nil, err
+	}
 
 	return adapter.TransactionPlan{
 		Writes:   adapter.TransactionWritesFromFiles(finalFiles, claudeFileMode),
-		Removes:  adapter.TransactionRemovesFromManifestDiff(diff, false),
+		Removes:  removes,
 		Manifest: manifest,
-	}, pf
+	}, pf, nil
+}
+
+// buildUpdateTransactionRemoves plans every deletion an update performs.
+//
+// Two complementary sources feed it. The manifest diff catches any managed file
+// the previous install recorded and this one no longer emits, which is the wide
+// net but only exists while a manifest survives. The obsolete-surface detector
+// catches a closed, hardcoded set of retired layouts regardless of the manifest,
+// which is what makes a fresh clone converge: `.autopus/*-manifest.json` is
+// gitignored while the generated files are committed, so a cloned workspace has
+// orphans with no ownership record and a manifest-only prune is structurally
+// blind to them — it rewrites the manifest without them and never proposes the
+// prune again, making the orphan permanent.
+func (a *Adapter) buildUpdateTransactionRemoves(
+	diff adapter.ManifestDiff,
+) ([]adapter.TransactionRemove, error) {
+	removes := adapter.TransactionRemovesFromManifestDiff(diff, false)
+	planned := make(map[string]bool, len(removes))
+	for _, remove := range removes {
+		planned[filepath.ToSlash(filepath.Clean(remove.Path))] = true
+	}
+
+	obsolete, err := obsoleteClaudeSurfacePaths(a.root)
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range obsolete {
+		if planned[path] {
+			continue
+		}
+		planned[path] = true
+		removes = append(removes, adapter.TransactionRemove{Path: path, Recursive: true})
+	}
+	return removes, nil
 }

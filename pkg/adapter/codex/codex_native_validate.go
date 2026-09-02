@@ -61,48 +61,13 @@ func validateNativeCodexSkill(root, path string, errs *[]adapter.ValidationError
 	}
 }
 
+// validateObsoleteCodexSurface reports every retired Codex surface the detector
+// names. Detection itself lives in obsoleteCodexSurfacePaths so the update
+// prune removes exactly what this report claims is obsolete.
 func validateObsoleteCodexSurface(root string, openCodeOwnsSharedSkills bool, errs *[]adapter.ValidationError) {
-	skillsRoot := filepath.Join(root, ".codex", "skills")
-	if entries, err := os.ReadDir(skillsRoot); err == nil {
-		for _, entry := range entries {
-			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
-				appendObsoleteCodexSurface(errs, filepath.Join(".codex", "skills", entry.Name()))
-			}
-		}
+	for _, path := range obsoleteCodexSurfacePaths(root, openCodeOwnsSharedSkills) {
+		*errs = append(*errs, adapter.ValidationError{
+			File: path, Message: "obsolete Codex managed surface가 남아 있음", Level: "error",
+		})
 	}
-	if info, err := os.Stat(filepath.Join(root, ".codex", "prompts")); err == nil && info.IsDir() {
-		appendObsoleteCodexSurface(errs, filepath.Join(".codex", "prompts"))
-	}
-	validateMarkdownCodexRules(root, filepath.Join(".codex", "rules"), errs)
-	if !openCodeOwnsSharedSkills {
-		for _, spec := range workflowSpecs {
-			legacy := filepath.Join(".agents", "skills", spec.Name)
-			if _, err := os.Stat(filepath.Join(root, legacy)); err == nil {
-				appendObsoleteCodexSurface(errs, legacy)
-			}
-		}
-	}
-}
-
-func validateMarkdownCodexRules(root, relative string, errs *[]adapter.ValidationError) {
-	entries, err := os.ReadDir(filepath.Join(root, relative))
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		child := filepath.Join(relative, entry.Name())
-		if entry.IsDir() {
-			validateMarkdownCodexRules(root, child, errs)
-			continue
-		}
-		if strings.HasSuffix(entry.Name(), ".md") {
-			appendObsoleteCodexSurface(errs, child)
-		}
-	}
-}
-
-func appendObsoleteCodexSurface(errs *[]adapter.ValidationError, path string) {
-	*errs = append(*errs, adapter.ValidationError{
-		File: path, Message: "obsolete Codex managed surface가 남아 있음", Level: "error",
-	})
 }

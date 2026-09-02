@@ -1,5 +1,5 @@
 ---
-description: QAMESH project QA mesh — auto qa init, plan, run, release, evidence, and feedback guidance
+description: QAMESH project QA mesh — plan, run, report, and publish deterministic QA evidence
 agent: build
 ---
 

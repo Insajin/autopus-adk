@@ -49,15 +49,15 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 			tui.OK(out, p)
 		} else {
 			for _, ve := range validationErrs {
-				level := strings.ToUpper(ve.Level)
-				switch level {
+				detail := doctorPlatformValidationDetail(p, ve.Message, doctorValidationFile(ve.File))
+				switch strings.ToUpper(strings.TrimSpace(ve.Level)) {
 				case "ERROR":
-					tui.FAIL(out, fmt.Sprintf("%s: %s", p, ve.Message))
+					tui.FAIL(out, detail)
 					allOK = false
 				case "WARN":
-					tui.SKIP(out, fmt.Sprintf("%s: %s", p, ve.Message))
+					tui.SKIP(out, detail)
 				default:
-					tui.Info(out, fmt.Sprintf("%s: %s", p, ve.Message))
+					tui.Info(out, detail)
 				}
 			}
 		}

@@ -7,7 +7,7 @@ compatibility: omp
 # SPEC Review Gate Skill
 
 A review gate that validates SPEC document quality using multiple providers.
-Before Step 1, treat `content/rules/spec-quality.md` as the pre-review self-check that spec-writer should already have applied to `spec.md`, `plan.md`, `acceptance.md`, and `research.md`.
+Before Step 1, treat `.omp/rules/autopus-spec-quality.md` as the pre-review self-check that spec-writer should already have applied to `spec.md`, `plan.md`, `acceptance.md`, and `research.md`.
 
 The CLI writes the authoritative promotion receipt to
 `{SPEC_DIR}/review-receipt.json` with
@@ -24,7 +24,7 @@ security/correctness finding sets `critical_veto=true`, keeps
 
 ### Step 0: spec-writer self-verify
 
-Confirm that the draft went through a first-pass self-check using `content/rules/spec-quality.md`.
+Confirm that the draft went through a first-pass self-check using `.omp/rules/autopus-spec-quality.md`.
 Look for observable traces such as `research.md`'s `## Self-Verify Summary` or `spec.md`'s `## Open Issues`.
 Also prefer the draft's `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, `## Reviewer Brief`, `## Traceability Matrix`, and `## Reference Discipline` as scope-control evidence: review listed blockers and invariants first, treat Completion Debt as blocking, and treat Evolution Ideas or unrelated deeper-layer suggestions as advisory unless they expose critical/security/data integrity risk.
 Do not create or request follow-up/sibling SPECs from Evolution Ideas. A sibling SPEC request is valid only when the draft includes a `## Sibling SPEC Decision` with an allowed reason and bounded ownership.

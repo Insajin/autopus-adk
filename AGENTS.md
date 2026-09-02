@@ -9,25 +9,102 @@
 
 ## Installed Components
 
+- Claude Skills: .claude/skills/<name>/SKILL.md
+- Claude Agents: .claude/agents/autopus/
+- Claude Rules: .claude/rules/autopus/
+- Claude Hooks: .claude/hooks/autopus/
+- Claude Settings: .claude/settings.json
+- Claude Statusline: .claude/statusline.sh
+- Claude Root Doc: CLAUDE.md
 - Codex Native Skills: .codex/skills/codex-<name>/SKILL.md
 - Codex Agents: .codex/agents/
+- Codex Hook Scripts: .codex/hooks/
+- Codex Hook Registry: .codex/hooks.json
 - Codex Config: .codex/config.toml
 - Codex Plugin Router: @auto ... / $codex-auto-<route>
+- Gemini Skills: .gemini/skills/autopus/<name>/SKILL.md
+- Gemini Agents: .gemini/agents/autopus/
+- Gemini Rules: .gemini/rules/autopus/
+- Gemini Commands: .gemini/commands/
+- Gemini Hooks: .gemini/hooks/
+- Gemini Settings: .gemini/settings.json
+- Gemini Statusline: .gemini/statusline.sh
+- Gemini Hook Registry: .agents/hooks.json
+- Gemini Root Doc: GEMINI.md
+- Gemini Plugin Bundle: .agents/plugins/autopus/
+- Shared Commands: .agents/commands/
 - OpenCode Rules: .opencode/rules/autopus/
 - OpenCode Commands: .opencode/commands/
 - OpenCode Agents: .opencode/agents/
 - OpenCode Plugins: .opencode/plugins/
 - OpenCode-owned Shared Skills: .agents/skills/
+- OMP Skills: .omp/skills/
+- OMP Agents: .omp/agents/
+- OMP Rules: .omp/rules/
+- OMP Commands: .omp/commands/
 - Plugin Marketplace: .agents/plugins/marketplace.json
 
 
 ## Language Policy
 
-IMPORTANT: Follow these language settings strictly for all work in this project.
+These settings are prompt instructions for every agent in this project. They are
+not mechanically enforced: no hook, linter, or CI gate inspects the language of
+comments, commit messages, or responses. The pre-commit Lore check validates the
+commit type prefix and sign-off trailers only, never the language. Treat a
+violation as a review finding, not as something a gate will catch.
 
 - **Code comments**: en
 - **Commit messages**: ko
 - **AI responses**: ko
+
+## Autopus Branding
+
+The canonical banner header is the first line below. Start a `/auto` or `@auto`
+response with it and end the completed response with `🐙`.
+
+```text
+🐙 Autopus ─────────────────────────
+  프로젝트: {project-name} | 모드: {mode}
+  SPEC: {draft}개 draft · {approved}개 approved · {implemented}개 구현중 · {completed}개 완료
+  다음: {next-step recommendation}
+```
+
+Subagent completion summaries use the A3 Agent Result shape:
+
+```text
+🐙 {agent-name} ─────────────────────
+  {key metric 1} | {key metric 2} | {key metric 3}
+  다음: {next step guidance}
+```
+
+General responses that applied no harness rule carry no banner, footer, or emoji.
+
+## Document Storage
+
+IMPORTANT: A document stored in the wrong place causes sync failures and version
+control gaps.
+
+| Document Type | Location | Git Repo |
+|---------------|----------|----------|
+| Project context | Root | meta repo |
+| Harness bootstrap config | Root | meta repo |
+| Generated harness/runtime surface | Local working copy only | Do not commit |
+| Cross-module SPEC | Root `.autopus/specs/` | meta repo |
+| Module-specific SPEC | `{module}/.autopus/specs/` | module repo |
+| Brainstorm/runtime output | Local working copy only | Do not commit |
+| Module CHANGELOG | `{module}/CHANGELOG.md` | module repo |
+
+Module detection: match the referenced `pkg/`, `cmd/`, `internal/`, `src/`, or
+`app/` paths to their owning submodule. Paths spanning 2+ modules are
+cross-module and belong at the root.
+
+SPEC and BS IDs MUST be globally unique across the workspace. Scan both
+`.autopus/specs/SPEC-*` and `*/.autopus/specs/SPEC-*` (and the matching
+`brainstorms/BS-*` pair) before allocating an ID; a collision is a hard error.
+
+Run `auto sync verify` before committing. It is read-only and partitions every
+dirty path into a Phase A (module) or Phase B (meta) candidate, a blocked
+generated/runtime path, or an unclassified path.
 
 ## Execution Model
 
@@ -71,10 +148,13 @@ IMPORTANT: 리뷰는 discovery와 verification을 분리하세요. 첫 리뷰는
 
 IMPORTANT: 300줄 제한은 소스 코드 파일에만 적용합니다. SPEC Markdown files under .autopus/specs/** are documentation and exempt from the 300-line source code limit. prd.md, spec.md, plan.md, acceptance.md, research.md, review.md는 300줄 초과만으로 분할하거나 거절하지 마세요.
 
+### Mandatory Compact Policy
+
+IMPORTANT: Write tests before implementation when behavior changes. New code comments are English. Source and test files MUST stay at or below 300 lines. Do not edit outside assigned ownership. Every spawned worker returns exactly `owned_paths`, `changed_files`, `verification`, `blockers`, `next_required_step`.
+
 ### Prompting Notes
 
 IMPORTANT: 사용자가 계획만 요구한 경우를 제외하면, 긴 선행 계획만 출력하고 멈추지 마세요. 먼저 코드베이스를 확인하고, 필요한 경우 서브에이전트를 스폰한 뒤, 검증까지 이어서 진행하세요.
-
 
 ## Agents
 

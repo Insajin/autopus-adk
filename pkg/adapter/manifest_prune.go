@@ -1,7 +1,9 @@
 package adapter
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -59,13 +61,48 @@ func backupPrunedPath(root string, entry ManifestDiffEntry, target string, backu
 	return err
 }
 
+// resolvePruneRoot makes the workspace root absolute before symlinks are
+// resolved. `--dir .` reaches here as a relative root, and EvalSymlinks keeps a
+// relative path relative: `realRoot` became "." while the containment check
+// below compared it against "./" — so every prune was refused as "outside
+// workspace", and the Claude permission ledger read that same refusal as fatal.
+// Absolute-first also gives removeEmptyParents a terminator it can actually
+// reach; a relative root left the upward walk to stop only on a non-empty
+// directory, and filepath.Dir("/") is "/".
+//
+// `exists` is false when the root is simply not there yet. Generate runs a
+// permission-preimage read before the workspace is created, and nothing can be
+// pruned from a directory that does not exist, so the callers below treat that
+// as an empty prune set rather than an error.
+func resolvePruneRoot(root string) (resolved string, exists bool, err error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return "", false, fmt.Errorf("resolve workspace root: %w", err)
+	}
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("resolve workspace root: %w", err)
+	}
+	return real, true, nil
+}
+
 func safePruneFilePath(root, relPath string) (string, error) {
+	realRoot, exists, err := resolvePruneRoot(root)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", nil
+	}
 	cleanRel := filepath.Clean(relPath)
 	if cleanRel == "." || filepath.IsAbs(cleanRel) || strings.HasPrefix(cleanRel, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("unsafe prune path %s", relPath)
 	}
 
-	target := filepath.Join(root, cleanRel)
+	target := filepath.Join(realRoot, cleanRel)
 	if _, err := os.Lstat(target); err != nil {
 		if os.IsNotExist(err) {
 			return "", nil
@@ -73,10 +110,6 @@ func safePruneFilePath(root, relPath string) (string, error) {
 		return "", fmt.Errorf("stat prune path %s: %w", relPath, err)
 	}
 
-	realRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", fmt.Errorf("resolve workspace root: %w", err)
-	}
 	realTarget, err := filepath.EvalSymlinks(target)
 	if err != nil {
 		return "", fmt.Errorf("resolve prune path %s: %w", relPath, err)
@@ -90,9 +123,23 @@ func safePruneFilePath(root, relPath string) (string, error) {
 }
 
 func removeEmptyParents(root, dir string) error {
-	cleanRoot := filepath.Clean(root)
+	cleanRoot, exists, err := resolvePruneRoot(root)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return nil
+	}
 	current := filepath.Clean(dir)
-	for current != cleanRoot && current != "." {
+	// `dir` and `root` can name the same tree in two different spellings -- on
+	// macOS a temp root is /var/... while its resolved form is /private/var/...
+	// An equality terminator misses that and the walk runs past the root, so the
+	// loop below stops on containment instead and resolving here only widens how
+	// often the two spellings agree.
+	if resolved, resolveErr := filepath.EvalSymlinks(current); resolveErr == nil {
+		current = resolved
+	}
+	for isStrictDescendant(cleanRoot, current) {
 		entries, err := os.ReadDir(current)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -110,4 +157,15 @@ func removeEmptyParents(root, dir string) error {
 		current = filepath.Dir(current)
 	}
 	return nil
+}
+
+// isStrictDescendant reports whether path sits strictly below root. The root
+// itself is not a descendant of itself, which is what keeps the workspace root
+// out of every removal loop.
+func isStrictDescendant(root, path string) bool {
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel != "." && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }

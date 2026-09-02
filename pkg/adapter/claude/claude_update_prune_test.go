@@ -106,7 +106,8 @@ func TestBuildUpdateTransactionPlan_PruneSetCoversRelocation(t *testing.T) {
 		})
 	}
 
-	plan, _ := NewWithRoot(t.TempDir()).buildUpdateTransactionPlan(oldManifest, newFiles)
+	plan, _, err := NewWithRoot(t.TempDir()).buildUpdateTransactionPlan(oldManifest, newFiles)
+	require.NoError(t, err)
 
 	removed := make([]string, 0, len(plan.Removes))
 	for _, remove := range plan.Removes {
