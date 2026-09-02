@@ -205,12 +205,17 @@ What this does not settle is oracle equivalence. The 40-call cohort's verdict de
 The gateway the procedure asks for is OMP's own: `omp auth-gateway` is a loopback forward proxy backed by `omp auth-broker`, the OMP credential vault. A subscription account already lives in that vault, so nothing has to be retyped per release. Bring the pair up once:
 
 ```bash
-omp auth-broker serve --bind 127.0.0.1:47311
-OMP_AUTH_BROKER_URL=http://127.0.0.1:47311 omp auth-gateway serve --bind 127.0.0.1:47312
+scripts/companion-release/install-auth-services.sh
 
 export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
-export ADK_GATEWAY_URL=http://127.0.0.1:47312
+export ADK_GATEWAY_URL=http://127.0.0.1:47312   # put these two in your shell profile
 ```
+
+The installer registers both as launchd user agents with `KeepAlive`, so they survive a reboot and a crash. Verified by killing the gateway: launchd respawned it with a new pid and `auth-gateway status` returned to `ready: true`.
+
+The agents run the **installed** `omp`, not the release-pinned binary. The gateway is a credential proxy; the evidence oracle is a separate invocation prep makes with its own pinned digest. Tying a resident service to the release pin would mean reinstalling it every time the pin moves.
+
+Both bind loopback only and keep their bearer auth — the gateway answers `401` without a token. The broker holds subscription OAuth, so it is reachable from this machine and nowhere else. Remove both with `install-auth-services.sh --uninstall`.
 
 Then every attempt is one command with no arguments:
 

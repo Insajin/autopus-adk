@@ -82,11 +82,28 @@ check_release_prep_inputs() {
     warn "no verified OMP binary staged; download the pinned asset before prep"
   fi
 
+  # With a ready gateway the wrapper mints this variable itself from
+  # `omp auth-gateway token`, so demanding an exported one would be misleading.
   credential_names=$(env | awk -F= '/^AUTOPUS_OMP_CONTEXT_PROVIDER_/ { print $1 }')
+  gateway_ready=0
+  if OMP_AUTH_BROKER_URL="${OMP_AUTH_BROKER_URL:-}" omp auth-gateway status --json 2>/dev/null |
+    grep -q '"ready":true'; then
+    gateway_ready=1
+  fi
   if [[ -n "$credential_names" ]]; then
-    pass "provider credential locator present: $(tr '\n' ' ' <<<"$credential_names")"
+    pass "provider credential locator exported: $(tr '\n' ' ' <<<"$credential_names")"
+  elif [[ "$gateway_ready" -eq 1 ]]; then
+    pass 'credential resolves from the gateway bearer token; nothing to export'
   else
-    warn 'no AUTOPUS_OMP_CONTEXT_PROVIDER_* variable is exported; load the credential out of band'
+    warn 'no credential source: bring up the gateway or export AUTOPUS_OMP_CONTEXT_PROVIDER_*'
+  fi
+
+  # Resident launchd agents are the intended setup, so their absence is worth
+  # naming even when a gateway URL happens to be exported by hand.
+  if launchctl list 2>/dev/null | grep -q 'co\.autopus\.omp-auth-gateway'; then
+    pass 'omp auth-gateway is a resident launchd agent'
+  else
+    warn 'auth services are not resident; scripts/companion-release/install-auth-services.sh installs them'
   fi
 
   if [[ -n "${ADK_GATEWAY_URL:-}" ]]; then
