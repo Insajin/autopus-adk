@@ -233,17 +233,46 @@ jobs:
           [[ "$actual" == "$expected" ]]
           /bin/chmod 0555 "$omp_binary"
           [[ "$("$omp_binary" --version)" == 'omp/17.2.7' ]]
-          AUTOPUS_OMP_NATIVE_LIVE=1 \
-          AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary" \
-            go test -count=1 -timeout=90s \
-            -run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp
+          # `go test -run '^Name$'` exits 0 with "no tests to run" when the
+          # selector matches nothing, and both smokes t.Skip themselves when
+          # AUTOPUS_OMP_* or the omp binary do not reach them. Either way this
+          # job would report a verified live probe having executed nothing, so
+          # assert the selector inventory before the run the way the
+          # process-heavy selector is asserted above, then require an explicit
+          # `--- PASS` for the named test and no skip at all.
+          live_smoke() {
+            local name="$1" package="$2" log="${RUNNER_TEMP}/${1}.log"
+            local listed
+            listed="$(go test -list "^${name}\$" "$package" |
+              /usr/bin/awk -v want="$name" '$0 == want { found++ } END { print found + 0 }')"
+            if [[ "$listed" != 1 ]]; then
+              echo "::error::-run '^${name}\$' matches ${listed} test(s) in ${package}; the OMP live smoke selector no longer names a test and the gate would pass having run nothing"
+              return 1
+            fi
+            go test -count=1 -timeout=90s -v -run "^${name}\$" "$package" 2>&1 | tee "$log"
+            if ! /usr/bin/grep -q "^--- PASS: ${name} " "$log"; then
+              echo "::error::${name} reported no '--- PASS' line in ${package}; the live smoke ran 0 tests"
+              return 1
+            fi
+            if /usr/bin/grep -q '^--- SKIP' "$log"; then
+              echo "::error::${name} skipped in ${package}; the pinned omp binary or its AUTOPUS_OMP_* environment never reached the test, and a skipped live smoke proves nothing"
+              return 1
+            fi
+          }
+          (
+            export AUTOPUS_OMP_NATIVE_LIVE=1
+            export AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary"
+            live_smoke TestOMPNativeTaskHubLiveSmoke ./pkg/adapter/omp
+          )
           # The rule-delivery oracle resolves `omp` from PATH, so publish the same
           # verified binary under its plain name instead of downloading it twice.
           /bin/mkdir -m 0755 "$omp_bin_dir"
           /bin/ln -s "$omp_binary" "$omp_bin_dir/omp"
-          AUTOPUS_OMP_RULES_LIVE=1 PATH="$omp_bin_dir:$PATH" \
-            go test -count=1 -timeout=90s \
-            -run '^TestOMPRules_LiveSessionReceivesEverySourceRule$' ./pkg/adapter/omp
+          (
+            export AUTOPUS_OMP_RULES_LIVE=1
+            export PATH="$omp_bin_dir:$PATH"
+            live_smoke TestOMPRules_LiveSessionReceivesEverySourceRule ./pkg/adapter/omp
+          )
 
   macos-runtime:
     name: macos-runtime
@@ -324,7 +353,32 @@ jobs:
           ./scripts/companion-release/execsmoke
 
       - name: Test macOS POSIX installer signing
-        run: go test -count=1 -timeout=5m . -run '^TestPOSIXInstaller'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A prefix -run filter is not a gate by itself: `go test` exits 0 with
+          # "no tests to run" once every TestPOSIXInstaller* name is renamed away,
+          # and it also exits 0 when a signing oracle skips. Require the declared
+          # floor so a shrinking family cannot pass either, then require that the
+          # tests reporting PASS are exactly the ones `go test -list` names for the
+          # same filter. None of these tests call t.Skip today, so any skip is an
+          # unproven gate and must fail (scripts/integration-oracles.sh in Autopus
+          # is the same rule with an explicit allowed-skip argument).
+          filter='^TestPOSIXInstaller'
+          minimum=12
+          log="$(mktemp)"
+          listed="$(go test -list "$filter" . | awk '/^TestPOSIXInstaller/' | sort -u | tr '\n' ' ')"
+          set -- $listed
+          if [[ "$#" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists $# test(s) in the root package, below the declared ${minimum}: [${listed}]. Renamed installer signing tests would leave this gate vacuous"
+            exit 1
+          fi
+          go test -count=1 -timeout=5m -v . -run "$filter" 2>&1 | tee "$log"
+          observed="$(sed -n 's/^--- PASS: \([^ ]*\).*/\1/p' "$log" | sort -u | tr '\n' ' ')"
+          if [[ "$observed" != "$listed" ]]; then
+            echo "::error::-run '${filter}' listed [${listed}] but only [${observed}] reported PASS; the difference skipped or never ran"
+            exit 1
+          fi
 
   windows-runtime:
     name: windows-runtime
@@ -343,12 +397,65 @@ jobs:
         run: go test -count=1 -timeout=8m ./pkg/selfupdate
 
       - name: Test Windows process probe subtree cleanup
-        run: go test -count=3 -timeout=2m ./pkg/processprobe -run '^TestOutputWindows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # -count=3 multiplies the PASS lines, so compare the deduplicated names
+          # against `go test -list` for the same filter instead of a raw count:
+          # a renamed subtree-cleanup test would otherwise leave "no tests to run"
+          # behind a green gate. The floor is declared so losing most of the
+          # family fails even while one survivor still matches the prefix.
+          filter='^TestOutputWindows'
+          minimum=7
+          log="$(mktemp)"
+          listed="$(go test -list "$filter" ./pkg/processprobe | awk '/^TestOutputWindows/' | sort -u | tr '\n' ' ')"
+          set -- $listed
+          if [[ "$#" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists $# test(s) in ./pkg/processprobe, below the declared ${minimum}: [${listed}]"
+            exit 1
+          fi
+          go test -count=3 -timeout=2m -v ./pkg/processprobe -run "$filter" 2>&1 | tee "$log"
+          observed="$(sed -n 's/^--- PASS: \([^ ]*\).*/\1/p' "$log" | sort -u | tr '\n' ' ')"
+          if [[ "$observed" != "$listed" ]]; then
+            echo "::error::-run '${filter}' listed [${listed}] but only [${observed}] reported PASS; the difference skipped or never ran"
+            exit 1
+          fi
 
       - name: Test Windows self-update CLI failure boundaries
-        run: >-
-          go test -count=1 -timeout=5m ./internal/cli
-          -run '^(TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails|TestWithSelfUpdateTempDir_DoesNotRunAfterCreateFailure|TestVerifyAndReplaceSelfUpdate_.*|TestProbeStagedSelfUpdateVersion_.*|TestNormalizeSelfUpdateVersionOutput_.*)$'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The alternation carries three `.*` branches, so a rename inside any of
+          # them silently drops tests while `go test` still exits 0. Require the
+          # declared floor, then require every listed test to report PASS or an
+          # allowed SKIP. TestProbeStagedSelfUpdateVersion_UsesLiteralBinaryPath
+          # skips on Windows by design (executable names cannot carry shell
+          # metacharacters), so it is declared here the way
+          # scripts/integration-oracles.sh in Autopus takes an allowed-skip
+          # argument: every other skip still fails this gate.
+          filter='^(TestResolveCurrentBinaryPath_FailsClosedWhenSymlinkEvalFails|TestWithSelfUpdateTempDir_DoesNotRunAfterCreateFailure|TestVerifyAndReplaceSelfUpdate_.*|TestProbeStagedSelfUpdateVersion_.*|TestNormalizeSelfUpdateVersionOutput_.*)$'
+          minimum=8
+          allowed_skip='TestProbeStagedSelfUpdateVersion_UsesLiteralBinaryPath'
+          log="$(mktemp)"
+          listed="$(go test -list "$filter" ./internal/cli | awk '/^Test/' | sort -u | tr '\n' ' ')"
+          set -- $listed
+          if [[ "$#" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists $# test(s) in ./internal/cli, below the declared ${minimum}: [${listed}]"
+            exit 1
+          fi
+          go test -count=1 -timeout=5m -v ./internal/cli -run "$filter" 2>&1 | tee "$log"
+          observed="$(sed -n -e 's/^--- PASS: \([^ ]*\).*/\1/p' \
+            -e 's/^--- SKIP: \([^ ]*\).*/\1/p' "$log" | sort -u | tr '\n' ' ')"
+          if [[ "$observed" != "$listed" ]]; then
+            echo "::error::-run '${filter}' listed [${listed}] but observed [${observed}]; the difference never ran"
+            exit 1
+          fi
+          for name in $(sed -n 's/^--- SKIP: \([^ ]*\).*/\1/p' "$log" | sort -u); do
+            if [[ "$name" != "$allowed_skip" ]]; then
+              echo "::error::${name} skipped outside the declared allow-list (${allowed_skip}); a skipped self-update failure boundary proves nothing"
+              exit 1
+            fi
+          done
 
       - name: Test Windows installer signing on PowerShell 5.1
         run: >-

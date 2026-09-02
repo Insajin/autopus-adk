@@ -186,27 +186,44 @@ func TestOMPNativeSmokeCIPinsExactBinaryAndTest(t *testing.T) {
 		`/usr/bin/shasum -a 256 "$omp_binary"`,
 		`/bin/chmod 0555 "$omp_binary"`,
 		`[[ "$("$omp_binary" --version)" == 'omp/17.2.7' ]]`,
-		`AUTOPUS_OMP_NATIVE_LIVE=1`,
-		`AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary"`,
-		`go test -count=1 -timeout=90s`,
-		`-run '^TestOMPNativeTaskHubLiveSmoke$' ./pkg/adapter/omp`,
+		`export AUTOPUS_OMP_NATIVE_LIVE=1`,
+		`export AUTOPUS_OMP_LIVE_EXECUTABLE="$omp_binary"`,
+		// The two smokes now run through one `live_smoke` helper. It anchors the
+		// selector itself, so the anchored literal no longer appears at the call
+		// site -- what must stay pinned is the helper's own guarantee, asserted
+		// below, plus the exact test name each call names.
+		`live_smoke TestOMPNativeTaskHubLiveSmoke ./pkg/adapter/omp`,
+		`-run "^${name}\$"`,
+		// `go test -run` exits 0 on a selector that matches nothing, and both
+		// smokes t.Skip when their environment does not reach them. The helper
+		// asserts the selector inventory before running, then requires the named
+		// `--- PASS` and forbids any skip -- without these three a rename or a
+		// missing binary reports a verified live probe having run nothing.
+		`go test -list "^${name}\$" "$package"`,
+		`^--- PASS: ${name} `,
+		`/usr/bin/grep -q '^--- SKIP'`,
 		// The rule-delivery oracle resolves `omp` from PATH, so the job publishes
 		// the already-verified pinned binary under its plain name and removes the
 		// shim in the same trap instead of downloading a second copy.
 		`rm -rf -- "$omp_bin_dir"`,
 		`/bin/ln -s "$omp_binary" "$omp_bin_dir/omp"`,
-		`AUTOPUS_OMP_RULES_LIVE=1 PATH="$omp_bin_dir:$PATH"`,
-		`-run '^TestOMPRules_LiveSessionReceivesEverySourceRule$' ./pkg/adapter/omp`,
+		`export AUTOPUS_OMP_RULES_LIVE=1`,
+		`export PATH="$omp_bin_dir:$PATH"`,
+		`live_smoke TestOMPRules_LiveSessionReceivesEverySourceRule ./pkg/adapter/omp`,
 	}
 	for _, fragment := range required {
 		if !strings.Contains(section, fragment) {
 			t.Fatalf("omp-native-smoke must contain %q", fragment)
 		}
 	}
-	if strings.Count(section, "go test ") != 2 ||
-		strings.Count(section, "-run '^TestOMPNativeTaskHubLiveSmoke$'") != 1 ||
-		strings.Count(section, "-run '^TestOMPRules_LiveSessionReceivesEverySourceRule$'") != 1 {
-		t.Fatal("omp-native-smoke must run exactly the two anchored Go smokes")
+	// Exactly two smokes, each named once. The helper definition is
+	// `live_smoke()` with no space, so `"live_smoke "` counts call sites only --
+	// that count is what pins the inventory now that the anchored selector lives
+	// inside the helper rather than at each call.
+	if strings.Count(section, "live_smoke ") != 2 ||
+		strings.Count(section, "live_smoke TestOMPNativeTaskHubLiveSmoke") != 1 ||
+		strings.Count(section, "live_smoke TestOMPRules_LiveSessionReceivesEverySourceRule") != 1 {
+		t.Fatal("omp-native-smoke must run exactly the two anchored Go smokes through live_smoke")
 	}
 	for _, forbidden := range []string{"./...", "${{ secrets.", "AUTOPUS_OMP_LIVE=1"} {
 		if strings.Contains(section, forbidden) {

@@ -81,5 +81,8 @@ credentials.enc
 *.key
 .env
 .env.*
+# Mirrors autopus/.gitignore:127 -- the example is documentation, not a secret,
+# and the A2A trust variables are undiscoverable without it.
+!.env.example
 /tmp/autopus-*/
 runtime-a2a-canary-local-probe.md
