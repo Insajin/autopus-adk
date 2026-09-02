@@ -11,7 +11,7 @@ USAGE
 }
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
-readonly release_tag='v0.50.111'
+readonly release_tag='v0.50.112'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_go_toolchain='go1.26.6'
 readonly expected_omp_sha256='5f2512cce2a154ad2406a4792421c42f022b1335f83dcbde4236f76e50ab35b4'

@@ -54,6 +54,16 @@ readonly -a replace_targets=(
   'scripts/companion-release/build-omp-context-candidate.sh'
   'scripts/companion-release/tests/testdata/mock-release-prep-gh.sh'
   'scripts/companion-release/tests/testdata/mock-tap-gh.sh'
+)
+
+# Test files are deliberately absent from the list above. Each of them mixes
+# shipped-release pins with predecessor references in the same file — the
+# accumulate assertion for the previous phase, the predecessor Cask digests, a
+# fixture that needs a tag which already exists in git — so a whole-file
+# substitution corrupts as much as it fixes. That was observed, not theorised:
+# an earlier run rewrote `'v0.50.111 0.50.111 A23'` into the A24 row and
+# silently removed the guard that the older row survived.
+readonly -a review_targets=(
   'scripts/companion-release/tests/release-prep-hardening-test.sh'
   'scripts/companion-release/tests/release-homebrew-hardening-test.sh'
   'scripts/companion-release/tests/release-hardening-test.sh'
@@ -122,7 +132,14 @@ done
 
 # Phase labels need eyes, not sed. Each hit is either the shipped release (bump
 # it), a predecessor reference (leave it), or a historical statement (leave it).
-printf '\n%s\n' "REVIEW: files still naming ${from_phase}, classify each hit"
+printf '\n%s\n' "REVIEW: test files naming ${from_tag} or ${from_phase}, classify each hit"
+for target in "${review_targets[@]}"; do
+  while IFS= read -r hit; do
+    printf '  %s:%s\n' "$target" "$hit"
+  done < <(grep -n -e "$from_tag" -e "$from_phase" "$target" 2>/dev/null || true)
+done
+
+printf '\n%s\n' "REVIEW: sources still naming ${from_phase}, classify each hit"
 phase_hits=0
 for target in "${replace_targets[@]}" "$receipt" "$validator"; do
   if grep -n -- "$from_phase" "$target" >/dev/null 2>&1; then
