@@ -46,11 +46,20 @@ func normalizeCodexNativeSkillReferences(body string) string {
 	for name := range names {
 		nativeName := codexNativeSkillName(name)
 		body = strings.ReplaceAll(body, "$"+name, "$"+nativeName)
-		body = strings.ReplaceAll(
-			body,
-			filepath.ToSlash(filepath.Join(".codex", "skills", name+".md")),
-			filepath.ToSlash(codexProjectSkillPath(name)),
-		)
+		// Both layouts appear in sources: the legacy flat file and the
+		// directory form that every platform now installs. Rewriting only the
+		// flat one left .codex/skills/<name>/SKILL.md without its codex-
+		// prefix, so it named a directory the installer never creates.
+		for _, authored := range []string{
+			filepath.Join(".codex", "skills", name+".md"),
+			filepath.Join(".codex", "skills", name, "SKILL.md"),
+		} {
+			body = strings.ReplaceAll(
+				body,
+				filepath.ToSlash(authored),
+				filepath.ToSlash(codexProjectSkillPath(name)),
+			)
+		}
 	}
 	return body
 }

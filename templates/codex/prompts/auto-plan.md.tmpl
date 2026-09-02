@@ -63,7 +63,7 @@ description: "SPEC 작성 — 코드베이스 분석 후 EARS 요구사항, 구�
 - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 intent-confirmation wireframe을 이어받고, 사용자가 confirm or adjust 했는지와 `wireframe intent: assumed` / `wireframe intent: deferred` 리스크를 기록합니다.
 - Wireframe은 intent probe이자 communication aid이며 final design이 아닙니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 required scope입니다.
 - 최종 사용자 응답도 Visual Planning Brief의 핵심 플로우차트 또는 wireframe 요지를 포함해 SPEC 범위를 설명해야 합니다.
-- `content/rules/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용해야 합니다.
+- `.claude/rules/autopus/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용해야 합니다.
 - 4개 SPEC 파일을 저장한 직후 `auto spec validate {SPEC_DIR} --strict`를 실행해야 합니다. 실패하면 provider review로 넘기지 말고 deterministic preflight finding을 먼저 수정한 뒤 다시 실행합니다.
 - Completion Debt는 sync completion을 막는 필수 누락 작업이고, Evolution Ideas는 완료를 막지 않는 선택 개선입니다. Evolution Ideas에서 후속 SPEC을 만들지 않습니다.
 - `--multi` 또는 `review_gate.enabled` 가 활성화되면 `auto spec review {SPEC-ID}` 를 실행해 `draft/approved` 상태를 결정해야 합니다.
@@ -110,5 +110,5 @@ description: "SPEC 작성 — 코드베이스 분석 후 EARS 요구사항, 구�
 - Completion Debt를 `Out of Scope`나 `Evolution Ideas`로 숨기지 않습니다
 - Evolution Ideas는 자동 follow-up SPEC 또는 sibling SPEC으로 승격하지 않습니다
 - `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 적용해 reference discipline, semantic invariant traceability, reviewer scope가 닫혔는지 확인합니다
-- greenfield 기술스택 선택은 `content/rules/techstack-freshness.md`의 evidence gate를 통과해야 합니다
+- greenfield 기술스택 선택은 `.claude/rules/autopus/techstack-freshness.md`의 evidence gate를 통과해야 합니다
 - `Minimality Decision Matrix`와 `minimum sufficient verification`은 새 dependency/new abstraction 판단의 필수 증거입니다

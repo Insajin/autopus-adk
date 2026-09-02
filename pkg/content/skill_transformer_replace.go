@@ -39,6 +39,9 @@ var pathReplacements = map[string]map[string]string{
 		".claude/":          ".codex/",
 	},
 	"gemini": {
+		// The autopus/ entries collapse the stale namespace segment rather
+		// than stacking a second one; a downstream stage then folds the flat
+		// <name>.md form into the installed <name>/SKILL.md directory.
 		".claude/skills/autopus/": ".gemini/skills/autopus/",
 		".claude/commands/":       ".gemini/commands/",
 		".claude/skills/":         ".gemini/skills/autopus/",
@@ -116,6 +119,12 @@ func ReplacePlatformReferences(body string, platform string) string {
 
 // NormalizeAgentReferences applies platform-specific path fixes that should be
 // preserved across generated agent surfaces.
+//
+// Every target here must be a path the platform's installer actually writes.
+// Codex is the exception that makes the rule: .codex/rules is an execpolicy
+// directory and no markdown rule is installed there (see
+// pkg/adapter/parity_conditional_test.go), so its branding contract lives in
+// the AGENTS.md marker section and is addressed by heading anchor.
 func NormalizeAgentReferences(body, platform string) string {
 	p := normalizePlatform(platform)
 	normalized := body
@@ -125,20 +134,17 @@ func NormalizeAgentReferences(body, platform string) string {
 
 	brandingRule := map[string]string{
 		"claude":   "`.claude/rules/autopus/branding.md`",
-		"codex":    "`.codex/rules/autopus/branding.md`",
+		"codex":    "`AGENTS.md#autopus-branding`",
 		"gemini":   "`.gemini/rules/autopus/branding.md`",
 		"opencode": "`.opencode/rules/autopus/branding.md`",
 		"omp":      "`.omp/rules/autopus-branding.md`",
 	}[p]
 	if brandingRule == "" {
-		brandingRule = "`content/rules/branding.md`"
+		// An unrecognised platform has no known install target, so the source
+		// path is left untouched rather than rewritten into a guess.
+		return normalized
 	}
-
-	replacer := strings.NewReplacer(
-		"`content/rules/branding.md`", brandingRule,
-		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
-	)
-	return replacer.Replace(normalized)
+	return strings.ReplaceAll(normalized, "`content/rules/branding.md`", brandingRule)
 }
 
 // replacePaths converts .claude/ directory references to platform-specific paths.

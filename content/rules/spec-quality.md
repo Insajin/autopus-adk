@@ -1,6 +1,6 @@
 # SPEC Quality Checklist
 
-Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md` are drafted, and before the SPEC enters `content/skills/spec-review.md`.
+Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md` are drafted, and before the SPEC enters `.claude/skills/spec-review/SKILL.md`.
 
 ## How To Apply
 
@@ -62,7 +62,7 @@ Reason length is sanitized to 200 runes (`pkg/spec/provider_health.go::sanitizeN
 
 - PASS 기준: 아직 존재하지 않는 새 파일, 타입, 함수, 섹션은 `[NEW]`로 표기되고 기존 참조 검증 대상에서 제외된다.
 - FAIL 기준: 미래 변경을 기존 참조처럼 서술하거나, `[NEW]` 없는 신규 항목을 정합성 PASS 근거로 사용한다.
-- Example: `[NEW] content/rules/spec-quality.md`는 허용되지만, 같은 경로를 기존 파일처럼 단정하면 FAIL이다.
+- Example: `[NEW] pkg/foo/bar.go`는 허용되지만, 같은 경로를 기존 파일처럼 단정하면 FAIL이다.
 
 ### Q-CORR-03 — Claimed syntax matches real parser and validator behavior
 

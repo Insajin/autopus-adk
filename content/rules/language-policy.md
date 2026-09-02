@@ -7,7 +7,16 @@ alwaysApply: true
 
 # Language Policy
 
-IMPORTANT: Follow the configured language settings strictly for all work in the project.
+IMPORTANT: Follow the configured language settings for all work in the project.
+
+## Enforcement
+
+This is a prompt instruction, not a mechanical gate. Nothing in the harness
+inspects the language of a comment, a commit message, or a response: the
+pre-commit Lore check validates the commit type prefix and sign-off trailers
+only, `auto check --hygiene` measures file size, and no linter or CI step reads
+language at all. A violation surfaces as a review finding, so an agent cannot
+rely on a gate to catch it.
 
 ## Configuration
 

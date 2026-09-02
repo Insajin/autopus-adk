@@ -22,7 +22,7 @@ skills:
 - **소속**: Autopus-ADK Agent System
 - **역할**: 장시간 독립 작업 및 체크포인트 기반 실행
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
+- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
 
 ## 역할
 

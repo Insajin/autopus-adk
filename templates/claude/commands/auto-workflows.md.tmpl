@@ -874,7 +874,7 @@ Agent(
     15. For any new dependency or new abstraction, require evidence in this order: `actual need`, `existing code/helper/pattern`, `stdlib/native`, `existing dependency`, `new dependency or abstraction`. Missing prior evidence makes the item a `revise-target` or risk; explicit user intent still needs alternatives, justification, and verification obligation.
     16. Keep `minimum sufficient verification` focused on closing the Outcome Lock while preserving security, validation, accessibility, data-loss, deterministic-oracle, and generated-surface-hygiene gates.
     17. Write `## Reviewer Brief` in research.md with intended scope, explicit non-goals, self-verified evidence, and reviewer focus.
-    18. Apply Q-CORR-04, Q-COMP-05, and Q-COMP-06 from content/rules/spec-quality.md during Self-Verify Summary.
+    18. Apply Q-CORR-04, Q-COMP-05, and Q-COMP-06 from `.claude/rules/autopus/spec-quality.md` during Self-Verify Summary.
     19. For greenfield/new project/scaffold work, apply techstack-freshness and write `## Technology Stack Decision` in research.md or prd.md with concrete stable versions, source refs, checked_at, and rejected alternatives.
     20. For prompt-state work, record the prompt layer manifest contract: stable instructions, frozen snapshot recall, ephemeral request/evidence, and cache invalidation scope.
     21. After writing all four SPEC files, run `auto spec validate {SPEC_DIR} --strict` before provider review. Fix deterministic authoring preflight errors locally and rerun validation before returning.
@@ -1268,7 +1268,7 @@ Fallback taxonomy (every failure maps to exactly one class — no silent opt-out
 | `execution_abort` | `resumable` |
 | `api_unavailable` | `explicit` |
 
-The manifest (`content/workflows/route_a.{md,schema.json}`) is the source of truth; the workflow JS is a generated, edit-forbidden surface.
+The route manifest in the autopus-adk source repo is the source of truth; the workflow JS is a generated, edit-forbidden surface.
 
 #### Subagent Pipeline Phases (Route A)
 
@@ -1520,7 +1520,7 @@ Executor prompts must require searching existing code/helper/pattern before addi
 
 For each task in the planner's assignment table, spawn executor agents:
 
-**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference. See `.claude/rules/autopus/worktree-safety.md`.
+**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference.
 
 Migration directory serialization: tasks that create SQL migrations in the same owning repo and migration directory are sequential, even if their application code ownership is disjoint. Assign final migration numbers only after earlier migration branches are merged or rebased.
 
@@ -1572,7 +1572,7 @@ git -c gc.auto=0 merge <branch_T2>
 git worktree remove <path_T2>
 ```
 
-On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries). See `.claude/rules/autopus/worktree-safety.md`.
+On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries).
 
 After merge, display:
 ```

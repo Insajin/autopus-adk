@@ -67,7 +67,7 @@ auto workflow render --dry-run
 ## Deterministic 4-Phase Flow
 
 The workflow runs exactly four ordered phases. The phase-ids are authoritative
-and match `content/workflows/route_a.schema.json`.
+and match the route manifest schema in the autopus-adk source repo.
 
 1. **planning** — produces the implementation plan and task breakdown; does not
    mutate the working tree beyond plan artifacts.
@@ -106,12 +106,12 @@ Every workflow failure maps to exactly one class — silent opt-out is forbidden
 
 ## Manifest is the Source of Truth
 
-`content/workflows/route_a.md` and `content/workflows/route_a.schema.json` are
-the human- and machine-authoritative manifest. The Workflow JS
-(`templates/claude/workflows/route_a.workflow.js.tmpl` and the installed
-`.claude/workflows/route_a.workflow.js`) is a **generated, edit-forbidden
-surface** derived from the manifest by `auto generate-templates`. Do not edit the
-JS by hand — edit the manifest and regenerate. A parity gate compares the
+The route manifest in the autopus-adk source repo (markdown plus JSON schema) is
+the human- and machine-authoritative definition. The installed Workflow JS
+(`.claude/workflows/route_a.workflow.js`) is a **generated, edit-forbidden
+surface** derived from that manifest by `auto generate-templates`. Do not edit the
+JS by hand — edit the manifest in the ADK source repo and regenerate. A parity
+gate compares the
 phase-id, retry, budget, and result-type sets across the markdown, the schema,
 and the derived JS; any divergence fails generation closed and names the
 diverging element.

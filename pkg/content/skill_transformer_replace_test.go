@@ -194,15 +194,31 @@ See .claude/skills/tdd.md`
 	assert.Contains(t, result, ".codex/skills/tdd.md")
 }
 
+// The previous form of this test pinned ".codex/rules/autopus/branding.md" and
+// an injected "templates/shared/branding-formats.md.tmpl", neither of which any
+// install manifest writes. Pinning the injected string instead of the resolved
+// target is why 209 dangling references survived: the rewrite was "correct" by
+// its own assertion.
 func TestNormalizeAgentReferences_BrandingPaths(t *testing.T) {
 	t.Parallel()
 
-	input := "- **브랜딩**: `content/rules/branding.md` 준수\n- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조"
+	input := "- **브랜딩**: `content/rules/branding.md` 준수"
 
-	assert.Contains(t, content.NormalizeAgentReferences(input, "claude-code"), ".claude/rules/autopus/branding.md")
-	assert.Contains(t, content.NormalizeAgentReferences(input, "codex"), ".codex/rules/autopus/branding.md")
-	assert.Contains(t, content.NormalizeAgentReferences(input, "gemini"), ".gemini/rules/autopus/branding.md")
-	assert.Contains(t, content.NormalizeAgentReferences(input, "opencode"), ".opencode/rules/autopus/branding.md")
-	assert.NotContains(t, content.NormalizeAgentReferences(input, "codex"), "content/rules/branding.md")
-	assert.Contains(t, content.NormalizeAgentReferences(input, "codex"), "templates/shared/branding-formats.md.tmpl")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "claude-code"), "`.claude/rules/autopus/branding.md`")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "gemini"), "`.gemini/rules/autopus/branding.md`")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "opencode"), "`.opencode/rules/autopus/branding.md`")
+	assert.Contains(t, content.NormalizeAgentReferences(input, "omp"), "`.omp/rules/autopus-branding.md`")
+
+	// Codex installs no markdown rule surface, so its branding contract is a
+	// heading in the AGENTS.md marker section, not a rules path.
+	codexOut := content.NormalizeAgentReferences(input, "codex")
+	assert.Contains(t, codexOut, "`AGENTS.md#autopus-branding`")
+	assert.NotContains(t, codexOut, ".codex/rules/")
+	assert.NotContains(t, codexOut, "content/rules/branding.md")
+
+	// No platform may gain a pointer to an ADK source template.
+	for _, platform := range []string{"claude-code", "codex", "gemini", "opencode", "omp"} {
+		assert.NotContains(t, content.NormalizeAgentReferences(input, platform),
+			"templates/shared/", platform)
+	}
 }

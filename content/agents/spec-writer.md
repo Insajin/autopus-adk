@@ -19,7 +19,7 @@ SPEC 문서를 생성하는 전문 에이전트입니다.
 - **소속**: Autopus-ADK Agent System
 - **역할**: SPEC 문서 생성 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
+- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
 
 ## 역할
 
@@ -98,7 +98,7 @@ If neither the BS file nor plan intent context contains `## Clarification Ledger
 
 ### 1.5. Technology Stack Decision
 
-신규 프로젝트, 스캐폴드, starter, greenfield 요청이면 기술스택을 SPEC에 고정하기 전에 `content/rules/techstack-freshness.md`와 `pkg/techstack` 정책을 적용합니다.
+신규 프로젝트, 스캐폴드, starter, greenfield 요청이면 기술스택을 SPEC에 고정하기 전에 `.claude/rules/autopus/techstack-freshness.md`와 `pkg/techstack` 정책을 적용합니다.
 
 - `mode=greenfield`이면 런타임, 프레임워크, package manager, 주요 의존성마다 concrete stable version을 확인합니다.
 - 각 선택 항목은 official docs/release notes/registry/Context7 metadata 중 하나 이상의 source ref, resolved version, checked_at을 가져야 합니다.
@@ -299,7 +299,7 @@ These are optional improvements and do not block sync completion.
 
 작성 직후 아래 자체 검증 루프를 수행합니다.
 
-1. `content/rules/spec-quality.md`를 읽고 체크리스트 전체를 로드합니다.
+1. `.claude/rules/autopus/spec-quality.md`를 읽고 체크리스트 전체를 로드합니다.
 2. `spec.md`, `plan.md`, `acceptance.md`, `research.md`에 각 항목을 자연어로 적용하여 `PASS`, `FAIL`, `N/A`와 짧은 근거를 남깁니다.
 3. 판정 결과는 `research.md`의 `## Self-Verify Summary` 섹션에 `Q-* | status | attempt | files | reason` 형식으로 남깁니다. 같은 항목을 재검증하면 최신 상태가 보이도록 갱신합니다.
 4. FAIL이 나온 경우, 해당 차원이 요구하는 모든 관련 파일을 수정합니다. 증상이 보인 파일만 고치지 말고 원인 차원 기준으로 수정합니다.
@@ -353,7 +353,7 @@ These are optional improvements and do not block sync completion.
 - plan.md의 태스크는 독립적으로 실행 가능한 단위
 - plan.md는 Primary SPEC가 Outcome Lock을 닫는 태스크를 포함하고, 승인된 sibling 의존성과 Completion Debt만 명시해야 함
 - `research.md`는 `## Outcome Lock`, `## Completion Debt`, `## Evolution Ideas`, 필요 시 `## Sibling SPEC Decision`을 포함해야 함
-- 작성 직후 `content/rules/spec-quality.md`를 기준으로 최대 2회 자체 검증 루프 수행
+- 작성 직후 `.claude/rules/autopus/spec-quality.md`를 기준으로 최대 2회 자체 검증 루프 수행
 
 ## 협업
 

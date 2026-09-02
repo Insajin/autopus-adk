@@ -172,12 +172,16 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// Content tripwire over the whole prepared set. It moves when a shipped
 	// native file, a target path, a rendered skill body, or a workflow spec
 	// description changes; this value reflects the OMP 18.0.5 native roots,
-	// omission of the base config, and the auto-qa surface documenting the visual
+	// omission of the base config, the auto-qa surface documenting the visual
 	// report, the typed GUI capture contract, the `report` route in its command
 	// description, and the scenario authoring contract (`auto qa scenario`, the
 	// closed read-only step vocabulary, and the screen_ref link that makes
-	// gui.screen_matrix enforceable).
-	const priorPreparedFilesFingerprint = "c2ad563e81da5cd3fbe6feed1b1976568af533c5a0de02ffc3f3db26b5ba0a99"
+	// gui.screen_matrix enforceable). It last moved when generated surfaces
+	// stopped referencing ADK source paths that no install manifest writes:
+	// branding formats were inlined into the branding rule, rule references
+	// were repointed at installed per-platform paths, and the language policy
+	// stopped claiming mechanical enforcement.
+	const priorPreparedFilesFingerprint = "fd2d2f55025ff39306547a8b9c19b51a8650832584511e671701a84bc2014d52"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

@@ -210,6 +210,12 @@ func TestNativeSkillRoutingInAgentsMD(t *testing.T) {
 	assert.Contains(t, content, "$codex-auto-<route>")
 	assert.Contains(t, content, "$codex-<skill>")
 	assert.NotContains(t, content, ".codex/rules/autopus/")
+	// Asserting only that the old prefix disappeared accepted the prefix-only
+	// rewrite that produced AGENTS.mdbranding.md. The rewrite must land on a
+	// heading the marker section actually declares.
+	assert.NotRegexp(t, `AGENTS\.md[A-Za-z0-9_.-]`, content)
+	assert.Contains(t, content, "## Autopus Branding")
+	assert.Contains(t, content, "## Document Storage")
 }
 
 func TestMarkerSection_Under32KB(t *testing.T) {

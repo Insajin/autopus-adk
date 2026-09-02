@@ -22,7 +22,7 @@ TDD 또는 DDD 방법론에 따라 코드를 구현하는 에이전트입니다.
 - **소속**: Autopus-ADK Agent System
 - **역할**: TDD/DDD 기반 코드 구현 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
+- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
 
 ## 역할
 
@@ -192,7 +192,7 @@ SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from 
 
 ## Result Format
 
-> 이 포맷은 `branding-formats.md.tmpl` A3: Agent Result Format의 구현입니다.
+> 이 포맷은 A3 (Agent Result Format) 규격의 구현입니다.
 
 When returning results, use the following format at the end of your response:
 

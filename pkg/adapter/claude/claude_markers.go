@@ -146,7 +146,7 @@ IMPORTANT: This project uses this directory's Autopus-ADK instructions ONLY. You
 
 ## Language Policy
 
-IMPORTANT: Follow these language settings strictly for all work in this project.
+IMPORTANT: Follow these language settings for all work in this project. They are prompt instructions, not a mechanical gate: no hook, linter, or CI step inspects the language of a comment, commit message, or response, and the pre-commit Lore check validates only the commit type prefix and sign-off trailers. A violation surfaces as a review finding.
 
 - **Code comments**: Write all code comments, docstrings, and inline documentation in {{langName .Language.Comments}} ({{.Language.Comments}})
 - **Commit messages**: Write all git commit messages in {{langName .Language.Commits}} ({{.Language.Commits}})

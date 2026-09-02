@@ -68,8 +68,12 @@ func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, er
 	expanded := expandEnvVars(string(data))
 
 	var cfg HarnessConfig
-	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
-		return nil, false, fmt.Errorf("parse config: %w", err)
+	// Strict: an unrecognised key is a typo, and Save re-marshals the struct,
+	// so accepting it silently loses the user's line while looking like a
+	// working setting. Keys that are deliberately tolerated are named in
+	// removedConfigKeys and reservedConfigKeys, never inferred from absence.
+	if err := decodeStrict([]byte(expanded), &cfg); err != nil {
+		return nil, false, fmt.Errorf("parse config %s: %w", path, err)
 	}
 	applyMissingDefaults(&cfg, []byte(expanded))
 

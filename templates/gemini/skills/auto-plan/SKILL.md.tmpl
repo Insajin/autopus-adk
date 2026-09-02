@@ -156,7 +156,7 @@ Step 1에서 발견한 실제 코드 엔티티를 기반으로 요구사항을 �
 
 ### Step {{if .IsFullMode}}5.5{{else}}3.5{{end}}: 기능 커버리지 검증
 
-- 신규 프로젝트/스캐폴드/greenfield 요청이면 `content/rules/techstack-freshness.md`와 `pkg/techstack` 정책을 적용해 `research.md` 또는 `prd.md`에 `## Technology Stack Decision`을 작성합니다.
+- 신규 프로젝트/스캐폴드/greenfield 요청이면 `.gemini/rules/autopus/techstack-freshness.md`와 `pkg/techstack` 정책을 적용해 `research.md` 또는 `prd.md`에 `## Technology Stack Decision`을 작성합니다.
 - greenfield Technology Stack Decision은 선택한 런타임/프레임워크/주요 의존성의 concrete stable version, official source refs, checked_at, rejected alternatives를 포함해야 하며 prerelease는 명시 근거 없이는 선택하지 않습니다.
 - brownfield 작업이면 기존 manifest major version을 compatibility constraint로 보존하고, migration이 요구될 때만 동일한 version evidence를 기록합니다.
 - UI 관련 SPEC(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이면 `research.md`에 `## Design Source Pack`과 `## Design Discovery Matrix`를 작성합니다. 먼저 `auto design pack --format markdown` 결과 또는 동일한 local evidence를 사용하고, source refs, surface type, core job, density, risk, required primitives, required states, accessibility checks, responsive checks, anti-patterns를 기록합니다. Figma/Code Connect가 없으면 setup gap으로 기록하고 새 디자인 시스템을 임의로 만들지 않습니다.
@@ -176,7 +176,7 @@ Step 1에서 발견한 실제 코드 엔티티를 기반으로 요구사항을 �
 - `plan.md` 또는 `research.md`의 `## Visual Planning Brief`로 workflow/state에는 Mermaid `flowchart`, UI/UX에는 저충실도 wireframe, CLI/API/backend에는 sequence/data-flow/command-flow를 기록합니다.
 - UX intent wireframe gate: screens, user journeys, navigation/IA, layout, visual hierarchy, component state, interaction, copy, accessibility, responsive behavior, design-system tokens/primitives, or frontend UI files가 관련되면 intent-confirmation wireframe을 이어받고, 사용자가 confirm or adjust 했는지와 `wireframe intent: assumed` / `wireframe intent: deferred` 리스크를 기록합니다.
 - Wireframe은 intent probe이자 communication aid이며 final design이 아닙니다. Outcome Lock, mandatory requirements, acceptance seeds에 연결된 항목만 required scope입니다.
-- `content/rules/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용합니다.
+- `.gemini/rules/autopus/spec-quality.md`의 `Q-CORR-04`, `Q-COMP-05`, `Q-COMP-06`을 Self-Verify Summary에 적용합니다.
 - 4개 SPEC 파일 저장 직후 `auto spec validate {SPEC_DIR} --strict`를 실행합니다. 실패하면 provider review로 넘기지 말고 deterministic authoring preflight 오류를 먼저 수정한 뒤 다시 실행합니다.
 - Primary SPEC가 happy path, error/recovery, integration boundary, verification을 모두 닫으면 sibling SPEC를 만들지 않습니다.
 - sibling SPEC는 `## Sibling SPEC Decision`에 허용 사유를 기록한 경우에만 생성합니다. 허용 사유는 독립 사용자 결과, 별도 배포 repo/module ownership, migration/compat sequencing, 보안/컴플라이언스/auth/billing/data 경계, 또는 Primary SPEC가 25개 초과 태스크와 40개 초과 소스 파일을 동시에 요구하는 경우뿐이며 최대 2개입니다.

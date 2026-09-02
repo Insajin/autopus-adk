@@ -12,14 +12,15 @@ level1_metadata: "@AX tags, NOTE/WARN/ANCHOR/TODO, per-file limits, [AUTO] prefi
 
 # @AX Annotation Skill
 
-Reference: `pkg/content/ax.go:GenerateAXInstruction()` is the canonical source for all @AX rules.
-This skill provides actionable guidance for WHEN and HOW agents apply @AX tags.
+The canonical @AX rule set is emitted into this skill by the harness generator,
+so the tag definitions, trigger conditions, lifecycle rules, and per-file limits
+below are authoritative for this installation. This skill provides actionable
+guidance for WHEN and HOW agents apply @AX tags.
 
 ## Canonical Source
 
-All tag type definitions, trigger conditions, lifecycle rules, and per-file limits are defined in
-`pkg/content/ax.go:GenerateAXInstruction()`. Do NOT redefine rules here — consult that function
-as the authoritative source before applying any tag.
+Do NOT redefine tag rules elsewhere. Treat the sections of this document as the
+single source and apply them as written.
 
 ## When to Apply @AX Tags
 
