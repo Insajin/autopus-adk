@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -143,8 +142,13 @@ func startPipelineOMPActiveProcess(
 	}
 	defer func() { resultErr = errors.Join(resultErr, verifiedCommand.Close()) }()
 	cmd := verifiedCommand.cmd
+	// The child's stderr used to go to io.Discard, which made a startup failure
+	// unexplainable: the Darwin ptrace gate reports "context deadline exceeded"
+	// and the only text that could say why was thrown away. Bounded so a chatty
+	// child cannot grow this without limit, and only used on the failure paths.
+	childStderr := &boundedOutput{limit: pipelineOMPActiveStderrTailBytes}
 	cmd.Dir, cmd.Env, cmd.Stderr = active.backend.ProjectDir,
-		workflowContextManagedRPCEnvironment(environment, active.binding), io.Discard
+		workflowContextManagedRPCEnvironment(environment, active.binding), childStderr
 	cmd.WaitDelay = 500 * time.Millisecond
 	if err := configurePipelineOMPActiveSandbox(cmd, active.endpoint, active.sandboxMode); err != nil {
 		cleanup()
@@ -173,7 +177,8 @@ func startPipelineOMPActiveProcess(
 		_ = stdin.Close()
 		_ = stdout.Close()
 		cleanup()
-		return nil, fmt.Errorf("start managed active OMP RPC: %w", err)
+		return nil, fmt.Errorf("start managed active OMP RPC: %w%s", err,
+			pipelineOMPActiveStderrDetail(childStderr))
 	}
 	frameCtx, stopFrames := context.WithCancel(context.Background())
 	frames, done := readPipelineOMPFrames(frameCtx, stdout)
@@ -185,8 +190,9 @@ func startPipelineOMPActiveProcess(
 	defer cancel()
 	frame, err := process.next(readyCtx)
 	if err != nil || frame.Type != "ready" {
+		detail := pipelineOMPActiveStderrDetail(childStderr)
 		_ = process.Close()
-		return nil, errors.New("managed active OMP RPC readiness was not observed")
+		return nil, fmt.Errorf("managed active OMP RPC readiness was not observed%s", detail)
 	}
 	return process, nil
 }

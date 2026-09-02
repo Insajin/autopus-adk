@@ -3,6 +3,22 @@
 # the 300-line source limit. Sourced, not executed: it relies on the caller's
 # pass/warn/bad/section helpers and on $work being an existing temp directory.
 
+# pipeline_omp_report_pin states whether the pin still describes the upstream
+# asset, and says which kind of upstream statement backed the comparison so a
+# reader can tell a declared checksum from a locally measured one.
+pipeline_omp_report_pin() {
+  # `version` and `source` are readonly in the caller, so the locals are named
+  # apart from them rather than shadowing and failing at runtime.
+  local upstream=$1 pin=$2 pinned_version=$3 tag=$4 evidence_kind=$5
+  if [[ -z "$upstream" ]]; then
+    bad "no upstream darwin-arm64 digest for ${tag} (${evidence_kind})"
+  elif [[ "$upstream" == "$pin" ]]; then
+    pass "OMP pin ${pinned_version} matches the upstream darwin-arm64 asset (${evidence_kind})"
+  else
+    bad "OMP pin ${pin:0:12}… differs from upstream ${upstream:0:12}… for ${tag} (${evidence_kind})"
+  fi
+}
+
 check_release_prep_inputs() {
   section "release prep inputs"
   # prepare-release.sh cannot start without these, and it discovers them one at a
@@ -23,17 +39,20 @@ check_release_prep_inputs() {
   elif sums=$(gh release download "$omp_tag" --repo can1357/oh-my-pi \
     -p 'SHA256SUMS.txt' -D "$work" --clobber 2>/dev/null && cat "$work/SHA256SUMS.txt"); then
     upstream=$(awk '$2 == "omp-darwin-arm64" { print $1 }' <<<"$sums")
-    if [[ "$upstream" == "$omp_pin" ]]; then
-      pass "OMP pin ${omp_version_pin} matches the upstream darwin-arm64 asset"
-    else
-      bad "OMP pin ${omp_pin:0:12}… differs from upstream ${upstream:0:12}… for ${omp_tag}"
-    fi
-    latest=$(gh api repos/can1357/oh-my-pi/releases/latest --jq .tag_name 2>/dev/null || printf '')
-    if [[ -n "$latest" && "$latest" != "$omp_tag" ]]; then
-      warn "upstream latest is ${latest}; the pin is ${omp_tag}. Advancing the pin changes the evidence oracle, so decide it rather than drift into it"
-    fi
+    pipeline_omp_report_pin "$upstream" "$omp_pin" "$omp_version_pin" "$omp_tag" 'declared checksum'
+  elif gh release download "$omp_tag" --repo can1357/oh-my-pi \
+    -p 'omp-darwin-arm64' -D "$work/asset" --clobber >/dev/null 2>&1; then
+    # Releases before SHA256SUMS.txt existed publish no declared checksum, so the
+    # asset itself is the only upstream statement available. Measuring it is
+    # weaker than a declared digest and stronger than skipping the check.
+    upstream=$(shasum -a 256 "$work/asset/omp-darwin-arm64" | awk '{print $1}')
+    pipeline_omp_report_pin "$upstream" "$omp_pin" "$omp_version_pin" "$omp_tag" 'measured asset'
   else
-    bad "cannot read upstream SHA256SUMS.txt for ${omp_tag}"
+    bad "cannot read the upstream darwin-arm64 asset for ${omp_tag}"
+  fi
+  latest=$(gh api repos/can1357/oh-my-pi/releases/latest --jq .tag_name 2>/dev/null || printf '')
+  if [[ -n "$latest" && -n "$omp_tag" && "$latest" != "$omp_tag" ]]; then
+    warn "upstream latest is ${latest}; the pin is ${omp_tag}. The pin is a protocol contract, not just a version, so advancing it is its own task"
   fi
 
   # Signing keys are checked by public half only; nothing secret is read out.

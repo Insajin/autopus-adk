@@ -62,7 +62,11 @@ resolve_from_omp_gateway() {
 }
 
 gateway_source='env file'
-if resolve_from_omp_gateway "${HOME}/.cache/autopus/release/omp-v18.1.2-darwin-arm64"; then
+# The gateway probe uses whichever omp is on PATH rather than the release-pinned
+# path. The pin belongs to the evidence oracle; this call only asks the gateway
+# whether it is ready, and an earlier hardcoded version here went stale the
+# moment the pin moved.
+if resolve_from_omp_gateway "$(command -v omp || printf /nonexistent)"; then
   gateway_source='omp auth-gateway'
 elif [[ ! -f "$env_file" || -L "$env_file" ]]; then
   cat >&2 <<EOF

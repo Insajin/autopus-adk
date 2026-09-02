@@ -192,13 +192,15 @@ The correction is recorded rather than quietly applied, in `release-key-custody-
 
 The local key is `b1` — a prepositioned next-generation companion key that has never been activated, the same pattern as K2 in `pinnedkey.go`. It cannot sign this release's evidence, and substituting it would produce an attestation the active static policy does not accept.
 
-The OMP pin was advanced from `omp/17.2.7` to `omp/18.1.2` on decision, not drift. It had gone stale: the harness moved its own surfaces to OMP 18.x on 2026-08-26 while the release oracle stayed at 17.2.7, and v0.50.112's evidence will now be produced against the current oracle.
+The OMP pin was advanced to `omp/18.1.2` and then reverted to `omp/17.2.7`. Both moves are recorded because the reason for the revert is the useful part.
 
-The digest was taken from the upstream release rather than a local install, which is the distinction that matters here. Prep consumes `omp-darwin-arm64` published at `github.com/can1357/oh-my-pi`; a Homebrew build of the same version hashes differently, so a locally measured digest would pin something CI never downloads. Verified three ways before pinning: the upstream `SHA256SUMS.txt` entry, the measured digest of the downloaded asset, and the binary reporting `omp/18.1.2`.
+`--apply` reached the live canary and failed at the Darwin verified-exec gate: `observe managed active OMP exec stop / context deadline exceeded`, at record 1 of 42. The obvious suspicion was the version bump, and it was wrong — running the real embedded bridge against 18.1.2 outside isolation produces `{"type":"ready","protocolVersion":1,...}` and exits 0, so the bridge and the RPC are compatible.
 
-What this does not settle is oracle equivalence. The 40-call cohort's verdict depends on the model and oracle behaviour, so a report signed against 18.1.2 is not interchangeable with one against 17.2.7. Read the first A24 evidence rather than assuming it looks like A23's, and expect the reduction-basis-point margin to move.
+What the version bump does break is subtler and worse. `pipelineOMPActivePolicyIdentity` in `internal/cli/pipeline_omp_context_active_process.go` contains `snapcompact-image-schema=omp-v17.2.7`, and that string is recorded in the promotion evidence. The ADK also asserts concrete compaction frame shapes — `auto_compaction_end` with `action=snapcompact` and `reason=manual|threshold`. So the oracle version is not a digest to bump; it is a protocol contract the evidence claims. Running an 18.1.2 binary while the identity states v17.2.7 would publish a claim that is not true, whether or not the run happens to pass.
 
-`preflight-release.sh` now compares the pin to the upstream asset and warns when upstream has moved past it. The warning is deliberate rather than an auto-bump: advancing the oracle is a decision each time.
+The pin is therefore back at the version the contract names. Advancing to 18.x is its own task: qualify the compaction image schema, update the policy identity, and re-measure the gate, which allows five seconds for two ptrace exec stops.
+
+`preflight-release.sh` compares the pin to the upstream asset and says which kind of upstream statement backed it. Releases before `SHA256SUMS.txt` existed publish no declared checksum, so v17.2.7 is verified by measuring the asset — weaker than a declared digest, stronger than skipping. It also warns when upstream has moved ahead, with the reason: the pin is a contract, so advancing it is a decision each time.
 
 ### Prep invocation, one command
 
