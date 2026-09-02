@@ -298,12 +298,17 @@ Where each resolved value came from, so none of them is a guess:
 
 `--apply` builds the release canary as an isolated macOS user through `dscl`, so it requires noninteractive root and then refreshes the timestamp every 30 seconds while it runs. The check is `sudo -n -v`, which fails instead of prompting, so a stale timestamp stops apply about two seconds in.
 
-Authorize immediately before, in a terminal where you can type:
+`--apply` therefore has to run from an interactive terminal, and the authorization has to happen in that same terminal. macOS scopes the sudo timestamp per tty by default, so `sudo -v` in one terminal does not authorize a process running without a tty or on a different one. Authorizing elsewhere and then driving apply from a tty-less session fails with `sudo: a password is required` about two seconds in, which looks like a stale timestamp and is not.
+
+Run both in one line so the timestamp is fresh in the tty that will use it:
 
 ```bash
-sudo -v
-scripts/companion-release/release-prep.sh --apply
+export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
+export ADK_GATEWAY_URL=http://127.0.0.1:47312
+sudo -v && scripts/companion-release/release-prep.sh --apply | tee /tmp/prep-apply.log
 ```
+
+Do not widen the sudo policy to `timestamp_type=global` to make this work from an automated session. That would let any process on the machine reuse a release operator's authorization, which is a larger hole than the convenience is worth.
 
 `preflight-release.sh` reports this, so it surfaces before the 40-call cohort rather than after. `--preflight` itself does not need root, which is why the gap only appears at apply time.
 
