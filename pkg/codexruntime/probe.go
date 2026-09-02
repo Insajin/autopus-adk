@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	catalogProbeStartAttempts   = 5
 	catalogProbeStartRetryDelay = 10 * time.Millisecond
 	// codexHomeEnv is the variable the codex CLI resolves its credential home
 	// from. Pinning it is the only way to read the catalog one specific account
@@ -37,10 +36,13 @@ func ProbeModelCatalogUnderHome(
 ) ([]byte, error) {
 	probeCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	for attempt := 0; ; attempt++ {
+	// ETXTBSY lasts exactly as long as some other process holds the executable
+	// open for writing, which no fixed attempt count can predict. A five-attempt
+	// ceiling gave a 40ms budget and lost to a 25ms hold on a loaded runner. The
+	// caller's timeout is the real bound, so retry until it expires.
+	for {
 		output, err := probeModelCatalogOnce(probeCtx, binary, codexHome)
-		if err == nil || !errors.Is(err, syscall.ETXTBSY) ||
-			attempt+1 >= catalogProbeStartAttempts {
+		if err == nil || !errors.Is(err, syscall.ETXTBSY) {
 			return output, err
 		}
 		select {

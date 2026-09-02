@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **ETXTBSY 재시도를 호출자 timeout으로 묶는다** (2026-09-02): `TestProbeModelCatalogRetriesTextFileBusy`가 CI에서만 실패했다. 재시도가 5회 × 10ms = 40ms 고정 예산이고 테스트는 실행 파일을 25ms 잡는데, 부하 걸린 러너에서 25ms 해제가 40ms 이후로 밀리면 진다. ETXTBSY는 다른 프로세스가 실행 파일을 쓰기로 여는 동안만 지속되므로 고정 횟수로 예측할 수 없다. 시도 상한을 없애고 이미 존재하는 호출자 timeout이 경계가 되게 했다. 프로덕션에서도 더 정확하다.
+
 - **tip의 CI 실패 2건을 닫는다** (2026-09-02): 새 CI 게이트가 `set -- $listed`로 개수를 셌고 shellcheck가 SC2086으로 3곳을 잡았다. 억제 대신 `read -ra`로 배열을 만들어 인용 없는 확장을 없앴다. SKIP 스캔의 `for name in $(...)`도 `while IFS= read -r`로 바꿨다(SC2013). sticky rule 쌍은 rule 본문 교정으로 4492 -> 4628 바이트로 자랐다. aggregate 상한 6000은 그대로이고 여유 1372 바이트로 온전히 주입되므로, 상한이 아니라 tripwire 핀을 실측값으로 옮기고 SPEC REQ-STICKYRULE-FIRE-05과 research에 재측정을 기록했다.
 
 - **실수로 발행한 진행 중 작업을 커밋에서 되돌린다** (2026-09-02): 앞 커밋에서 `git add -A`를 써서 다른 작업의 미커밋 WIP 65개 파일(agents/templates 콘텐츠, `pkg/config` strict 로더)이 함께 발행됐다. strict 로더는 `LoadPreview`가 미지 키를 거부하게 만드는데, `TestSaveQualityProviderPreservesRawConfig` 등 CLI 계약 3건은 같은 `LoadPreview`로 미지 키(`future_extension`)가 라운드트립에서 보존되기를 요구한다. 두 계약은 같은 함수에서 양립할 수 없고, 이는 오타 안전성과 상위 호환성 사이의 제품 결정이라 소유자에게 남긴다. 해당 65개 파일을 커밋에서 되돌리고 내용은 워킹트리 미커밋 상태로 복원해, 실수 이전 상태로 되돌렸다. 내 변경(`pkg/qa/report/render.go` errcheck, runbook 이어가기)은 그대로 유지한다.
