@@ -19,7 +19,7 @@ SPEC 문서를 생성하는 전문 에이전트입니다.
 - **소속**: Autopus-ADK Agent System
 - **역할**: SPEC 문서 생성 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
+- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
 
 ## 역할
 

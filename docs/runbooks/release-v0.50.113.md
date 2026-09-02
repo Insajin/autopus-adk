@@ -1,6 +1,6 @@
-# Autopus ADK v0.50.112 Release
+# Autopus ADK v0.50.113 Release
 
-> **BURNED 2026-09-02.** `v0.50.112` is failed release history. The tag object
+> **PREDECESSOR ATTEMPT BURNED 2026-09-02.** `v0.50.112` is failed release history. The tag object
 > `8be0cfb67c596448a6abd0de237e9db6d6eadd30` and the evidence tag
 > `omp-context-evidence-v0.50.112` exist and must never be moved, deleted,
 > recreated, or reused. GitHub release ID `381031316` remains an unpublished
@@ -8,7 +8,7 @@
 > failed: CI concluded failure at the tagged commit.
 >
 > Nothing was published, so no consumer saw a partial release. What was lost is
-> the coordinate. The next attempt is `v0.50.113`.
+> the coordinate. This runbook is that next attempt.
 >
 > Why it burned, plainly: CI had been failing on `main` for every run that day,
 > and nothing in the preflight looked at CI. The local Makefile lanes, the
@@ -19,7 +19,7 @@
 
 ## Purpose and stop conditions
 
-This document is a procedure, not proof that v0.50.112 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
+This document is a procedure, not proof that v0.50.113 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
 
 A24 is the first phase whose direct predecessor is a *successful* release since A22. Its lineage points at A23/v0.50.111, which published fifteen assets on 2026-08-31 including the promotion report, the promotion attestation, and the signed release lineage. That is verified below, not assumed.
 
@@ -29,12 +29,12 @@ A24 is the first phase whose direct predecessor is a *successful* release since 
 |---|---|
 | Repository | `Insajin/autopus-adk` |
 | Release phase | `A24` |
-| Release tag / ref | `v0.50.112` / `refs/tags/v0.50.112` |
-| Version | `0.50.112` |
-| Workflow trigger | only `refs/tags/v0.50.112` |
-| Evidence tag / ref | `omp-context-evidence-v0.50.112` / `refs/tags/omp-context-evidence-v0.50.112` |
-| Prep-lock ref | `refs/heads/omp-context-evidence-v0.50.112-source` |
-| Release tag ruleset | `autopus-v0.50.112-release-authority` |
+| Release tag / ref | `v0.50.113` / `refs/tags/v0.50.113` |
+| Version | `0.50.113` |
+| Workflow trigger | only `refs/tags/v0.50.113` |
+| Evidence tag / ref | `omp-context-evidence-v0.50.113` / `refs/tags/omp-context-evidence-v0.50.113` |
+| Prep-lock ref | `refs/heads/omp-context-evidence-v0.50.113-source` |
+| Release tag ruleset | `autopus-v0.50.113-release-authority` |
 | Protected environment | `adk-companion-release` |
 | Release operator user ID | `204883817` |
 | Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, present at `~/.config/autopus/release-keys/release-tag-signing-2026-q3-r2` |
@@ -73,7 +73,7 @@ A24's direct release predecessor is the immutable v0.50.111 release. The lineage
 | Lineage signing key | `adk-release-2026-q3-b0`, ed25519 |
 | Evidence tag | `omp-context-evidence-v0.50.111` |
 
-Run the committed lineage verifier and require it to identify A24 → A23 with these exact values. The v0.50.111 release ID, tag, and asset bytes are immutable history and are predecessor proof only: the v0.50.112 lane must not copy, rename, re-upload, or otherwise reuse any v0.50.111 asset.
+Run the committed lineage verifier and require it to identify A24 → A23 with these exact values. The v0.50.111 release ID, tag, and asset bytes are immutable history and are predecessor proof only: the v0.50.113 lane must not copy, rename, re-upload, or otherwise reuse any v0.50.111 asset.
 
 The companion manifest and signature digests are not restated here. Read them from the A23 release at execution time and bind the observed values; restating them from a prior runbook is how a stale digest survives a rotation.
 
@@ -129,7 +129,7 @@ Download the two lineage files from the v0.50.111 release rather than reusing a 
 
 `v0.50.110` remains failed release history. Its release tag and `omp-context-evidence-v0.50.110` evidence tag exist and must never be moved, deleted, recreated, or reused. GitHub release ID `379549016` remains an unpublished failed draft. No v0.50.110 asset was published.
 
-A24 maps only to `v0.50.112`. It requires a new one-shot evidence object and a fresh K3 report and attestation. Never copy or reuse any v0.50.110 or v0.50.111 report, attestation, evidence commit, evidence tag object, draft, or workflow artifact.
+A24 maps only to `v0.50.113`. It requires a new one-shot evidence object and a fresh K3 report and attestation. Never copy or reuse any v0.50.110 or v0.50.111 report, attestation, evidence commit, evidence tag object, draft, or workflow artifact.
 
 ## Active K3 policy and fresh evidence
 
@@ -154,7 +154,7 @@ Follow `release-v0.50.111.md` "Prerequisites" unchanged, plus these A24-specific
 
 ### Release-authority ruleset
 
-`autopus-v0.50.112-release-authority` now exists as ruleset `21986875`, created for this release. The rulesets present are:
+`autopus-v0.50.113-release-authority` now exists as ruleset `21986875`, created for this release. The rulesets present are:
 
 | Ruleset | ID |
 |---|---|
@@ -162,7 +162,7 @@ Follow `release-v0.50.111.md` "Prerequisites" unchanged, plus these A24-specific
 | `autopus-v0.50.109-rotation-ref-authority` | `21713791` |
 | `autopus-v0.50.110-release-authority` | `21901908` |
 | `autopus-v0.50.111-release-authority` | `21909571` |
-| `autopus-v0.50.112-release-authority` | `21986875` |
+| `autopus-v0.50.113-release-authority` | `21986875` |
 
 Never widen an existing ruleset's ref pattern to cover a new tag: a per-version ruleset is what makes the authority boundary auditable.
 
@@ -376,11 +376,11 @@ The load-bearing items are:
 - Credential-URL redaction extended to every scheme; seven leaked while the gate reported `passed`.
 - Unknown `--lane` now refuses instead of running auto-detected journeys and reporting a pass.
 
-The third item matters for this release specifically: releases cut before v0.50.112 may carry release indexes with an empty evidence chain. That is prior history and must not be repaired retroactively; note it in the release description rather than editing any published artifact.
+The third item matters for this release specifically: releases cut before v0.50.113 may carry release indexes with an empty evidence chain. That is prior history and must not be repaired retroactively; note it in the release description rather than editing any published artifact.
 
 ## Remaining procedure
 
-Sections "Static remote coordinates" through "Reconciliation and rollback boundaries" in `release-v0.50.111.md` apply unchanged, with `v0.50.111` replaced by `v0.50.112`, `A23` by `A24`, and the predecessor table above substituted for the v0.50.109 predecessor table. Do not paraphrase those sections here; a second copy is a second thing to drift.
+Sections "Static remote coordinates" through "Reconciliation and rollback boundaries" in `release-v0.50.111.md` apply unchanged, with `v0.50.111` replaced by `v0.50.113`, `A23` by `A24`, and the predecessor table above substituted for the v0.50.109 predecessor table. Do not paraphrase those sections here; a second copy is a second thing to drift.
 
 ## Exact asset gate
 
@@ -388,8 +388,8 @@ A23 published fifteen assets. A24 must publish the same fifteen names with the v
 
 ```sh
 gh release view v0.50.111 --json assets --jq '[.assets[].name]|sort' |
-  sed 's/0\.50\.111/0.50.112/g' > /tmp/a24-expected.json
-gh release view v0.50.112 --json assets --jq '[.assets[].name]|sort' > /tmp/a24-actual.json
+  sed 's/0\.50\.111/0.50.113/g' > /tmp/a24-expected.json
+gh release view v0.50.113 --json assets --jq '[.assets[].name]|sort' > /tmp/a24-actual.json
 diff /tmp/a24-expected.json /tmp/a24-actual.json && echo ASSET_SHAPE_OK
 ```
 
@@ -397,7 +397,7 @@ The expected names, for review before the release exists:
 
 | Group | Names |
 |---|---|
-| Archives | `autopus-adk_0.50.112_{darwin,linux}_{amd64,arm64}.tar.gz`, `autopus-adk_0.50.112_windows_{amd64,arm64}.{tar.gz,zip}` |
+| Archives | `autopus-adk_0.50.113_{darwin,linux}_{amd64,arm64}.tar.gz`, `autopus-adk_0.50.113_windows_{amd64,arm64}.{tar.gz,zip}` |
 | Checksums and signatures | `checksums.txt`, `checksums.txt.bundle`, `checksums.txt.signatures` |
 | Evidence | `omp-context-promotion-report.v1.json`, `omp-context-promotion-attestation.v2.json` |
 | Lineage | `release-lineage-v1.json`, `release-lineage-v1.sig` |
@@ -408,7 +408,7 @@ An extra asset is as much a stop as a missing one: it means the workflow uploade
 
 Stop and escalate rather than improvising if any of these hold.
 
-1. `autopus-v0.50.112-release-authority` (ruleset `21986875`) is missing at tag-push time, or still carries the operator bypass after the tag exists. An unsealed release tag is mutable by the operator, which is the property the ruleset removes.
+1. `autopus-v0.50.113-release-authority` (ruleset `21986875`) is missing at tag-push time, or still carries the operator bypass after the tag exists. An unsealed release tag is mutable by the operator, which is the property the ruleset removes.
 2. The A0 receipt bundle cannot be produced, or the lineage verifier does not identify A24 → A23 with every predecessor pin above. Skipping the gate is not the smaller option: shipping without it is the failure mode the gate exists to catch.
 3. The freshly generated evidence reuses any A22, A23, or v0.50.110 identifier.
 4. Either test lane fails for a reason other than the confirmed port-1455 collision.

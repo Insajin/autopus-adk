@@ -1520,7 +1520,7 @@ Executor prompts must require searching existing code/helper/pattern before addi
 
 For each task in the planner's assignment table, spawn executor agents:
 
-**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference. See `.claude/rules/autopus/worktree-safety.md`.
+**GC Suppression**: During parallel worktree execution, all git commands MUST use `git -c gc.auto=0` to prevent garbage collection interference.
 
 Migration directory serialization: tasks that create SQL migrations in the same owning repo and migration directory are sequential, even if their application code ownership is disjoint. Assign final migration numbers only after earlier migration branches are merged or rebased.
 
@@ -1572,7 +1572,7 @@ git -c gc.auto=0 merge <branch_T2>
 git worktree remove <path_T2>
 ```
 
-On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries). See `.claude/rules/autopus/worktree-safety.md`.
+On lock error (`.git/refs.lock`, etc.), retry with exponential backoff: 3s → 6s → 12s (max 3 retries).
 
 After merge, display:
 ```

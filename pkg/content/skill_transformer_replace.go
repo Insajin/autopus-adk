@@ -39,27 +39,24 @@ var pathReplacements = map[string]map[string]string{
 		".claude/":          ".codex/",
 	},
 	"gemini": {
-		".claude/skills/autopus/": ".gemini/skills/autopus/",
-		".claude/commands/":       ".gemini/commands/",
-		".claude/skills/":         ".gemini/skills/autopus/",
-		".claude/agents/":         ".gemini/agents/",
-		".claude/rules/":          ".gemini/rules/",
-		".claude/":                ".gemini/",
+		".claude/commands/": ".gemini/commands/",
+		".claude/skills/":   ".gemini/skills/autopus/",
+		".claude/agents/":   ".gemini/agents/",
+		".claude/rules/":    ".gemini/rules/",
+		".claude/":          ".gemini/",
 	},
 	"opencode": {
-		".claude/skills/autopus/": ".agents/skills/",
-		".claude/commands/":       ".opencode/commands/",
-		".claude/skills/":         ".agents/skills/",
-		".claude/agents/":         ".opencode/agents/",
-		".claude/rules/":          ".opencode/rules/",
-		".claude/hooks/":          ".opencode/plugins/",
-		".claude/":                ".opencode/",
+		".claude/commands/": ".opencode/commands/",
+		".claude/skills/":   ".agents/skills/",
+		".claude/agents/":   ".opencode/agents/",
+		".claude/rules/":    ".opencode/rules/",
+		".claude/hooks/":    ".opencode/plugins/",
+		".claude/":          ".opencode/",
 	},
 	"omp": {
-		".claude/skills/autopus/": ".agents/skills/",
-		".claude/commands/":       ".agents/commands/",
-		".claude/skills/":         ".agents/skills/",
-		".claude/agents/":         ".omp/agents/",
+		".claude/commands/": ".agents/commands/",
+		".claude/skills/":   ".agents/skills/",
+		".claude/agents/":   ".omp/agents/",
 		// omp discovers rules non-recursively, so every autopus rule lands
 		// flat in .omp/rules under an autopus- filename prefix. A source that
 		// already spells the namespace out must not gain a second one.
@@ -70,9 +67,12 @@ var pathReplacements = map[string]map[string]string{
 }
 
 // pathOrder ensures specific paths are replaced before the general .claude/ prefix.
+//
+// There is no ".claude/skills/autopus/" entry: Claude installs skills as
+// .claude/skills/<name>/SKILL.md, so that prefix only ever produced paths no
+// manifest writes.
 var pathOrder = []string{
 	".claude/commands/",
-	".claude/skills/autopus/",
 	".claude/skills/",
 	".claude/agents/",
 	".claude/rules/autopus/",
@@ -116,6 +116,12 @@ func ReplacePlatformReferences(body string, platform string) string {
 
 // NormalizeAgentReferences applies platform-specific path fixes that should be
 // preserved across generated agent surfaces.
+//
+// Every target here must be a path the platform's installer actually writes.
+// Codex is the exception that makes the rule: .codex/rules is an execpolicy
+// directory and no markdown rule is installed there (see
+// pkg/adapter/parity_conditional_test.go), so its branding contract lives in
+// the AGENTS.md marker section and is addressed by heading anchor.
 func NormalizeAgentReferences(body, platform string) string {
 	p := normalizePlatform(platform)
 	normalized := body
@@ -125,20 +131,17 @@ func NormalizeAgentReferences(body, platform string) string {
 
 	brandingRule := map[string]string{
 		"claude":   "`.claude/rules/autopus/branding.md`",
-		"codex":    "`.codex/rules/autopus/branding.md`",
+		"codex":    "`AGENTS.md#autopus-branding`",
 		"gemini":   "`.gemini/rules/autopus/branding.md`",
 		"opencode": "`.opencode/rules/autopus/branding.md`",
 		"omp":      "`.omp/rules/autopus-branding.md`",
 	}[p]
 	if brandingRule == "" {
-		brandingRule = "`content/rules/branding.md`"
+		// An unrecognised platform has no known install target, so the source
+		// path is left untouched rather than rewritten into a guess.
+		return normalized
 	}
-
-	replacer := strings.NewReplacer(
-		"`content/rules/branding.md`", brandingRule,
-		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
-	)
-	return replacer.Replace(normalized)
+	return strings.ReplaceAll(normalized, "`content/rules/branding.md`", brandingRule)
 }
 
 // replacePaths converts .claude/ directory references to platform-specific paths.

@@ -1,0 +1,33 @@
+## Installed Components
+
+{{if contains (join ", " .Platforms) "claude-code"}}- Claude Skills: .claude/skills/<name>/SKILL.md
+- Claude Agents: .claude/agents/autopus/
+- Claude Rules: .claude/rules/autopus/
+- Claude Hooks: .claude/hooks/autopus/
+- Claude Settings: .claude/settings.json
+- Claude Root Doc: CLAUDE.md
+{{end}}{{if contains (join ", " .Platforms) "codex"}}- Codex Native Skills: .codex/skills/codex-<name>/SKILL.md
+- Codex Agents: .codex/agents/
+- Codex Hooks: .codex/hooks/ and .codex/hooks.json
+- Codex Config: .codex/config.toml
+- Codex Plugin Router: @auto ... / $codex-auto-<route>
+{{end}}{{if contains (join ", " .Platforms) "antigravity-cli"}}- Gemini Skills: .gemini/skills/autopus/<name>/SKILL.md
+- Gemini Agents: .gemini/agents/autopus/
+- Gemini Rules: .gemini/rules/autopus/
+- Gemini Commands: .gemini/commands/
+- Gemini Hooks: .gemini/hooks/
+- Gemini Settings: .gemini/settings.json
+- Gemini Root Doc: GEMINI.md
+- Gemini Plugin Bundle: .agents/plugins/autopus/
+- Shared Commands: .agents/commands/
+{{end}}{{if contains (join ", " .Platforms) "opencode"}}- OpenCode Rules: .opencode/rules/autopus/
+- OpenCode Commands: .opencode/commands/
+- OpenCode Agents: .opencode/agents/
+- OpenCode Plugins: .opencode/plugins/
+- OpenCode-owned Shared Skills: .agents/skills/
+{{end}}{{if contains (join ", " .Platforms) "omp"}}- OMP Skills: .omp/skills/
+- OMP Agents: .omp/agents/
+- OMP Rules: .omp/rules/
+- OMP Commands: .omp/commands/
+{{end}}{{if contains (join ", " .Platforms) "codex"}}- Plugin Marketplace: .agents/plugins/marketplace.json
+{{end}}

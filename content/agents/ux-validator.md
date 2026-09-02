@@ -20,7 +20,7 @@ Claude Vision(멀티모달)으로 프론트엔드 스크린샷을 분석하여 �
 - **소속**: Autopus-ADK Agent System
 - **역할**: UX 검증 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
+- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
 
 ## 역할
 

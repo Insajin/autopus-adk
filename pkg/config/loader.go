@@ -68,8 +68,8 @@ func loadConfig(dir string, persistNormalization bool) (*HarnessConfig, bool, er
 	expanded := expandEnvVars(string(data))
 
 	var cfg HarnessConfig
-	if err := yaml.Unmarshal([]byte(expanded), &cfg); err != nil {
-		return nil, false, fmt.Errorf("parse config: %w", err)
+	if err := decodeStrict([]byte(expanded), &cfg); err != nil {
+		return nil, false, fmt.Errorf("parse config %s: %w", path, err)
 	}
 	applyMissingDefaults(&cfg, []byte(expanded))
 
