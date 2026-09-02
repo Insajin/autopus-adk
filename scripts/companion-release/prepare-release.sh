@@ -158,17 +158,17 @@ release_present=0; evidence_present=0
 [[ -n "$evidence_remote" ]] && evidence_present=1
 if [[ "$release_present" -eq 0 ]]; then
   scripts/companion-release/verify-release-tag-ruleset.sh --armed ||
-    fail 'exact armed v0.50.111 tag ruleset or environment is unavailable'
+    fail 'exact armed v0.50.112 tag ruleset or environment is unavailable'
   ruleset_state=armed
 elif scripts/companion-release/verify-release-tag-ruleset.sh --sealed; then
   ruleset_state=sealed
 elif scripts/companion-release/verify-release-tag-ruleset.sh --armed; then
   ruleset_state=armed-reconciliation-required
 else
-  fail 'committed v0.50.111 tag ruleset is neither exact sealed nor reconcilable armed state'
+  fail 'committed v0.50.112 tag ruleset is neither exact sealed nor reconcilable armed state'
 fi
 releases=$(gh api --paginate --slurp "repos/${repository}/releases?per_page=100") || fail 'cannot inspect GitHub Release state'
-release_count=$(jq '[.[][] | select(.tag_name == "v0.50.111")] | length' <<<"$releases") || fail 'GitHub Release state is malformed'
+release_count=$(jq '[.[][] | select(.tag_name == "v0.50.112")] | length' <<<"$releases") || fail 'GitHub Release state is malformed'
 [[ "$release_count" == '0' || "$release_count" == '1' ]] || fail 'GitHub Release state is ambiguous'
 [[ "$release_count" == '0' || "$release_present" -eq 1 || -n "$retained_lock_commit" ]] ||
   fail 'GitHub Release exists without its source tag or retained prep lock'
@@ -196,7 +196,7 @@ candidate_sha256=$(shasum -a 256 "$final_candidate" | awk '{print $1}')
 if [[ "$evidence_present" -eq 1 ]]; then
   load_evidence
   derive_policy "$verified_report" "$final_static_policy_file"
-  cmp "$static_policy_file" "$final_static_policy_file" || fail 'verified evidence static policy differs from the current A23 plan'
+  cmp "$static_policy_file" "$final_static_policy_file" || fail 'verified evidence static policy differs from the current A24 plan'
   evidence_mode=active; [[ "$release_present" -eq 1 ]] && evidence_mode=historical
   verify_evidence "$evidence_mode"
 fi

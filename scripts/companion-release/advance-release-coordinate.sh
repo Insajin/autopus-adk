@@ -1,0 +1,139 @@
+#!/usr/bin/env bash
+# Advance every pinned release coordinate from one tag to the next.
+#
+# The coordinate is not one constant. It is pinned in workflow triggers, ref
+# guards, asset name literals, a ruleset gate, the current-release verifier, the
+# Homebrew bridge, and a phase resolver. release-hardening-test.sh guards them
+# together, so missing one turns into a red test rather than a broken release —
+# but only after someone notices. Doing them by hand across seven files is how a
+# coordinate drifts.
+#
+# Two kinds of pin, and telling them apart is the whole job:
+#   replace  - names the release currently being shipped
+#   append   - accumulates every shipped release, never rewritten
+set -euo pipefail
+umask 077
+
+fail() { printf 'advance coordinate: %s\n' "$1" >&2; exit 1; }
+usage() {
+  printf '%s\n' 'usage: advance-release-coordinate.sh FROM_TAG FROM_PHASE TO_TAG TO_PHASE' >&2
+  exit 64
+}
+[[ $# -eq 4 ]] || usage
+readonly from_tag=$1 from_phase=$2 to_tag=$3 to_phase=$4
+[[ "$from_phase" =~ ^A[0-9]+$ ]] || fail 'FROM_PHASE is not a phase label'
+readonly from_version="${from_tag#v}" to_version="${to_tag#v}"
+
+[[ "$from_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'FROM_TAG is not a release tag'
+[[ "$to_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail 'TO_TAG is not a release tag'
+[[ "$to_phase" =~ ^A[0-9]+$ ]] || fail 'TO_PHASE is not a phase label'
+[[ "$from_tag" != "$to_tag" ]] || fail 'FROM_TAG and TO_TAG are equal'
+
+repo_root=$(git rev-parse --show-toplevel) || fail 'not a git repository'
+cd "$repo_root"
+
+# Replace: each of these names the release being shipped, so exactly one value
+# is correct at a time.
+# The list was built by enumerating every v-tag reference under scripts/ and
+# .github/ and dropping the ones that name a predecessor or a historical pin. An
+# earlier draft held six entries and missed six more; the guard tests caught it,
+# but only after the coordinate was half moved. If a release fails on "not exact
+# <tag>", the missing file belongs here.
+readonly -a replace_targets=(
+  '.github/workflows/release.yaml'
+  '.github/workflows/homebrew-formula-bridge-recovery.yaml'
+  '.github/workflows/upgrade-canary.yaml'
+  'scripts/companion-release/verify-release-tag-ruleset.sh'
+  'scripts/companion-release/verify-current-release.sh'
+  'scripts/companion-release/publish-homebrew-formula-bridge.sh'
+  'scripts/companion-release/prepare-release.sh'
+  'scripts/companion-release/publish-release-coordinates.sh'
+  'scripts/companion-release/verify-omp-context-release-binary.sh'
+  'scripts/companion-release/verify-omp-context-evidence-tag.sh'
+  'scripts/companion-release/verify-release-prep-lock.sh'
+  'scripts/companion-release/build-omp-context-candidate.sh'
+  'scripts/companion-release/tests/testdata/mock-release-prep-gh.sh'
+  'scripts/companion-release/tests/testdata/mock-tap-gh.sh'
+  'scripts/companion-release/tests/release-prep-hardening-test.sh'
+  'scripts/companion-release/tests/release-homebrew-hardening-test.sh'
+  'scripts/companion-release/tests/release-hardening-test.sh'
+  'scripts/companion-release/tests/release-omp-context-evidence-hardening-test.sh'
+  'scripts/companion-release/tests/release-prep-environment-inheritance-test.sh'
+)
+for target in "${replace_targets[@]}"; do
+  [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target $target"
+done
+
+changed=0
+for target in "${replace_targets[@]}"; do
+  before=$(shasum -a 256 "$target" | awk '{print $1}')
+  # Two forms are safe to rewrite: the tag in refs and triggers, and the bare
+  # version in asset name literals and RELEASE_VERSION constants.
+  #
+  # Phase labels are deliberately not rewritten. A blunt A23-to-A24 pass looks
+  # right and is wrong: it also hits predecessor references, historical comments,
+  # and accumulate assertions that must keep naming the older phase. Those are
+  # reported below for review instead.
+  perl -pi -e "s/\Q${from_tag}\E/${to_tag}/g; s/\Q${from_version}\E/${to_version}/g" "$target"
+  after=$(shasum -a 256 "$target" | awk '{print $1}')
+  if [[ "$before" != "$after" ]]; then
+    printf '  updated  %s\n' "$target"
+    changed=$((changed + 1))
+  else
+    printf '  no pin   %s\n' "$target"
+  fi
+done
+
+# Append: the receipt resolver keeps every shipped triple. Rewriting an old row
+# would make a published receipt unverifiable.
+readonly receipt='scripts/companion-release/produce-public-key-receipt.sh'
+[[ -f "$receipt" && ! -L "$receipt" ]] || fail "missing or unsafe target $receipt"
+readonly receipt_row="${to_tag} ${to_version} ${to_phase}"
+if grep -qF -- "$receipt_row" "$receipt"; then
+  printf '  present  %s already lists %s\n' "$receipt" "$receipt_row"
+else
+  grep -qF -- "${from_tag} ${from_version}" "$receipt" ||
+    fail "receipt resolver does not list ${from_tag}; refusing to append out of order"
+  perl -pi -e "s/^(\Q${from_tag} ${from_version}\E .*)\$/\$1\n${receipt_row}/" "$receipt"
+  grep -qF -- "$receipt_row" "$receipt" || fail 'receipt row append failed'
+  printf '  appended %s to %s\n' "$receipt_row" "$receipt"
+  changed=$((changed + 1))
+fi
+
+# The phase map and its ancestor pin are deliberately not automated. The
+# ancestor is the predecessor's source commit, which has to be read from the
+# published tag rather than derived from a version string, and getting it wrong
+# would let a release ship without containing its predecessor.
+readonly validator='scripts/companion-release/validate-source.sh'
+if grep -qF -- "${to_tag}) release_phase='${to_phase}'" "$validator"; then
+  printf '  present  %s maps %s to %s\n' "$validator" "$to_tag" "$to_phase"
+else
+  printf '\n%s\n' "MANUAL: ${validator} does not map ${to_tag} to ${to_phase}."
+  printf '%s\n' "  Add the phase row, an ancestor constant set to"
+  printf '%s\n' "  \$(git rev-parse ${from_tag}^{commit}), and an ancestor branch."
+  printf '%s\n' "  The tag-to-phase map fails closed, so the release is refused until then."
+fi
+
+for target in "${replace_targets[@]}" "$receipt"; do
+  case "$target" in
+    *.sh) bash -n "$target" || fail "$target no longer parses" ;;
+  esac
+done
+
+# Phase labels need eyes, not sed. Each hit is either the shipped release (bump
+# it), a predecessor reference (leave it), or a historical statement (leave it).
+printf '\n%s\n' "REVIEW: files still naming ${from_phase}, classify each hit"
+phase_hits=0
+for target in "${replace_targets[@]}" "$receipt" "$validator"; do
+  if grep -n -- "$from_phase" "$target" >/dev/null 2>&1; then
+    while IFS= read -r hit; do
+      printf '  %s:%s\n' "$target" "$hit"
+      phase_hits=$((phase_hits + 1))
+    done < <(grep -n -- "$from_phase" "$target")
+  fi
+done
+[[ "$phase_hits" -gt 0 ]] || printf '  none\n'
+
+printf '\n%s\n' "advanced ${changed} file(s) from ${from_tag} to ${to_tag} (${to_phase})"
+printf '%s\n' 'Run scripts/companion-release/tests/release-hardening-test.sh to confirm the'
+printf '%s\n' 'coordinate moved together, then preflight-release.sh for the rest.'

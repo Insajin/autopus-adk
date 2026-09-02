@@ -25,6 +25,18 @@ readonly A19_REPOSITORY='Insajin/autopus-adk' A20_TAG='v0.50.91' A20_VERSION='0.
 readonly A20_REPOSITORY='Insajin/autopus-adk' A21_TAG='v0.50.92' A21_VERSION='0.50.92'
 readonly A21_REPOSITORY='Insajin/autopus-adk' A22_TAG='v0.50.109' A22_VERSION='0.50.109'
 readonly A22_REPOSITORY='Insajin/autopus-adk' A23_TAG='v0.50.111' A23_VERSION='0.50.111'
+readonly A23_REPOSITORY='Insajin/autopus-adk' A24_TAG='v0.50.112' A24_VERSION='0.50.112'
+# A23 published a full asset set, so A24 pins every archive rather than the
+# arm64-only subset A22's bridge could offer. Read from release 379595447.
+readonly A23_RELEASE_ID='379595447'
+readonly A23_COMMIT_SHA='954f60a77acb59fd4106537020693fdcadb3d640'
+readonly A23_TREE_SHA='fcd3f2aed498955235ae7807ba031d32a053db09'
+readonly A23_TAG_OBJECT_SHA='b751c5beba4374534b1a73615ff0d6d57bdb4131'
+readonly A23_CHECKSUMS_SHA256='9d315535abe8b67779c7f5fe598aece7b8b60d48b9aa5c8c55b01e02e03a86f2'
+readonly A23_AMD64_ARCHIVE_SHA256='366d3329081649f322ca29a1e33406c7bcf9f08bd490ec740306b5c8bcc12982'
+readonly A23_ARM64_ARCHIVE_SHA256='a0a06284a86dfaf2175b9c8114dc6f5c72bdf4553637605455b44f85cf59973b'
+readonly A23_LINUX_AMD64_ARCHIVE_SHA256='62e979308e09b28fa9976fd65172ed8483ed30b6bd0adcb68071c6fd61853207'
+readonly A23_LINUX_ARM64_ARCHIVE_SHA256='006cc1b8bcd9f4bbbbdaf051a1cef62fb1578747c170a9019934b43d33c495cf'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -109,6 +121,11 @@ elif [[ "$GITHUB_REF_NAME" == "$A22_TAG" && "$COMPANION_VERSION" == "$A22_VERSIO
 elif [[ "$GITHUB_REF_NAME" == "$A23_TAG" && "$COMPANION_VERSION" == "$A23_VERSION" ]]; then
   release_phase='A23' prior_phase='A22' prior_repository="$A22_REPOSITORY" prior_evidence_source='immutable A22 GitHub release' prior_tag="$A22_TAG" prior_version="$A22_VERSION" prior_commit="$A22_COMMIT_SHA" prior_release_id="$A22_RELEASE_ID" prior_tree="$A22_TREE_SHA"
   prior_tag_object="$A22_TAG_OBJECT_SHA" prior_checksums="$A22_CHECKSUMS_SHA256" prior_amd64_archive='' prior_arm64_archive="$A22_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive='' prior_linux_arm64_archive='' prior_amd64_manifest='' prior_arm64_manifest="$A22_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A24_TAG" && "$COMPANION_VERSION" == "$A24_VERSION" ]]; then
+  release_phase='A24' prior_phase='A23' prior_repository="$A23_REPOSITORY" prior_evidence_source='immutable A23 GitHub release' prior_tag="$A23_TAG" prior_version="$A23_VERSION" prior_commit="$A23_COMMIT_SHA" prior_release_id="$A23_RELEASE_ID" prior_tree="$A23_TREE_SHA"
+  # A23 shipped no companion manifest assets, so those two pins stay empty
+  # rather than being invented; the archive and checksum pins carry the identity.
+  prior_tag_object="$A23_TAG_OBJECT_SHA" prior_checksums="$A23_CHECKSUMS_SHA256" prior_amd64_archive="$A23_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A23_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A23_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A23_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest='' prior_arm64_manifest=''
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24 policy'
 fi
