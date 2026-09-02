@@ -200,7 +200,26 @@ What this does not settle is oracle equivalence. The 40-call cohort's verdict de
 
 `preflight-release.sh` now compares the pin to the upstream asset and warns when upstream has moved past it. The warning is deliberate rather than an auto-bump: advancing the oracle is a decision each time.
 
-### Prep invocation, resolved
+### Prep invocation, one command
+
+`scripts/companion-release/release-prep.sh --preflight` resolves every derivable value and calls `prepare-release.sh`. Create the env file once:
+
+```bash
+install -m 0600 /dev/null ~/.config/autopus/release-keys/prep-env.sh
+cat >~/.config/autopus/release-keys/prep-env.sh <<'ENV'
+ADK_GATEWAY_URL='http://127.0.0.1:PORT'
+ADK_CREDENTIAL_LOCATOR='AUTOPUS_OMP_CONTEXT_PROVIDER_APPROVED'
+export AUTOPUS_OMP_CONTEXT_PROVIDER_APPROVED='<credential>'
+ENV
+```
+
+Then every attempt is `release-prep.sh --preflight` and `release-prep.sh --apply`.
+
+The credential stays in a file rather than moving to a flag, and that is not incidental. `prepare-release.sh` reads the variable named by `--credential-locator` from its own environment and unsets it immediately, and `internal/cli/workflow_context_runtime_observe_session_evidence.go` asserts the credential, endpoint, project dir, and task root never appear in emitted evidence. A flag would put the secret in the process list and the shell history and would defeat both. The wrapper exports it into the same process instead; a sentinel credential run confirmed neither it nor the gateway URL reaches the output.
+
+The wrapper refuses an env file that is not mode 0600, refuses a non-loopback gateway, and re-verifies the staged OMP digest against the pin that `prepare-release.sh` itself enforces, so the two cannot drift apart.
+
+### Prep invocation, resolved values
 
 Every value that could be read from the repository, the published predecessor, or the operator key store is filled in below. Two are left blank because they are operator infrastructure, not repository state: the gateway must be running and the credential must be loaded out of band. `preflight-release.sh` reports both.
 
