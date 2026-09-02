@@ -37,13 +37,46 @@ cd "$repo_root"
 readonly key_store="${HOME}/.config/autopus/release-keys"
 readonly env_file="${ADK_RELEASE_PREP_ENV:-$key_store/prep-env.sh}"
 
-# The env file carries only what cannot be derived: the gateway URL and the
-# credential. It is operator-local and must not be readable by anyone else.
-if [[ ! -f "$env_file" || -L "$env_file" ]]; then
-  cat >&2 <<EOF
-release prep: no env file at $env_file
+# Preferred path: the operator's own OMP auth-gateway. It is a loopback forward
+# proxy backed by the OMP credential vault, so a subscription account is already
+# in the broker and nothing has to be retyped per release. The env file below
+# stays supported for setups without a gateway.
+#
+# The credential the ADK carries is the gateway's inbound bearer token, not the
+# upstream provider secret: the upstream stays in the broker and never enters
+# this process. That is strictly less exposure than pasting a provider key.
+resolve_from_omp_gateway() {
+  local omp=$1 broker=${OMP_AUTH_BROKER_URL:-} status url token
+  command -v curl >/dev/null || return 1
+  [[ -x "$omp" ]] || return 1
+  status=$(OMP_AUTH_BROKER_URL="$broker" "$omp" auth-gateway status --json 2>/dev/null) || return 1
+  grep -q '"ready":true' <<<"$status" || return 1
+  url=${ADK_GATEWAY_URL:-}
+  [[ -n "$url" ]] || return 1
+  token=$(OMP_AUTH_BROKER_URL="$broker" "$omp" auth-gateway token 2>/dev/null | tr -d '\n')
+  [[ -n "$token" ]] || return 1
+  ADK_GATEWAY_URL=$url
+  ADK_CREDENTIAL_LOCATOR='AUTOPUS_OMP_CONTEXT_PROVIDER_GATEWAY'
+  export AUTOPUS_OMP_CONTEXT_PROVIDER_GATEWAY="$token"
+  return 0
+}
 
-Create it once, with mode 0600:
+gateway_source='env file'
+if resolve_from_omp_gateway "${HOME}/.cache/autopus/release/omp-v18.1.2-darwin-arm64"; then
+  gateway_source='omp auth-gateway'
+elif [[ ! -f "$env_file" || -L "$env_file" ]]; then
+  cat >&2 <<EOF
+release prep: no gateway and no env file at $env_file
+
+Either bring up the OMP auth-gateway, which needs no per-release typing because
+the subscription already lives in the broker:
+
+  omp auth-broker serve --bind 127.0.0.1:47311
+  OMP_AUTH_BROKER_URL=http://127.0.0.1:47311 omp auth-gateway serve --bind 127.0.0.1:47312
+  export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
+  export ADK_GATEWAY_URL=http://127.0.0.1:47312
+
+or create the env file once, with mode 0600:
 
   install -m 0600 /dev/null "$env_file"
   cat >"$env_file" <<'ENV'
@@ -52,31 +85,33 @@ Create it once, with mode 0600:
   export AUTOPUS_OMP_CONTEXT_PROVIDER_APPROVED='<credential>'
   ENV
 
-The credential stays in this file rather than a command line because
-prepare-release.sh reads it from the environment and the evidence writer
-refuses to emit it. Never commit it; \$HOME is outside the repository.
+Either way the credential reaches prepare-release.sh through the environment,
+never a flag: it reads the named variable and unsets it, and the evidence writer
+refuses to emit it. \$HOME is outside the repository.
 EOF
   exit 1
 fi
 
-case "$(uname -s)" in
-  Darwin) mode_bits=$(/usr/bin/stat -f '%Lp' "$env_file") ;;
-  Linux) mode_bits=$(stat -c '%a' "$env_file") ;;
-  *) fail 'unsupported platform' ;;
-esac
-[[ "$mode_bits" == '600' ]] || fail "env file mode is ${mode_bits}, expected 600"
+if [[ "$gateway_source" == 'env file' ]]; then
+  case "$(uname -s)" in
+    Darwin) mode_bits=$(/usr/bin/stat -f '%Lp' "$env_file") ;;
+    Linux) mode_bits=$(stat -c '%a' "$env_file") ;;
+    *) fail 'unsupported platform' ;;
+  esac
+  [[ "$mode_bits" == '600' ]] || fail "env file mode is ${mode_bits}, expected 600"
+  # shellcheck source=/dev/null
+  . "$env_file"
+fi
 
-# shellcheck source=/dev/null
-. "$env_file"
-
-[[ -n "${ADK_GATEWAY_URL:-}" ]] || fail 'env file does not set ADK_GATEWAY_URL'
-[[ -n "${ADK_CREDENTIAL_LOCATOR:-}" ]] || fail 'env file does not set ADK_CREDENTIAL_LOCATOR'
+# Both paths converge here, so the shape checks run once and apply to either.
+[[ -n "${ADK_GATEWAY_URL:-}" ]] || fail 'ADK_GATEWAY_URL is unset'
+[[ -n "${ADK_CREDENTIAL_LOCATOR:-}" ]] || fail 'ADK_CREDENTIAL_LOCATOR is unset'
 [[ "$ADK_GATEWAY_URL" =~ ^http://127\.0\.0\.1:[1-9][0-9]{0,4}$ ]] ||
   fail 'ADK_GATEWAY_URL is not an exact loopback HTTP URL'
 [[ "$ADK_CREDENTIAL_LOCATOR" =~ ^AUTOPUS_OMP_CONTEXT_PROVIDER_[A-Z0-9_]{1,96}$ ]] ||
   fail 'ADK_CREDENTIAL_LOCATOR does not match the required name shape'
 [[ -n "${!ADK_CREDENTIAL_LOCATOR-}" ]] ||
-  fail "env file does not export ${ADK_CREDENTIAL_LOCATOR}"
+  fail "${ADK_CREDENTIAL_LOCATOR} is not exported"
 
 # Resolved values. Each is measured rather than typed: the OMP version and digest
 # come from the pins prepare-release.sh itself enforces, so they cannot drift
@@ -91,17 +126,19 @@ omp_executable="${HOME}/.cache/autopus/release/omp-${omp_version/omp\//v}-darwin
 [[ "$(shasum -a 256 "$omp_executable" | awk '{print $1}')" == "$omp_pin" ]] ||
   fail 'staged OMP binary does not match the pinned digest'
 
-oracle_policy_digest=$(gh variable get OMP_CONTEXT_STATIC_POLICY_B64 \
-  --repo Insajin/autopus-adk 2>/dev/null |
-  tr '_-' '/+' | base64 -d 2>/dev/null |
-  sed -n 's/.*"oracle_policy_digest":"\([^"]*\)".*/\1/p')
+# One fetch, two values. Both live in the active static policy, which is the
+# authority that selected them for the predecessor release. An earlier draft
+# inferred the provider from the predecessor's asset list through a grep in a
+# command substitution; it worked once and then silently resolved to empty.
+active_policy=$(gh variable get OMP_CONTEXT_STATIC_POLICY_B64 \
+  --repo Insajin/autopus-adk 2>/dev/null | tr '_-' '/+' | base64 -d 2>/dev/null) ||
+  fail 'cannot read the active static policy'
+oracle_policy_digest=$(sed -n 's/.*"oracle_policy_digest":"\([^"]*\)".*/\1/p' <<<"$active_policy")
+provider=$(sed -n 's/.*"provider":"\([^"]*\)".*/\1/p' <<<"$active_policy")
 [[ "$oracle_policy_digest" =~ ^sha256:[0-9a-f]{64}$ ]] ||
-  fail 'cannot read the oracle policy digest from the active static policy'
-
-provider=$(gh release view v0.50.111 --repo Insajin/autopus-adk \
-  --json assets --jq '.assets[].name' 2>/dev/null | grep -qx 'omp-context-promotion-report.v1.json' &&
-  printf 'openai-codex' || printf '')
-[[ -n "$provider" ]] || fail 'cannot confirm the provider from the predecessor evidence'
+  fail 'active static policy has no usable oracle policy digest'
+[[ "$provider" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] ||
+  fail 'active static policy has no usable provider id'
 
 model=$(awk -F'"' '/^model[[:space:]]*=/ { print $2; exit }' "${HOME}/.codex/config.toml")
 model_context_window=$(awk -F'=' '/^model_context_window[[:space:]]*=/ { gsub(/[^0-9]/, "", $2); print $2; exit }' \
@@ -116,8 +153,8 @@ for key in "$r2_key" "$k3_key"; do
   [[ -f "$key" && ! -L "$key" ]] || fail "signing key is missing at $key"
 done
 
-printf 'release prep: %s with provider=%s model=%s omp=%s\n' \
-  "$mode" "$provider" "$model" "$omp_version" >&2
+printf 'release prep: %s via %s with provider=%s model=%s omp=%s\n' \
+  "$mode" "$gateway_source" "$provider" "$model" "$omp_version" >&2
 
 exec scripts/companion-release/prepare-release.sh \
   --endpoint "$ADK_GATEWAY_URL" \

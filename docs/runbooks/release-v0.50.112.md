@@ -202,6 +202,31 @@ What this does not settle is oracle equivalence. The 40-call cohort's verdict de
 
 ### Prep invocation, one command
 
+The gateway the procedure asks for is OMP's own: `omp auth-gateway` is a loopback forward proxy backed by `omp auth-broker`, the OMP credential vault. A subscription account already lives in that vault, so nothing has to be retyped per release. Bring the pair up once:
+
+```bash
+omp auth-broker serve --bind 127.0.0.1:47311
+OMP_AUTH_BROKER_URL=http://127.0.0.1:47311 omp auth-gateway serve --bind 127.0.0.1:47312
+
+export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
+export ADK_GATEWAY_URL=http://127.0.0.1:47312
+```
+
+Then every attempt is one command with no arguments:
+
+```bash
+scripts/companion-release/release-prep.sh --preflight
+scripts/companion-release/release-prep.sh --apply
+```
+
+Verified on 2026-09-02: broker ready with the local vault, gateway `ready: true`, `brokerAuthenticated: true`, and the wrapper reporting `--preflight via omp auth-gateway with provider=openai-codex model=gpt-5.6-sol omp=omp/18.1.2` before reaching prep's own source checks.
+
+What the ADK carries is the gateway's inbound bearer token, from `omp auth-gateway token`, not the upstream provider secret. The upstream credential stays in the broker and never enters the release process, which is strictly less exposure than exporting a provider key. A run with a sentinel confirmed the token does not reach the output.
+
+`release-prep.sh` still supports an operator env file for setups without a gateway, and refuses it unless it is mode 0600. Either path converges on the same shape checks: exact loopback HTTP, an `AUTOPUS_OMP_CONTEXT_PROVIDER_*` variable name, and a non-empty single-line credential.
+
+### Prep invocation, one command with an env file
+
 `scripts/companion-release/release-prep.sh --preflight` resolves every derivable value and calls `prepare-release.sh`. Create the env file once:
 
 ```bash
