@@ -17,6 +17,40 @@
 > `needs: [ci, security, omp-production-evidence]`, so CI is the gate, and
 > `preflight-release.sh` now refuses when CI is not green at the release commit.
 
+## Prep state, verified 2026-09-02
+
+Everything below `--apply` is done and measured. The remaining step needs a
+human at the keyboard.
+
+| Item | State |
+|---|---|
+| CI at the release commit `272f4fff` | green (run `33617265419`) |
+| Coordinate | A24 = `v0.50.113` in the phase table, all four armed sites, every Go pin |
+| Burned `v0.50.112` | recorded as rejected: `burned_A24_tag_112` in both lineage contracts |
+| Tag ruleset `22081360` | armed (bypass actor `204883817`); prep seals it after the push |
+| Deployment policy `58893610` | `v0.50.113` tag policy created |
+| Release hardening tests | 11/11 pass |
+| `preflight-release.sh` | 0 failures; two warnings, both expected |
+
+The two expected warnings: the OMP pin stays at `omp/17.2.7` because advancing
+it is its own task with its own evidence, and `sudo -v` has not been given yet.
+
+Release from the clean linked worktree rather than the main checkout, because
+the main checkout carries unrelated uncommitted work and `prepare-release.sh`
+refuses a dirty tree:
+
+```bash
+cd /tmp/adk-release-113   # git worktree add --detach, HEAD 272f4fff
+export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
+export ADK_GATEWAY_URL=http://127.0.0.1:47312
+sudo -v                   # required: --apply builds an isolated canary user via dscl
+bash scripts/release-tools/release-prep.sh --apply
+```
+
+Stop condition unchanged: the tag becomes immutable the moment it is pushed. If
+anything mismatches, do not move, delete, or reuse it — carry the coordinate to
+`v0.50.114` and record the burn here.
+
 ## Purpose and stop conditions
 
 This document is a procedure, not proof that v0.50.113 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
