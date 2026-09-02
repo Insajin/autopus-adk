@@ -7,7 +7,6 @@ import (
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
-	"github.com/insajin/autopus-adk/templates"
 )
 
 // renderSkillTemplates reads Codex skill templates from embedded FS,
@@ -47,12 +46,8 @@ func (a *Adapter) renderSkillTemplates(cfg *config.HarnessConfig) ([]adapter.Fil
 	return files, nil
 }
 
-// agentsMDTemplate is the AGENTS.md AUTOPUS section template used when codex
-// owns the root document, i.e. when opencode is not installed (see
-// codexOwnsRootDoc). The platform-independent policy comes from the shared
-// fragments so the codex and opencode markers cannot drift apart; only the
-// installed path list, execution model, and native routing are codex-specific.
-var agentsMDTemplate = `# Autopus-ADK Harness
+// agentsMDTemplate is the AGENTS.md AUTOPUS section template.
+const agentsMDTemplate = `# Autopus-ADK Harness
 
 > 이 섹션은 Autopus-ADK에 의해 자동 생성됩니다. 수동으로 편집하지 마세요.
 
@@ -60,9 +55,27 @@ var agentsMDTemplate = `# Autopus-ADK Harness
 - **모드**: {{.Mode}}
 - **플랫폼**: {{join ", " .Platforms}}
 
-` + templates.RootDocInstalledComponents() + `
+## Installed Components
 
-` + templates.RootDocPolicy() + `
+{{if contains (join ", " .Platforms) "codex"}}- Codex Skills: .codex/skills/codex-*/SKILL.md
+- Codex Agents: .codex/agents/*.toml
+- Codex Hooks: .codex/hooks.json
+- Codex Config: .codex/config.toml
+- Plugin Marketplace: .agents/plugins/marketplace.json
+{{end}}{{if contains (join ", " .Platforms) "opencode"}}- OpenCode Rules: .opencode/rules/autopus/
+- OpenCode Commands: .opencode/commands/
+- OpenCode Agents: .opencode/agents/
+- OpenCode Plugins: .opencode/plugins/
+- OpenCode Skills: .agents/skills/
+{{end}}
+
+## Language Policy
+
+IMPORTANT: Follow these language settings strictly for all work in this project.
+
+- **Code comments**: {{.Language.Comments}}
+- **Commit messages**: {{.Language.Commits}}
+- **AI responses**: {{.Language.AIResponses}}
 
 ## Execution Model
 
@@ -78,12 +91,33 @@ var agentsMDTemplate = `# Autopus-ADK Harness
 
 ## Core Guidelines
 
-` + templates.RootDocGuidelines() + `
-{{if contains (join ", " .Platforms) "codex"}}
+{{if contains (join ", " .Platforms) "codex"}}### Supervisor Contract
+
+IMPORTANT: 메인 세션은 얇은 라우터가 아니라 phase/gate를 관리하는 supervisor입니다. 각 단계마다 필수 단계, skip 조건, retry 한도, 다음 필수 단계를 명확히 유지하세요.
+
+### Subagent Delegation
+
+IMPORTANT: 3개 이상 파일 수정, 다중 도메인 변경, 또는 신규 코드 200줄 초과가 예상되면 기본적으로 서브에이전트를 사용하세요. 단, 읽기 위주 탐색/리서치/테스트 분석은 병렬 fan-out을 우선하고, 쓰기 위주 구현은 파일 소유권이 겹치면 순차 실행으로 전환하세요.
+
+### Worker Contracts
+
+IMPORTANT: 각 worker 프롬프트에는 반드시 소유 파일/모듈, 수정 금지 범위, 완료 기준, 반환 형식을 포함하세요. 최소 반환 필드는 ` + "`owned_paths`, `changed_files`, `verification`, `blockers`, `next_required_step`" + ` 입니다.
+
+### Review Convergence
+
+IMPORTANT: 리뷰는 discovery와 verification을 분리하세요. 첫 리뷰는 finding discovery에 집중하고, 재시도는 열린 finding 해결 여부만 diff 기준으로 확인하세요. 같은 범위를 무한 재탐색하지 마세요.
+
+### File Size Limit
+
+IMPORTANT: 300줄 제한은 소스 코드 파일에만 적용합니다. SPEC Markdown files under .autopus/specs/** are documentation and exempt from the 300-line source code limit. prd.md, spec.md, plan.md, acceptance.md, research.md, review.md는 300줄 초과만으로 분할하거나 거절하지 마세요.
+
+### Mandatory Compact Policy
+
+IMPORTANT: Write tests before implementation when behavior changes. New code comments are English. Source and test files MUST stay at or below 300 lines. Do not edit outside assigned ownership. Every spawned worker returns exactly ` + "`owned_paths`, `changed_files`, `verification`, `blockers`, `next_required_step`" + `.
+
 ### Native Skill Routing
 
 Use ` + "`@auto`" + ` or ` + "`$codex-auto`" + ` for routing. Load detailed ` + "`$codex-auto-<route>`" + ` and ` + "`$codex-<skill>`" + ` contracts before execution. Agent definitions live in ` + "`.codex/agents/`" + `.
-{{end}}{{if contains (join ", " .Platforms) "opencode"}}
-See .opencode/rules/autopus/ for OpenCode rule definitions.
+{{end}}{{if contains (join ", " .Platforms) "opencode"}}See .opencode/rules/autopus/ for OpenCode rule definitions.
 {{end}}
 `

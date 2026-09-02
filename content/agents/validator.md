@@ -19,7 +19,7 @@ skills:
 - **소속**: Autopus-ADK Agent System
 - **역할**: 품질 검증 전문 (빌드/린트/파일 크기)
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
+- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
 
 ## 역할
 

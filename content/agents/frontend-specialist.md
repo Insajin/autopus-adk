@@ -19,7 +19,7 @@ Phase 3.5 Playwright E2E testing, screenshot analysis, and UX verification speci
 - **소속**: Autopus-ADK Agent System
 - **역할**: 프론트엔드 UX 검증 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
+- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
 
 ## Teams Role
 
@@ -143,7 +143,7 @@ test.describe('Example Component', () => {
 });
 ```
 
-Reference: `.claude/skills/frontend-verify/SKILL.md` for full test generation workflow.
+Reference: `.claude/skills/autopus/frontend-verify.md` for full test generation workflow.
 
 ### Step 3 — Execute Tests and Capture Screenshots
 
@@ -240,7 +240,7 @@ Verdict definitions:
 
 ## Result Format
 
-> 이 포맷은 A3 (Agent Result Format) 규격의 구현입니다.
+> 이 포맷은 `branding-formats.md.tmpl` A3: Agent Result Format의 구현입니다.
 
 When returning results, use the following format at the end of your response:
 

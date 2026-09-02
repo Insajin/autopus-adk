@@ -19,7 +19,7 @@ Phase 2.5 @AX tag scanning and application specialist.
 - **소속**: Autopus-ADK Agent System
 - **역할**: Phase 2.5 @AX 태그 스캔 및 적용 전문
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
+- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
 
 ## Role
 
@@ -87,7 +87,7 @@ Use the comment syntax appropriate for the file's language:
 // @AX:ANCHOR: [AUTO] public API contract — do not change signature
 ```
 
-Reference: `.claude/skills/ax-annotation/SKILL.md` for full application workflow.
+Reference: `.claude/skills/autopus/ax-annotation.md` for full application workflow.
 
 ### Step 4 — Validate Per-File Limits
 
@@ -141,7 +141,7 @@ This avoids spurious annotations on documentation files.
 
 ## Result Format
 
-> 이 포맷은 A3 (Agent Result Format) 규격의 구현입니다.
+> 이 포맷은 `branding-formats.md.tmpl` A3: Agent Result Format의 구현입니다.
 
 When returning results, use the following format at the end of your response:
 

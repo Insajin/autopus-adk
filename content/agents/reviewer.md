@@ -20,7 +20,7 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 에이전트입니�
 - **소속**: Autopus-ADK Agent System
 - **역할**: 코드 리뷰 전문 (TRUST 5 기준)
 - **브랜딩**: `content/rules/branding.md` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
+- **출력 포맷**: A3 (Agent Result Format) — `branding-formats.md.tmpl` 참조
 
 ## 역할
 
@@ -241,7 +241,7 @@ Only modify the listed items. Do not refactor unrelated code.
 
 ## Result Format
 
-> 이 포맷은 A3 (Agent Result Format) 규격의 구현입니다.
+> 이 포맷은 `branding-formats.md.tmpl` A3: Agent Result Format의 구현입니다.
 
 When returning results, use the following format at the end of your response:
 

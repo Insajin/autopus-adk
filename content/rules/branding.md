@@ -8,8 +8,8 @@ Branding visibility is tiered by context. Show only what is meaningful — never
 
 ### Tier 1 — Session Start
 
-First response of a new conversation: use the A0 Session Start Format in
-`## Canonical Formats` below.
+First response of a new conversation: use the A0 Session Start Format defined in
+`templates/shared/branding-formats.md.tmpl`.
 
 **Project status block display rules:**
 - R1: When SPECs exist, display SPEC counts (draft/approved/implemented/completed) and most recent completed SPEC
@@ -22,7 +22,7 @@ After the banner and status block, continue with the response normally.
 
 Every `/auto` subcommand response: start with the full banner, end with `🐙`.
 
-- The canonical banner header is the first line of the A0 format in `## Canonical Formats` below.
+- The canonical banner header is the first line from `templates/shared/branding-formats.md.tmpl`.
 - When only the header line is rendered, prefer `🐙 Autopus ─────────────────────────` over a standalone `🐙`.
 
 ### Tier 3 — Rule Applied
@@ -55,30 +55,10 @@ After completing a major milestone (commit, deploy, review complete, plan finali
 - Error messages or quick follow-ups
 - When only Tier 4 applies (no rules were actively used)
 
-## Canonical Formats
+## Canonical Source
 
-This installed rule is the canonical source for the harness. The ADK template
-that authors it is not installed in a consumer repo, so the formats an agent
-has to produce are spelled out here rather than referenced.
+All branding formats are defined in `templates/shared/branding-formats.md.tmpl`.
 
-### A0 — Session Start
-
-```
-🐙 Autopus ─────────────────────────
-  프로젝트: {project-name} | 모드: {mode}
-  SPEC: {draft}개 draft · {approved}개 approved · {implemented}개 구현중 · {completed}개 완료
-  최근 완료: {SPEC-ID} ({title})
-  다음: {next-step recommendation}
-```
-
-### A3 — Agent Result
-
-```
-🐙 {agent-name} ─────────────────────
-  {key metric 1} | {key metric 2} | {key metric 3}
-  다음: {next step guidance}
-```
-
-- R7: The canonical banner header is `🐙 Autopus ─────────────────────────`
-- R8: Agent Result Format sections (subagent completion summaries) MUST use the A3 shape above
-- R9: Tier display formats are authoritative in this rule file; do not point at ADK source paths that a consumer repo does not install
+- R7: All branding formats MUST reference `templates/shared/branding-formats.md.tmpl` as the canonical source — do NOT duplicate format definitions inline
+- R8: Agent Result Format sections (subagent completion summaries) MUST use the A3 format from `templates/shared/branding-formats.md.tmpl`
+- R9: Tier display formats (A0–A4) are authoritative in `templates/shared/branding-formats.md.tmpl`; references in rule files MUST point there rather than redefining the format

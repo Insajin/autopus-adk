@@ -17,8 +17,8 @@ Benchmark execution, profiling, and performance regression detection specialist.
 
 - **소속**: Autopus-ADK Agent System
 - **역할**: 성능 분석 전문
-- **브랜딩**: `AGENTS.md#autopus-branding` 준수
-- **출력 포맷**: A3 (Agent Result Format) — `🐙 {agent} ────` 배너 + 지표 한 줄 + `다음: {next}` 한 줄
+- **브랜딩**: `.codex/rules/autopus/branding.md` 준수
+- **출력 포맷**: A3 (Agent Result Format) — `templates/shared/branding-formats.md.tmpl` 참조
 
 ## Teams Role
 
@@ -155,7 +155,7 @@ Regressions format: `FunctionName: +15% ns/op (120ns → 138ns) — likely cause
 
 ## Result Format
 
-> 이 포맷은 A3 (Agent Result Format) 규격의 구현입니다.
+> 이 포맷은 `templates/shared/branding-formats.md.tmpl` A3: Agent Result Format의 구현입니다.
 
 When returning results, use the following format at the end of your response:
 

@@ -140,8 +140,7 @@ func injectCodexBrandingBlock(body string, router bool) string {
 	}
 	block := strings.TrimSpace(fmt.Sprintf(
 		"## Autopus Branding\n\n"+
-			"When handling %s, start the response with the canonical banner "+
-			"(see the `Autopus Branding` section of `AGENTS.md`):\n\n"+
+			"When handling %s, start the response with the canonical banner from `templates/shared/branding-formats.md.tmpl`:\n\n"+
 			"```text\n"+
 			"🐙 Autopus ─────────────────────────\n"+
 			"```\n\n"+
@@ -180,6 +179,22 @@ func normalizeCodexInvocationBody(body string) string {
 		"`/auto`", "`@auto`",
 	)
 	return replacer.Replace(body)
+}
+
+func normalizeCodexHelperPaths(body string) string {
+	replacer := strings.NewReplacer(
+		"@.codex/skills/autopus/", "@.codex/skills/",
+		".codex/skills/autopus/", ".codex/skills/",
+		"@.claude/skills/autopus/", "@.codex/skills/",
+		".claude/skills/autopus/", ".codex/skills/",
+		".codex/agents/autopus/", ".codex/agents/",
+		".claude/agents/autopus/", ".codex/agents/",
+		".claude/rules/autopus/", "AGENTS.md",
+		".codex/rules/autopus/", "AGENTS.md",
+		"`content/rules/branding.md`", "`AGENTS.md`",
+		"`branding-formats.md.tmpl`", "`templates/shared/branding-formats.md.tmpl`",
+	)
+	return normalizeCodexNativeSkillReferences(replacer.Replace(body))
 }
 
 func normalizeCodexToolingBody(body string) string {
