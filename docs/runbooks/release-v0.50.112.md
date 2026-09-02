@@ -24,7 +24,7 @@ A24 is the first phase whose direct predecessor is a *successful* release since 
 | Active promotion signer | `omp-context-promotion-2026-q3-k3` |
 | Active policy ID | `omp-context-active-v1` |
 | Go toolchain | `1.26.6` |
-| OMP oracle | `omp/17.2.7`, with the source-pinned executable digest |
+| OMP oracle | `omp/18.1.2`, digest `5f2512cce2a154ad2406a4792421c42f022b1335f83dcbde4236f76e50ab35b4` |
 
 The A24 source commit and tree are not filled in here. Freeze them from the exact clean `origin/main` used for the release. All later coordinates must bind those observed values.
 
@@ -217,12 +217,18 @@ One further option exists and should be named so it is rejected on purpose rathe
 
 | Input | Pinned | Observed here |
 |---|---|---|
-| OMP oracle | `omp/17.2.7`, digest `cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0` | `omp/18.0.11` at `/opt/homebrew/bin/omp`, digest `88b4a3e68e19904b8fcc1ba4b319ef68795f4fe06a6d101d564fc482cb0cc252` |
+| OMP oracle | `omp/18.1.2`, digest `5f2512cce2a154ad2406a4792421c42f022b1335f83dcbde4236f76e50ab35b4` | advanced 2026-09-02; the pin now matches the upstream `omp-darwin-arm64` asset |
 | K3 promotion signing key | `omp-context-promotion-2026-q3-k3`, public `YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM=` | absent; the only local key is `adk-companion-ed25519-2026-q3-b1`, public `OPNeS2QNyooNcJV4xuFT/V6U9uh50ycVulLOmKy2Tpg=`, which matches neither K3, companion b0, nor the channel key |
 
 The local key is `b1` — a prepositioned next-generation companion key that has never been activated, the same pattern as K2 in `pinnedkey.go`. It cannot sign this release's evidence, and substituting it would produce an attestation the active static policy does not accept.
 
-The OMP mismatch is a decision, not just a missing file. The harness moved its own surfaces to OMP 18.x on 2026-08-26 while the release oracle stayed pinned at 17.2.7. Advancing the pin changes the oracle the evidence was produced against, so it belongs to whoever owns the evidence contract: either supply `omp/17.2.7` at the pinned digest, or advance the pin deliberately and record why the new oracle is equivalent. Do not edit the digest to make prep start.
+The OMP pin was advanced from `omp/17.2.7` to `omp/18.1.2` on decision, not drift. It had gone stale: the harness moved its own surfaces to OMP 18.x on 2026-08-26 while the release oracle stayed at 17.2.7, and v0.50.112's evidence will now be produced against the current oracle.
+
+The digest was taken from the upstream release rather than a local install, which is the distinction that matters here. Prep consumes `omp-darwin-arm64` published at `github.com/can1357/oh-my-pi`; a Homebrew build of the same version hashes differently, so a locally measured digest would pin something CI never downloads. Verified three ways before pinning: the upstream `SHA256SUMS.txt` entry, the measured digest of the downloaded asset, and the binary reporting `omp/18.1.2`.
+
+What this does not settle is oracle equivalence. The 40-call cohort's verdict depends on the model and oracle behaviour, so a report signed against 18.1.2 is not interchangeable with one against 17.2.7. Read the first A24 evidence rather than assuming it looks like A23's, and expect the reduction-basis-point margin to move.
+
+`preflight-release.sh` now compares the pin to the upstream asset and warns when upstream has moved past it. The warning is deliberate rather than an auto-bump: advancing the oracle is a decision each time.
 
 ### Content gates
 

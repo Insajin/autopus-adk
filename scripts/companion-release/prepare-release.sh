@@ -14,7 +14,7 @@ readonly environment_name='adk-companion-release'
 readonly release_tag='v0.50.112'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_go_toolchain='go1.26.6'
-readonly expected_omp_sha256='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+readonly expected_omp_sha256='5f2512cce2a154ad2406a4792421c42f022b1335f83dcbde4236f76e50ab35b4'
 readonly expected_promotion_key_id='omp-context-promotion-2026-q3-k3'
 readonly release_ref="refs/tags/${release_tag}"
 readonly evidence_tag="omp-context-evidence-${release_tag}"
@@ -124,11 +124,11 @@ for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.
   exec 9<&-
 done
 trap 'cleanup $?' EXIT
-staged_omp="$temp_dir/omp-v17.2.7"
+staged_omp="$temp_dir/omp-v18.1.2"
 readonly staged_omp
 cp "$omp_executable" "$staged_omp"; chmod 0500 "$staged_omp"
 [[ "$(shasum -a 256 "$staged_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] || fail 'staged OMP executable digest differs'
-[[ "$("$staged_omp" --version)" == 'omp/17.2.7' ]] || fail 'verified OMP version differs from v17.2.7'
+[[ "$("$staged_omp" --version)" == 'omp/18.1.2' ]] || fail 'verified OMP version differs from v18.1.2'
 omp_executable=$staged_omp
 environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value) ||
   fail 'protected environment variables are unavailable'

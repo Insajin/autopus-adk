@@ -173,20 +173,33 @@ fi
 section "release prep inputs"
 # prepare-release.sh cannot start without these, and it discovers them one at a
 # time deep into its own argument parsing. Checking here costs a second.
+#
+# The OMP check deliberately does not look at `command -v omp`. Prep consumes the
+# published release asset, not whatever a package manager installed: a Homebrew
+# build of the same version hashes differently, so comparing against it reports a
+# mismatch that means nothing. What matters is that the pinned digest still
+# describes the upstream asset for the pinned version.
 omp_pin=$(awk -F"'" '/^readonly expected_omp_sha256=/ { print $2 }' \
   scripts/companion-release/prepare-release.sh)
 omp_version_pin=$(awk -F"'" "/verified OMP version differs/ { print \$2 }" \
   scripts/companion-release/prepare-release.sh | head -1)
-omp_path=$(command -v omp 2>/dev/null || printf '')
-if [[ -z "$omp_path" ]]; then
-  bad "omp is not on PATH; prep pins ${omp_version_pin:-the recorded version}"
-else
-  omp_digest=$(shasum -a 256 "$omp_path" | awk '{print $1}')
-  if [[ "$omp_digest" == "$omp_pin" ]]; then
-    pass "omp at $omp_path matches the pinned digest"
+omp_tag="v${omp_version_pin#omp/}"
+if [[ -z "$omp_pin" || -z "$omp_version_pin" ]]; then
+  bad 'cannot read the OMP version and digest pins from prepare-release.sh'
+elif sums=$(gh release download "$omp_tag" --repo can1357/oh-my-pi \
+  -p 'SHA256SUMS.txt' -D "$work" --clobber 2>/dev/null && cat "$work/SHA256SUMS.txt"); then
+  upstream=$(awk '$2 == "omp-darwin-arm64" { print $1 }' <<<"$sums")
+  if [[ "$upstream" == "$omp_pin" ]]; then
+    pass "OMP pin ${omp_version_pin} matches the upstream darwin-arm64 asset"
   else
-    bad "omp at $omp_path is $(omp --version 2>/dev/null || printf 'unknown'), digest ${omp_digest:0:12}…; prep pins ${omp_version_pin} digest ${omp_pin:0:12}…"
+    bad "OMP pin ${omp_pin:0:12}… differs from upstream ${upstream:0:12}… for ${omp_tag}"
   fi
+  latest=$(gh api repos/can1357/oh-my-pi/releases/latest --jq .tag_name 2>/dev/null || printf '')
+  if [[ -n "$latest" && "$latest" != "$omp_tag" ]]; then
+    warn "upstream latest is ${latest}; the pin is ${omp_tag}. Advancing the pin changes the evidence oracle, so decide it rather than drift into it"
+  fi
+else
+  bad "cannot read upstream SHA256SUMS.txt for ${omp_tag}"
 fi
 
 # The promotion key is checked by public half only; nothing secret is read out.
