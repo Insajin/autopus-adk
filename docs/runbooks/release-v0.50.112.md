@@ -211,6 +211,19 @@ Local key material was checked rather than assumed. `~/.ssh` holds one Ed25519 k
 
 One further option exists and should be named so it is rejected on purpose rather than by omission: replacing the channel key itself. The channel public key lives in the repository variable `AUTOPUS_ADK_CHANNEL_PUBLIC_KEY` and in the committed authority document, both writable with repository admin. Rewriting them would let a new trust root mint releases. That removes the property the whole apparatus exists to provide — that repository access alone cannot authorize a release — and it must not be done to work around a missing key. If the channel key is genuinely lost, that is an incident with its own runbook, not a step in a feature release.
 
+### Prep inputs, measured on this machine
+
+`prepare-release.sh --preflight` was attempted and stops on two inputs. Both are now checked by `preflight-release.sh` so the next attempt learns in seconds instead of mid-procedure.
+
+| Input | Pinned | Observed here |
+|---|---|---|
+| OMP oracle | `omp/17.2.7`, digest `cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0` | `omp/18.0.11` at `/opt/homebrew/bin/omp`, digest `88b4a3e68e19904b8fcc1ba4b319ef68795f4fe06a6d101d564fc482cb0cc252` |
+| K3 promotion signing key | `omp-context-promotion-2026-q3-k3`, public `YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM=` | absent; the only local key is `adk-companion-ed25519-2026-q3-b1`, public `OPNeS2QNyooNcJV4xuFT/V6U9uh50ycVulLOmKy2Tpg=`, which matches neither K3, companion b0, nor the channel key |
+
+The local key is `b1` — a prepositioned next-generation companion key that has never been activated, the same pattern as K2 in `pinnedkey.go`. It cannot sign this release's evidence, and substituting it would produce an attestation the active static policy does not accept.
+
+The OMP mismatch is a decision, not just a missing file. The harness moved its own surfaces to OMP 18.x on 2026-08-26 while the release oracle stayed pinned at 17.2.7. Advancing the pin changes the oracle the evidence was produced against, so it belongs to whoever owns the evidence contract: either supply `omp/17.2.7` at the pinned digest, or advance the pin deliberately and record why the new oracle is equivalent. Do not edit the digest to make prep start.
+
 ### Content gates
 
 Freeze `origin/main` only after all of these pass on the exact release commit.

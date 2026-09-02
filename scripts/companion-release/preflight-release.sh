@@ -170,6 +170,47 @@ else
   bad 'cannot download the predecessor signature envelope'
 fi
 
+section "release prep inputs"
+# prepare-release.sh cannot start without these, and it discovers them one at a
+# time deep into its own argument parsing. Checking here costs a second.
+omp_pin=$(awk -F"'" '/^readonly expected_omp_sha256=/ { print $2 }' \
+  scripts/companion-release/prepare-release.sh)
+omp_version_pin=$(awk -F"'" "/verified OMP version differs/ { print \$2 }" \
+  scripts/companion-release/prepare-release.sh | head -1)
+omp_path=$(command -v omp 2>/dev/null || printf '')
+if [[ -z "$omp_path" ]]; then
+  bad "omp is not on PATH; prep pins ${omp_version_pin:-the recorded version}"
+else
+  omp_digest=$(shasum -a 256 "$omp_path" | awk '{print $1}')
+  if [[ "$omp_digest" == "$omp_pin" ]]; then
+    pass "omp at $omp_path matches the pinned digest"
+  else
+    bad "omp at $omp_path is $(omp --version 2>/dev/null || printf 'unknown'), digest ${omp_digest:0:12}…; prep pins ${omp_version_pin} digest ${omp_pin:0:12}…"
+  fi
+fi
+
+# The promotion key is checked by public half only; nothing secret is read out.
+readonly k3_public='YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM='
+key_path="${ADK_PROMOTION_SIGNING_KEY:-}"
+if [[ -z "$key_path" ]]; then
+  warn 'ADK_PROMOTION_SIGNING_KEY is unset; set it to the K3 key path to check it here'
+elif [[ ! -f "$key_path" || -L "$key_path" ]]; then
+  bad "ADK_PROMOTION_SIGNING_KEY does not name a regular file"
+else
+  derived=$(python3 - "$key_path" <<'PY' 2>/dev/null || printf ''
+import base64, pathlib, sys
+raw = pathlib.Path(sys.argv[1]).read_bytes().strip()
+dec = base64.b64decode(raw, validate=True)
+print(base64.b64encode(dec[32:]).decode() if len(dec) == 64 else '')
+PY
+  )
+  if [[ "$derived" == "$k3_public" ]]; then
+    pass 'ADK_PROMOTION_SIGNING_KEY is the K3 promotion key'
+  else
+    bad 'ADK_PROMOTION_SIGNING_KEY is not the K3 promotion key'
+  fi
+fi
+
 section "release script contracts"
 for script in scripts/companion-release/*.sh; do
   bash -n "$script" || bad "$script does not parse"
