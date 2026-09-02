@@ -30,17 +30,26 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 
 	ctx := doctorCommandContext(cmd)
 	allOK := true
+	// `--fix` only installs missing dependencies. A missing or invalid managed
+	// surface is installed by `auto update`, so the two failure classes are
+	// tracked apart: a fresh clone of a repo that gitignores its harness fails
+	// every platform check, and pointing that operator at `--fix` sends them to
+	// a command that repairs nothing and reprints the same advice.
+	platformFailed := false
+	depsMissing := false
 	for _, p := range cfg.Platforms {
 		validationErrs, validateErr := validateDoctorPlatform(ctx, opts.dir, p)
 
 		if validateErr != nil {
 			tui.FAIL(out, fmt.Sprintf("%s 검증 실패: %v", p, validateErr))
 			allOK = false
+			platformFailed = true
 			continue
 		}
 		if p == "omp" {
 			if !renderOMPDoctorReadinessText(ctx, out, opts.dir, validationErrs) {
 				allOK = false
+				platformFailed = true
 			}
 			continue
 		}
@@ -54,6 +63,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 				case "ERROR":
 					tui.FAIL(out, detail)
 					allOK = false
+					platformFailed = true
 				case "WARN":
 					tui.SKIP(out, detail)
 				default:
@@ -71,6 +81,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		} else if s.Required {
 			tui.FAIL(out, fmt.Sprintf("%s not installed (install: %s)", s.Name, s.InstallCmd))
 			allOK = false
+			depsMissing = true
 		} else {
 			tui.SKIP(out, fmt.Sprintf("%s not installed (optional, install: %s)", s.Name, s.InstallCmd))
 		}
@@ -162,7 +173,7 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 		if allOK {
 			return "All checks passed"
 		}
-		return "Issues found — review warnings or run 'auto doctor --fix' where offered"
+		return doctorRemediationAdvice(platformFailed, depsMissing)
 	}())
 
 	return nil
