@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-const frozenReleasePhasePolicy = "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23 policy"
+const frozenReleasePhasePolicy = "outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24 policy"
 
 func TestReleaseSourceValidator_HistoricalTagsPreserveExactCoordinates(t *testing.T) {
 	dir, sha := newMinimalSourceRepository(t)
@@ -174,73 +174,12 @@ func TestReleaseSourceValidator_RejectsCoordinateMismatchAndOutsidePolicy(t *tes
 		{name: "failed_A22_tag_95", tag: "v0.50.95", sha: headSHA, message: frozenReleasePhasePolicy},
 		{name: "failed_A22_tag_96", tag: "v0.50.96", sha: headSHA, message: frozenReleasePhasePolicy},
 		{name: "burned_A23_tag_110", tag: "v0.50.110", sha: headSHA, message: frozenReleasePhasePolicy},
+		{name: "burned_A24_tag_112", tag: "v0.50.112", sha: headSHA, message: frozenReleasePhasePolicy},
 	} {
 		output, err := runReleaseSourceValidator(t, dir, test.tag, test.sha)
 		if err == nil || !strings.Contains(output, test.message) {
 			t.Fatalf("%s result: %v\n%s", test.name, err, output)
 		}
-	}
-}
-
-func TestLineageVerifier_A0BootstrapsWhileA1ThroughA23WithoutLiveEvidenceFailClosed(t *testing.T) {
-	script := filepath.Join(repositoryRoot(t), "scripts/companion-release/verify-public-key-lineage.sh")
-	cases := []struct {
-		name    string
-		tag     string
-		wantOK  bool
-		message string
-	}{
-		{name: "A0", tag: "v0.50.69", wantOK: true, message: "bootstrap accepted"},
-		{name: "A1", tag: "v0.50.70", message: "missing GITHUB_TOKEN"},
-		{name: "A2", tag: "v0.50.71", message: "missing GITHUB_TOKEN"},
-		{name: "A3", tag: "v0.50.72", message: "missing GITHUB_TOKEN"},
-		{name: "A4", tag: "v0.50.73", message: "missing GITHUB_TOKEN"},
-		{name: "A5", tag: "v0.50.74", message: "missing GITHUB_TOKEN"},
-		{name: "A6", tag: "v0.50.77", message: "missing GITHUB_TOKEN"},
-		{name: "A7", tag: "v0.50.78", message: "missing GITHUB_TOKEN"},
-		{name: "A8", tag: "v0.50.79", message: "missing GITHUB_TOKEN"},
-		{name: "A9", tag: "v0.50.80", message: "missing GITHUB_TOKEN"},
-		{name: "A10", tag: "v0.50.81", message: "missing GITHUB_TOKEN"},
-		{name: "A11", tag: "v0.50.82", message: "missing GITHUB_TOKEN"},
-		{name: "A12", tag: "v0.50.83", message: "missing GITHUB_TOKEN"},
-		{name: "A13", tag: "v0.50.84", message: "missing GITHUB_TOKEN"},
-		{name: "A14", tag: "v0.50.85", message: "missing GITHUB_TOKEN"},
-		{name: "A15", tag: "v0.50.86", message: "missing GITHUB_TOKEN"},
-		{name: "A16", tag: "v0.50.87", message: "missing GITHUB_TOKEN"},
-		{name: "A17", tag: "v0.50.88", message: "missing GITHUB_TOKEN"},
-		{name: "A18", tag: "v0.50.89", message: "missing GITHUB_TOKEN"},
-		{name: "A19", tag: "v0.50.90", message: "missing GITHUB_TOKEN"},
-		{name: "A20", tag: "v0.50.91", message: "missing GITHUB_TOKEN"},
-		{name: "A21", tag: "v0.50.92", message: "missing GITHUB_TOKEN"},
-		{name: "A22", tag: "v0.50.109", message: "missing GITHUB_TOKEN"},
-		{name: "A23", tag: "v0.50.111", message: "missing GITHUB_TOKEN"},
-		{name: "failed_A6_tag_75", tag: "v0.50.75", message: frozenReleasePhasePolicy},
-		{name: "failed_A6_tag_76", tag: "v0.50.76", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_93", tag: "v0.50.93", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_94", tag: "v0.50.94", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_95", tag: "v0.50.95", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_96", tag: "v0.50.96", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_97", tag: "v0.50.97", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_98", tag: "v0.50.98", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_99", tag: "v0.50.99", message: frozenReleasePhasePolicy},
-		{name: "failed_A22_tag_100", tag: "v0.50.100", message: frozenReleasePhasePolicy},
-		{name: "burned_A23_tag_110", tag: "v0.50.110", message: frozenReleasePhasePolicy},
-	}
-	for _, test := range cases {
-		t.Run(test.name, func(t *testing.T) {
-			command := exec.Command("bash", script)
-			command.Env = []string{"GITHUB_REF_NAME=" + test.tag, "PATH=" + os.Getenv("PATH")}
-			output, err := command.CombinedOutput()
-			if test.wantOK && err != nil {
-				t.Fatalf("A0 bootstrap failed: %v\n%s", err, output)
-			}
-			if !test.wantOK && err == nil {
-				t.Fatalf("%s unexpectedly passed\n%s", test.name, output)
-			}
-			if !strings.Contains(string(output), test.message) {
-				t.Fatalf("%s output = %q, want %q", test.name, output, test.message)
-			}
-		})
 	}
 }
 

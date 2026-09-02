@@ -54,6 +54,15 @@ readonly -a replace_targets=(
   'scripts/companion-release/build-omp-context-candidate.sh'
   'scripts/companion-release/tests/testdata/mock-release-prep-gh.sh'
   'scripts/companion-release/tests/testdata/mock-tap-gh.sh'
+  # These three carry the coordinate as data rather than as a trigger, and all
+  # three were missed on the v0.50.112 -> v0.50.113 move: the phase case arm in
+  # validate-source.sh, the A24_TAG pair in the lineage coordinates, and the
+  # producer table row. A missed file here is silent drift that only the Go
+  # contract tests catch, which is far too late.
+  'scripts/companion-release/validate-source.sh'
+  'scripts/companion-release/verify-public-key-lineage-coordinates.sh'
+  'scripts/companion-release/produce-public-key-receipt.sh'
+  'scripts/companion-release/verify-current-release-signatures.sh'
 )
 
 # Test files are deliberately absent from the list above. Each of them mixes

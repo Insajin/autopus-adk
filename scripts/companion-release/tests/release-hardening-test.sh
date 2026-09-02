@@ -52,8 +52,8 @@ contains "$prep" 'verify-release-tag-ruleset.sh --armed'
 contains "$prep" 'verify-release-tag-ruleset.sh --sealed'
 contains "$publisher" 'verify-release-tag-ruleset.sh --armed'
 contains "$publisher" 'verify-release-tag-ruleset.sh --sealed'
-contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.112-release-authority'"
-contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.112'"
+contains "$tag_ruleset_gate" "ruleset_name='autopus-v0.50.113-release-authority'"
+contains "$tag_ruleset_gate" "release_ref='refs/tags/v0.50.113'"
 contains "$tag_ruleset_gate" 'usage: verify-release-tag-ruleset.sh --armed|--sealed|--sealed-runtime'
 contains "$tag_ruleset_gate" 'actor_type:"User"'
 contains "$tag_ruleset_gate" 'else .bypass_actors == [] end'
@@ -90,9 +90,9 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'COMPANION_SOURCE_PIN_REQUIRED=1'
   contains "$workflow" 'verify-release-tag-ruleset.sh --sealed-runtime'
 done
-contains "$release" "- 'v0.50.112'"
-contains "$release" "if: github.ref == 'refs/tags/v0.50.112'"
-contains "$recovery" "if: github.ref == 'refs/tags/v0.50.112'"
+contains "$release" "- 'v0.50.113'"
+contains "$release" "if: github.ref == 'refs/tags/v0.50.113'"
+contains "$recovery" "if: github.ref == 'refs/tags/v0.50.113'"
 not_contains "$release" 'canonical-full-bridge'
 not_contains "$recovery" 'canonical-full bridge'
 not_contains "$release" 'omp-context-bridge-release.v1.json'
@@ -102,14 +102,14 @@ for workflow in "$release" "$recovery"; do
   contains "$workflow" 'GITHUB_REF_NAME="$GITHUB_REF_NAME"'
   contains "$workflow" 'COMPANION_VERSION="${GITHUB_REF_NAME#v}"'
 done
-contains "$release" "'autopus-adk_0.50.112_darwin_amd64.tar.gz'"
-contains "$release" "'autopus-adk_0.50.112_darwin_arm64.tar.gz'"
+contains "$release" "'autopus-adk_0.50.113_darwin_amd64.tar.gz'"
+contains "$release" "'autopus-adk_0.50.113_darwin_arm64.tar.gz'"
 contains "$producer_receipt" 'v0.50.109 0.50.109 A22'
 contains "$producer_receipt" 'v0.50.111 0.50.111 A23'
-contains "$producer_receipt" 'v0.50.112 0.50.112 A24'
+contains "$producer_receipt" 'v0.50.113 0.50.113 A24'
 contains "$producer_receipt" "fail 'public_key_receipt_release_identity_mismatch'"
-contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.112'"
-contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.112'"
+contains "$homebrew_bridge" "readonly RELEASE_TAG='v0.50.113'"
+contains "$homebrew_bridge" "readonly RELEASE_VERSION='0.50.113'"
 contains "$release" 'timeout-minutes: 60'
 contains "$recovery" 'timeout-minutes: 20'
 
@@ -120,8 +120,8 @@ for workflow in "$release" "$recovery"; do
   workflow_token_index=$(grep -n 'name: Create Homebrew tap token' "$workflow" | cut -d: -f1)
   (( workflow_evidence_index < workflow_token_index )) || fail 'tap token precedes release evidence'
 done
-contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.112'"
-contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.112'"
+contains "$current_release_gate" "readonly RELEASE_TAG='v0.50.113'"
+contains "$current_release_gate" "readonly RELEASE_VERSION='0.50.113'"
 contains "$current_release_gate" '.target_commitish == $commit'
 contains "$current_release_gate" '.immutable == true'
 contains "$current_release_gate" '(.assets | length) == ($expected | length)'

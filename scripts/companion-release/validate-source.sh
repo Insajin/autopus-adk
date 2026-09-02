@@ -60,7 +60,7 @@ case "$GITHUB_REF_NAME" in
   v0.50.92) release_phase='A21' ;;
   v0.50.109) release_phase='A22' ;;
   v0.50.111) release_phase='A23' ;;
-  v0.50.112) release_phase='A24' ;;
+  v0.50.113) release_phase='A24' ;;
   *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
@@ -85,7 +85,8 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A16' || "$release_phase" == 'A17' ||
       "$release_phase" == 'A18' || "$release_phase" == 'A19' ||
       "$release_phase" == 'A20' || "$release_phase" == 'A21' ||
-      "$release_phase" == 'A22' || "$release_phase" == 'A23' ]]; then
+      "$release_phase" == 'A22' || "$release_phase" == 'A23' ||
+      "$release_phase" == 'A24' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
