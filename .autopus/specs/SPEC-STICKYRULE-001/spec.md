@@ -118,7 +118,7 @@ THE SYSTEM SHALL emit only sticky rule names and injectable bodies, and SHALL NO
 **REQ-STICKYRULE-FIRE-05**
 Priority: Must
 Type: Ubiquitous
-THE SYSTEM SHALL cap injected context at 6000 bytes measured over the injectable bodies plus any truncation notice and excluding JSON framing, and SHALL drop whole rules in reverse rule-name order once the cap is reached, which admits the shipped pair whose injectable bodies measure 4492 bytes or less.
+THE SYSTEM SHALL cap injected context at 6000 bytes measured over the injectable bodies plus any truncation notice and excluding JSON framing, and SHALL drop whole rules in reverse rule-name order once the cap is reached, which admits the shipped pair whose injectable bodies measure 4628 bytes or less.
 
 **REQ-STICKYRULE-FIRE-06**
 Priority: Must

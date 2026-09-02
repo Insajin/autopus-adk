@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **tip의 CI 실패 2건을 닫는다** (2026-09-02): 새 CI 게이트가 `set -- $listed`로 개수를 셌고 shellcheck가 SC2086으로 3곳을 잡았다. 억제 대신 `read -ra`로 배열을 만들어 인용 없는 확장을 없앴다. SKIP 스캔의 `for name in $(...)`도 `while IFS= read -r`로 바꿨다(SC2013). sticky rule 쌍은 rule 본문 교정으로 4492 -> 4628 바이트로 자랐다. aggregate 상한 6000은 그대로이고 여유 1372 바이트로 온전히 주입되므로, 상한이 아니라 tripwire 핀을 실측값으로 옮기고 SPEC REQ-STICKYRULE-FIRE-05과 research에 재측정을 기록했다.
+
 - **실수로 발행한 진행 중 작업을 커밋에서 되돌린다** (2026-09-02): 앞 커밋에서 `git add -A`를 써서 다른 작업의 미커밋 WIP 65개 파일(agents/templates 콘텐츠, `pkg/config` strict 로더)이 함께 발행됐다. strict 로더는 `LoadPreview`가 미지 키를 거부하게 만드는데, `TestSaveQualityProviderPreservesRawConfig` 등 CLI 계약 3건은 같은 `LoadPreview`로 미지 키(`future_extension`)가 라운드트립에서 보존되기를 요구한다. 두 계약은 같은 함수에서 양립할 수 없고, 이는 오타 안전성과 상위 호환성 사이의 제품 결정이라 소유자에게 남긴다. 해당 65개 파일을 커밋에서 되돌리고 내용은 워킹트리 미커밋 상태로 복원해, 실수 이전 상태로 되돌렸다. 내 변경(`pkg/qa/report/render.go` errcheck, runbook 이어가기)은 그대로 유지한다.
 
 - **runbook을 v0.50.113으로 이어가고 남은 errcheck를 정리한다** (2026-09-02): runbook은 이름을 옮기고 소각 이력을 안에 남기는 기존 규약을 따랐다 - v0.50.111 runbook이 v0.50.110 소각을 담고 있는 것과 같다. `docs/runbooks/release-v0.50.112.md`를 `release-v0.50.113.md`로 옮기고, 소각 배너는 112 객체를 계속 가리키게 두고 나머지 좌표만 113으로 옮겼다. CI lint가 `pkg/qa/report/render.go`의 `os.Remove` 3건을 잡았고 `sanitize.go`와 같은 방식으로 명시적으로 버렸다. 저장소 전체의 `os.Remove` 호출을 전수 확인해 남은 곳이 없음을 확인했다.

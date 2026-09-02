@@ -251,3 +251,5 @@ The basis is pinned by two characterization tests in `pkg/rulecond/sticky_cap_te
 - Evolution Ideas: surfaced as optional, not scheduled.
 
 Evidence: build and vet clean; coverage pkg/rulecond 88.7%, pkg/config 89.1%, pkg/content 93.8%, pkg/adapter/claude 86.9%, sticky CLI files 87.0% and 92.0%; parity unchanged; `auto check --hygiene --arch --quiet` exit 0; no source file over the 300-line limit; code review APPROVE with zero blockers; adversarial security audit PASS at round 3 after a reopened leaf-containment finding was closed and re-attacked; live re-injection observed and recorded above.
+
+Re-measured 2026-09-02: correcting the two rule bodies grew the pair to 4628 injectable bytes. The 6000-byte aggregate is unchanged and still admits the pair whole with 1372 bytes of headroom, so the cap held its purpose while the content moved.

@@ -368,9 +368,9 @@ jobs:
           minimum=12
           log="$(mktemp)"
           listed="$(go test -list "$filter" . | awk '/^TestPOSIXInstaller/' | sort -u | tr '\n' ' ')"
-          set -- $listed
-          if [[ "$#" -lt "$minimum" ]]; then
-            echo "::error::-run '${filter}' lists $# test(s) in the root package, below the declared ${minimum}: [${listed}]. Renamed installer signing tests would leave this gate vacuous"
+          read -ra listed_tests <<<"$listed"
+          if [[ "${#listed_tests[@]}" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists ${#listed_tests[@]} test(s) in the root package, below the declared ${minimum}: [${listed}]. Renamed installer signing tests would leave this gate vacuous"
             exit 1
           fi
           go test -count=1 -timeout=5m -v . -run "$filter" 2>&1 | tee "$log"
@@ -409,9 +409,9 @@ jobs:
           minimum=7
           log="$(mktemp)"
           listed="$(go test -list "$filter" ./pkg/processprobe | awk '/^TestOutputWindows/' | sort -u | tr '\n' ' ')"
-          set -- $listed
-          if [[ "$#" -lt "$minimum" ]]; then
-            echo "::error::-run '${filter}' lists $# test(s) in ./pkg/processprobe, below the declared ${minimum}: [${listed}]"
+          read -ra listed_tests <<<"$listed"
+          if [[ "${#listed_tests[@]}" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists ${#listed_tests[@]} test(s) in ./pkg/processprobe, below the declared ${minimum}: [${listed}]"
             exit 1
           fi
           go test -count=3 -timeout=2m -v ./pkg/processprobe -run "$filter" 2>&1 | tee "$log"
@@ -438,9 +438,9 @@ jobs:
           allowed_skip='TestProbeStagedSelfUpdateVersion_UsesLiteralBinaryPath'
           log="$(mktemp)"
           listed="$(go test -list "$filter" ./internal/cli | awk '/^Test/' | sort -u | tr '\n' ' ')"
-          set -- $listed
-          if [[ "$#" -lt "$minimum" ]]; then
-            echo "::error::-run '${filter}' lists $# test(s) in ./internal/cli, below the declared ${minimum}: [${listed}]"
+          read -ra listed_tests <<<"$listed"
+          if [[ "${#listed_tests[@]}" -lt "$minimum" ]]; then
+            echo "::error::-run '${filter}' lists ${#listed_tests[@]} test(s) in ./internal/cli, below the declared ${minimum}: [${listed}]"
             exit 1
           fi
           go test -count=1 -timeout=5m -v ./internal/cli -run "$filter" 2>&1 | tee "$log"
@@ -450,12 +450,13 @@ jobs:
             echo "::error::-run '${filter}' listed [${listed}] but observed [${observed}]; the difference never ran"
             exit 1
           fi
-          for name in $(sed -n 's/^--- SKIP: \([^ ]*\).*/\1/p' "$log" | sort -u); do
+          while IFS= read -r name; do
+            [[ -n "$name" ]] || continue
             if [[ "$name" != "$allowed_skip" ]]; then
               echo "::error::${name} skipped outside the declared allow-list (${allowed_skip}); a skipped self-update failure boundary proves nothing"
               exit 1
             fi
-          done
+          done < <(sed -n 's/^--- SKIP: \([^ ]*\).*/\1/p' "$log" | sort -u)
 
       - name: Test Windows installer signing on PowerShell 5.1
         run: >-
