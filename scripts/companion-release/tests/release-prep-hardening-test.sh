@@ -18,7 +18,7 @@ for file in "$publisher" "$transaction" "$prep" "$prep_lib" "$user_lib" "$local_
   [[ -f "$file" && ! -L "$file" ]] || fail "missing or unsafe release-prep component $file"
 done
 contains "$prep" 'usage: prepare-release.sh --endpoint URL'; contains "$prep" '(--preflight|--apply)'
-contains "$prep" "readonly release_tag='v0.50.112'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
+contains "$prep" "readonly release_tag='v0.50.111'"; contains "$prep" "expected_go_toolchain='go1.26.6'"
 contains "$prep" "expected_promotion_key_id='omp-context-promotion-2026-q3-k3'"
 contains "$prep" 'prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh'
 contains "$prep" 'go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner'
@@ -93,15 +93,8 @@ for source in "$prep" "$prep_lib" "$user_lib" "$uidrunner_dir"/*.go \
 done
 contains "$local_lib" '--static-policy-b64 "$static_policy_b64"'; not_contains "$local_lib" '--expected-signing-key-id'
 contains "$publisher" 'static policy does not own the exact K3 signer'
-# The R2 tag signature was retired with the key. What must hold now is that the
-# publisher creates an annotated tag, asserts the object type instead of a
-# signature, and no longer reaches for the destroyed key.
-not_contains "$publisher" 'release-tag-signing-2026-q3-r2.pub'
-not_contains "$publisher" 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ'
-not_contains "$publisher" 'git verify-tag'
-not_contains "$publisher" 'tag_signing_key'
-contains "$publisher" 'git tag -a "$release_tag" "$source_commit"'
-contains "$publisher" 'release tag is not an annotated tag object'
+contains "$publisher" 'release-tag-signing-2026-q3-r2.pub'
+contains "$publisher" 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ'
 contains "$publisher" 'names=(ADK_COMPANION_APPROVED_SOURCE_COMMIT ADK_COMPANION_APPROVED_SOURCE_TREE OMP_CONTEXT_EVIDENCE_TAG_OBJECT_SHA'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository"'
 contains "$publisher" 'gh variable set "${names[$index]}" --repo "$repository" --env "$environment_name"'
@@ -164,6 +157,7 @@ if env PATH="$temp/ruleset-bin:$PATH" MOCK_RELEASE_PREP_STATE="$ruleset_state" "
   fail 'sealed-runtime verifier accepted extra actor or rule'
 fi
 ssh-keygen -q -t ed25519 -N '' -f "$temp/signing-key"
+ssh-keygen -q -t ed25519 -N '' -f "$temp/wrong-signing-key"
 printf 'release-test %s\n' "$(<"$temp/signing-key.pub")" >"$temp/allowed-signers"
 git_env=(GIT_CONFIG_COUNT=5 GIT_CONFIG_KEY_0=gpg.format GIT_CONFIG_VALUE_0=ssh
   GIT_CONFIG_KEY_1=user.signingkey GIT_CONFIG_VALUE_1="$temp/signing-key"
@@ -183,8 +177,19 @@ setup_fixture() {
   printf '0\n' >"$state/write-count"; : >"$state/calls.log"; printf armed >"$state/ruleset-state"
   git init --quiet --bare "$remote"; git init --quiet "$work"; printf 'release source\n' >"$work/source.txt"
   mkdir -p "$work/scripts/companion-release"
+  cp "$temp/signing-key.pub" "$work/scripts/companion-release/release-tag-signing-2026-q3-r2.pub"
   cp "$transaction" "$work/scripts/companion-release/release-coordinate-transaction-lib.sh"
   cp "$lock_verifier" "$work/scripts/companion-release/verify-release-prep-lock.sh"
+  printf '%s\n' 'SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ' >"$work/scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint"
+  cat >"$fixture/bin/ssh-keygen" <<EOF
+#!/usr/bin/env bash
+if [[ "\${1-}" == '-lf' ]]; then
+  printf '%s\n' '256 SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ release-test (ED25519)'
+  exit 0
+fi
+exec '$real_ssh_keygen' "\$@"
+EOF
+  chmod 0700 "$fixture/bin/ssh-keygen"
   cp "$ruleset_verifier" "$work/scripts/companion-release/verify-release-tag-ruleset.sh"
   chmod 0700 "$work/scripts/companion-release/verify-release-tag-ruleset.sh" \
     "$work/scripts/companion-release/verify-release-prep-lock.sh"
@@ -221,6 +226,7 @@ HOOK
 }
 run_publisher() {
   local lock_argument=${RELEASE_PREP_LOCK_ARGUMENT:-fresh:$prep_lock_commit}
+  local signing_key=${RELEASE_PREP_SIGNING_KEY:-$temp/signing-key}
   env "${git_env[@]}" PATH="$fixture/bin:$PATH" MOCK_RELEASE_PREP_STATE="$state" \
     MOCK_RELEASE_PREP_FAIL_AT="${MOCK_RELEASE_PREP_FAIL_AT:-}" MOCK_RELEASE_PREP_FAIL_FROM="${MOCK_RELEASE_PREP_FAIL_FROM:-}" \
     MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL="${MOCK_RELEASE_PREP_RELEASE_DELETE_FAIL:-0}" \
@@ -228,23 +234,25 @@ run_publisher() {
     bash "$publisher" Insajin/autopus-adk adk-companion-release v0.50.112 "$source_commit" "$source_tree" \
     "$fixture/static-policy.b64" "$evidence_tag_object" "$evidence_commit" "$evidence_tree" \
     "$(shasum -a 256 "$fixture/report" | awk '{print $1}')" \
-    "$(shasum -a 256 "$fixture/attestation" | awk '{print $1}')" "$lock_argument"
+    "$(shasum -a 256 "$fixture/attestation" | awk '{print $1}')" "$lock_argument" "$signing_key"
 }
 setup_fixture k3_mismatch
 policy_value omp-context-promotion-2026-q3-k2 >"$fixture/static-policy.b64"
 if (cd "$work" && run_publisher >/dev/null 2>&1); then fail 'publisher accepted a K2 active policy'; fi
 [[ "$(<"$state/write-count")" == '0' ]] || fail 'K3 mismatch mutated release state'
-# The R2 signer-mismatch case was removed with the key. The publisher no longer
-# takes a tag signing key, so there is no mismatch left to reject; what replaces
-# it is the annotated-tag assertion after the success run below.
+setup_fixture r2_mismatch
+if (cd "$work" && RELEASE_PREP_SIGNING_KEY="$temp/wrong-signing-key" run_publisher >/dev/null 2>&1); then fail 'publisher accepted a non-R2 tag signer'; fi
+[[ "$(<"$state/write-count")" == '0' ]] || fail 'R2 mismatch mutated release state'
 setup_fixture success
 (cd "$work" && run_publisher >"$fixture/result.json")
 jq -e '.mode == "committed" and .release_tag == "v0.50.112" and .promotion_signing_key_id == "omp-context-promotion-2026-q3-k3"' "$fixture/result.json" >/dev/null || fail 'success receipt differs'
 committed_tag=$(git -C "$work" rev-parse refs/tags/v0.50.112)
 [[ "$(git -C "$work" cat-file -t "$committed_tag")" == 'tag' ]] ||
   fail 'committed release tag is not an annotated tag object'
-if git -C "$work" cat-file tag "$committed_tag" | grep -q 'BEGIN SSH SIGNATURE'; then
-  fail 'committed release tag carries a signature the procedure no longer makes'
+# R2 signing is in force, so the committed tag must carry a signature. This is
+# the inverse of the assertion that stood while the signer was believed lost.
+if ! git -C "$work" cat-file tag "$committed_tag" | grep -q 'BEGIN SSH SIGNATURE'; then
+  fail 'committed release tag carries no signature'
 fi
 [[ "$(jq 'length' "$state/repository-variables.json")" == '9' && "$(jq 'length' "$state/environment-variables.json")" == '9' ]] || fail 'coordinate transaction did not converge both variable scopes'
 jq -e 'length == 1 and .[0].draft == true and (.[0].assets | length) == 0 and (.[0].body | fromjson | .schema_version == "autopus.adk_release_reservation.v1")' "$state/releases.json" >/dev/null || fail 'operator draft reservation differs'

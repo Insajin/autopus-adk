@@ -172,11 +172,11 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
     git merge-base --is-ancestor "$A24_A23_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A24 source does not contain the immutable A23 release'
   fi
-  # A24 is deliberately absent from the tag-signature list below. Its tags are
-  # annotated and unsigned because R2 and the channel key that could have
-  # replaced it were destroyed; see docs/runbooks/release-key-custody-loss.md.
-  # Adding A24 here would gate the release on a key that cannot exist.
-  if [[ "$release_phase" == 'A22' || "$release_phase" == 'A23' ]]; then
+  # A24 signs with R2 like its predecessors. An earlier commit removed it from
+  # this list on the belief that R2 was destroyed; the key was found intact in
+  # the operator's release-key store, so the guarantee continues unbroken.
+  if [[ "$release_phase" == 'A22' || "$release_phase" == 'A23' ||
+        "$release_phase" == 'A24' ]]; then
     if [[ "$release_phase" == 'A22' &&
           "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" == '1' ]]; then
       [[ "${ADK_KEY_ROTATION_VERIFIED-}" == '1' ]] ||

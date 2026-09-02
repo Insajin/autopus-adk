@@ -20,7 +20,7 @@ A24 is the first phase whose direct predecessor is a *successful* release since 
 | Release tag ruleset | `autopus-v0.50.112-release-authority` |
 | Protected environment | `adk-companion-release` |
 | Release operator user ID | `204883817` |
-| Tag signer | none; annotated unsigned tag, see `release-key-custody-loss.md` |
+| Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, present at `~/.config/autopus/release-keys/release-tag-signing-2026-q3-r2` |
 | Active promotion signer | `omp-context-promotion-2026-q3-k3` |
 | Active policy ID | `omp-context-active-v1` |
 | Go toolchain | `1.26.6` |
@@ -177,39 +177,9 @@ The single blocker is the tag signature. `verify_tag_signing_authority` in `scri
 
 Signing the tag with a different key is not a smaller version of this release. The published v0.50.109 rotation sidecar names R2 as the authorized signer, so another key contradicts immutable published history. Consumers are unaffected either way — nothing a consumer runs verifies a git tag signature — which is exactly why the decision must be recorded rather than absorbed silently.
 
-**Resolved 2026-09-02, option A.** The precondition was retired on the record: release tags from v0.50.112 onward are annotated and unsigned, and artifact trust rests on the K1 envelope over `checksums.txt` plus the sigstore bundle. `release-key-custody-loss.md` carries the change list and the cost.
+**Resolved 2026-09-02 by finding the key.** R2 was reported destroyed and the tag-signature precondition was retired on that basis. A local search then found R2 intact at `~/.config/autopus/release-keys/release-tag-signing-2026-q3-r2`, fingerprint verified, readable without a passphrase. The retirement is reverted; tags are signed as before and A24 joins its predecessors in the tag-signature list.
 
-Two consequences for this runbook's own coordinates:
-
-| Coordinate | Was | Now |
-|---|---|---|
-| Tag signer | R2, `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ` | none; annotated unsigned tag |
-| Release phase registration | absent | `v0.50.112` is phase `A24` in `validate-source.sh`, ancestor `954f60a77acb59fd4106537020693fdcadb3d640` |
-
-The phase registration was a hidden blocker worth naming: `validate-source.sh` maps tag to phase with a fail-closed default, so v0.50.112 would have been rejected as "outside the frozen policy" no matter what else was correct. It fails closed rather than misvalidating, which is the right behaviour and also easy to miss until the workflow runs.
-
-State plainly in the release description that the tag is unsigned and why. A release that quietly stops carrying a guarantee is worse than one that says it stopped.
-
-### Generating a new key on the release machine
-
-A tempting shortcut when R2 is not at hand is to generate a fresh signer locally. The design anticipates a lost tag key — that is exactly why the channel key, not the tag key, is the rotation authority — but the path is a procedure of its own and it does not fit inside this release.
-
-What generating a new tag signer requires, in order:
-
-| Step | Reachable from this machine |
-|---|---|
-| Generate the new Ed25519 tag key | yes |
-| Write a new `adk-key-rotation-authority.v1.json` with a new `bridge_tag` and `next_tag_*` | yes |
-| Publish it on a new immutable ref `release-key-rotation-authority-v3` with its own ruleset | yes; the authority actor is `204883817` |
-| **Sign the rotation document with the channel key `adk-channel-2026-q3-a0`** | **no** |
-| Publish the signed sidecar, then cut a `canonical-full-bridge` release carrying the new public keys | needs the step above |
-| Use the new key — only from the release *after* the bridge | needs the step above |
-
-The committed authority document is pinned to `bridge_tag: v0.50.109` and hard-codes `next_tag_fingerprint: SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`. It authorizes exactly one rotation, the one already performed. It cannot be reused to bless a third key, and the rotation tooling only ever verifies a document and signature pair — `publish-key-rotation-sidecar.sh` takes them as arguments and `rotation-authority/verify-rotation.sh` checks them. Nothing in the repository signs. That is deliberate: the channel private key never touches the repository.
-
-Local key material was checked rather than assumed. `~/.ssh` holds one Ed25519 key, raw public `IdUKgFll1QQlfdpojHMyv3v7vuljNFgTkYmBWpWJ5yI=`, which is neither R2 nor the channel key `1IqFilCntaMPUxg7ndOZnyy6Lj1NBQXkXBJp3rEu6kI=`. `ssh-add -l` reports no identities. This machine therefore holds no release authority key of any kind.
-
-One further option exists and should be named so it is rejected on purpose rather than by omission: replacing the channel key itself. The channel public key lives in the repository variable `AUTOPUS_ADK_CHANNEL_PUBLIC_KEY` and in the committed authority document, both writable with repository admin. Rewriting them would let a new trust root mint releases. That removes the property the whole apparatus exists to provide — that repository access alone cannot authorize a release — and it must not be done to work around a missing key. If the channel key is genuinely lost, that is an incident with its own runbook, not a step in a feature release.
+The correction is recorded rather than quietly applied, in `release-key-custody-loss.md`, because a release procedure was changed on a premise nobody had checked. The check was one command.
 
 ### Prep inputs, measured on this machine
 

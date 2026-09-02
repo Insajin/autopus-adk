@@ -1,5 +1,12 @@
 # Autopus ADK release key custody loss
 
+> **WITHDRAWN 2026-09-02.** The premise was wrong. Nothing was destroyed. Every
+> key named below was found intact in `~/.config/autopus/release-keys/` on the
+> release machine, verified by fingerprint. This document is kept because the
+> analysis of what survives without operator keys is accurate and useful, and
+> because withdrawing it silently would hide that a release procedure was changed
+> on a false premise. See "What was actually found" at the end.
+
 ## What this document is
 
 `release-key-rotation.md` rotates keys while the channel key is in hand. This one covers the case that runbook cannot: the channel key itself is gone, so no surviving key can authorize a replacement.
@@ -135,3 +142,23 @@ Do not resolve the stop by signing with an unexpected key and saying nothing. Th
 `release-v0.50.112.md` is written and its repository-side work is complete: the ruleset exists, content gates pass, the asset gate and lineage invocation are pinned. Its blocker is now exactly one thing — the R2 precondition in step 3 above — because every other input it listed as operator-held is in fact a GitHub secret that the workflow materializes.
 
 That correction matters for planning. An earlier draft of this document, and of the v0.50.112 runbook, treated the evidence layer as dead. It is not. Re-read both before acting.
+
+## What was actually found
+
+A local search of the release machine turned up every key, all verified rather than assumed:
+
+| Key | File | Verification |
+|---|---|---|
+| R2 tag signer | `release-tag-signing-2026-q3-r2` | `ssh-keygen -y` yields `SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`, an exact match; readable without a passphrase |
+| K3 promotion | `omp-context-promotion-2026-q3-k3.b64` | public half `YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM=`, exact match |
+| K1 ECDSA | `autopus-adk-k1-2026-07-17.pk8.pem` | `public.pem` SPKI digest equals the compiled `e1fdfe06…`; private half is passphrase-encrypted |
+| K2 ECDSA | `autopus-adk-k2-2026-07-17.pk8.pem` | SPKI digest equals the compiled `93d9f681…`; the prepositioned anchor was real all along |
+| Channel A0 | `rotation-private-backup-2026-08-28.enc` | integrity matches the `backup_sha256` recorded in the ceremony note; passphrase is in the macOS keychain under service `autopus-adk-rotation-2026-q3-r2-k3` |
+
+The ceremony note `ceremony-2026-08-28-tag-r2-promotion-k3.txt` documents the whole set, including where the backup passphrase lives. It was sitting next to the keys the entire time.
+
+### What this cost, and the lesson
+
+Acting on the reported loss, the R2 tag-signature precondition was removed and release tags were switched to unsigned annotated tags. That change has been reverted: `verify_tag_signing_authority`, the `--tag-signing-key` flag, the R2 derivation in the publisher, `git tag -s`, and the signature verification in `verify_remote_release` are all back, and A24 is in the tag-signature list with its predecessors. The test now asserts the committed tag **does** carry a signature, the inverse of what stood while the key was believed lost.
+
+The lesson is not "the user was wrong." Custody is exactly the kind of state a person cannot be expected to hold in memory, and the honest answer to "is the key gone" was always a filesystem search. Searching first would have taken one command and saved a release-procedure change made on a false premise. Do that before believing any custody claim, including a confident one.

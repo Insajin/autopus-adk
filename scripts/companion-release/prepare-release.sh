@@ -5,13 +5,13 @@ umask 077
 fail() { printf 'companion release prep: %s\n' "$1" >&2; exit 1; }
 usage() {
   cat >&2 <<'USAGE'
-usage: prepare-release.sh --endpoint URL --credential-locator ENV --provider NAME --model NAME --model-context-window N --omp PATH --oracle-policy-digest sha256:HEX --promotion-signing-key PATH [--inherit-parent-sandbox] (--preflight|--apply)
+usage: prepare-release.sh --endpoint URL --credential-locator ENV --provider NAME --model NAME --model-context-window N --omp PATH --oracle-policy-digest sha256:HEX --tag-signing-key PATH --promotion-signing-key PATH [--inherit-parent-sandbox] (--preflight|--apply)
 USAGE
   exit 64
 }
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
-readonly release_tag='v0.50.112'
+readonly release_tag='v0.50.111'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_go_toolchain='go1.26.6'
 readonly expected_omp_sha256='5f2512cce2a154ad2406a4792421c42f022b1335f83dcbde4236f76e50ab35b4'
@@ -21,7 +21,7 @@ readonly evidence_tag="omp-context-evidence-${release_tag}"
 readonly evidence_ref="refs/tags/${evidence_tag}"
 readonly evidence_source_ref="refs/heads/${evidence_tag}-source"
 endpoint='' credential_locator='' provider='' model='' model_context_window=''
-omp_executable='' oracle_policy_digest='' promotion_signing_key=''
+omp_executable='' oracle_policy_digest='' tag_signing_key='' promotion_signing_key=''
 operation='' inherit_parent_sandbox=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -32,6 +32,7 @@ while [[ $# -gt 0 ]]; do
     --model-context-window) [[ $# -ge 2 ]] || usage; model_context_window=$2; shift 2 ;;
     --omp) [[ $# -ge 2 ]] || usage; omp_executable=$2; shift 2 ;;
     --oracle-policy-digest) [[ $# -ge 2 ]] || usage; oracle_policy_digest=$2; shift 2 ;;
+    --tag-signing-key) [[ $# -ge 2 ]] || usage; tag_signing_key=$2; shift 2 ;;
     --promotion-signing-key) [[ $# -ge 2 ]] || usage; promotion_signing_key=$2; shift 2 ;;
     --inherit-parent-sandbox) inherit_parent_sandbox=1; shift ;;
     --preflight) [[ -z "$operation" ]] || usage; operation=preflight; shift ;;
@@ -64,7 +65,7 @@ if [[ "$operation" == 'apply' ]]; then
 fi
 [[ -f "$omp_executable" && ! -L "$omp_executable" && -x "$omp_executable" ]] || fail 'OMP executable is unsafe'
 omp_executable=$(cd -- "$(dirname -- "$omp_executable")" && pwd)/$(basename -- "$omp_executable")
-for key_name in promotion_signing_key; do
+for key_name in tag_signing_key promotion_signing_key; do
   key_path=${!key_name}
   [[ -f "$key_path" && ! -L "$key_path" ]] || fail "${key_name} is unsafe"
   key_path=$(cd -- "$(dirname -- "$key_path")" && pwd)/$(basename -- "$key_path")
@@ -92,18 +93,23 @@ git fetch --no-tags origin main
 [[ "$(git rev-parse --verify origin/main)" == "$source_commit" ]] || fail 'source is not exact origin/main'
 [[ "$(gh api "repos/${repository}" --jq .default_branch)" == 'main' ]] || fail 'default branch differs'
 assert_source_identity
-# The R2 tag signer pins are no longer read here. The pin files stay in the tree
-# because verify-key-rotation-sidecar.sh still needs them to verify the
-# published v0.50.109 rotation sidecar, which is immutable history.
+readonly tag_public_key_file="$repo_root/scripts/companion-release/release-tag-signing-2026-q3-r2.pub"
+readonly tag_fingerprint_file="$repo_root/scripts/companion-release/release-tag-signing-2026-q3-r2.fingerprint"
+[[ -f "$tag_public_key_file" && ! -L "$tag_public_key_file" &&
+   -f "$tag_fingerprint_file" && ! -L "$tag_fingerprint_file" ]] || fail 'R2 release tag signer pins are unavailable'
 bootstrap_cleanup() { rm -rf -- "$temp_dir"; }
 temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/companion-release-prep.XXXXXX")
 readonly temp_dir
 chmod 0700 "$temp_dir"
 trap bootstrap_cleanup EXIT
+staged_tag_signing_key="$temp_dir/release-tag-signing-key"
 staged_promotion_signing_key="$temp_dir/omp-context-promotion-signing-key"
+/usr/bin/install -m 0600 "$tag_signing_key" "$staged_tag_signing_key"
 /usr/bin/install -m 0400 "$promotion_signing_key" "$staged_promotion_signing_key"
-[[ "$(/usr/bin/stat -f '%u:%Lp' "$staged_promotion_signing_key")" == "$(id -u):400" ]] ||
+[[ "$(/usr/bin/stat -f '%u:%Lp' "$staged_tag_signing_key")" == "$(id -u):600" &&
+   "$(/usr/bin/stat -f '%u:%Lp' "$staged_promotion_signing_key")" == "$(id -u):400" ]] ||
   fail 'staged release signing key ownership or mode is unsafe'
+tag_signing_key=$staged_tag_signing_key
 promotion_signing_key=$staged_promotion_signing_key
 evidence_source_commit=''; retain_prep_lock=0; prep_lock_mode='fresh'; isolation_roots=()
 sudo_keepalive_pid=''; live_canary_started=0
@@ -130,6 +136,7 @@ cp "$omp_executable" "$staged_omp"; chmod 0500 "$staged_omp"
 [[ "$(shasum -a 256 "$staged_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] || fail 'staged OMP executable digest differs'
 [[ "$("$staged_omp" --version)" == 'omp/18.1.2' ]] || fail 'verified OMP version differs from v18.1.2'
 omp_executable=$staged_omp
+verify_tag_signing_authority
 environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value) ||
   fail 'protected environment variables are unavailable'
 readonly environment_variables

@@ -285,7 +285,7 @@ publish_coordinates() {
   if coordinates=$(scripts/companion-release/publish-release-coordinates.sh \
     "$repository" "$environment_name" "$release_tag" "$source_commit" "$source_tree" "$static_policy_file" \
     "$evidence_tag_object" "$evidence_commit" "$evidence_tree" "$report_sha256" "$attestation_sha256" \
-    "$lock_argument"); then
+    "$lock_argument" "$tag_signing_key"); then
     evidence_source_commit=''; printf '%s\n' "$coordinates"; return 0
   else
     status=$?; if [[ "$status" -eq 75 ]]; then retain_prep_lock=1; fi; exit "$status"

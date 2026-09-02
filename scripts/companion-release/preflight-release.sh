@@ -202,11 +202,27 @@ else
   bad "cannot read upstream SHA256SUMS.txt for ${omp_tag}"
 fi
 
-# The promotion key is checked by public half only; nothing secret is read out.
+# Signing keys are checked by public half only; nothing secret is read out.
+#
+# The default store is checked before reporting anything missing. A release was
+# nearly re-engineered around a "destroyed" key that was sitting here, so this
+# looks before it believes.
+readonly key_store="${HOME}/.config/autopus/release-keys"
 readonly k3_public='YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM='
-key_path="${ADK_PROMOTION_SIGNING_KEY:-}"
+readonly r2_fingerprint='SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ'
+
+r2_key="${ADK_TAG_SIGNING_KEY:-$key_store/release-tag-signing-2026-q3-r2}"
+if [[ ! -f "$r2_key" || -L "$r2_key" ]]; then
+  bad "R2 tag signing key not found at $r2_key"
+elif [[ "$(ssh-keygen -y -f "$r2_key" 2>/dev/null | ssh-keygen -lf - -E sha256 2>/dev/null | awk '{print $2}')" == "$r2_fingerprint" ]]; then
+  pass 'R2 tag signing key present and matches the pinned fingerprint'
+else
+  bad "key at $r2_key is not R2"
+fi
+
+key_path="${ADK_PROMOTION_SIGNING_KEY:-$key_store/omp-context-promotion-2026-q3-k3.b64}"
 if [[ -z "$key_path" ]]; then
-  warn 'ADK_PROMOTION_SIGNING_KEY is unset; set it to the K3 key path to check it here'
+  warn 'ADK_PROMOTION_SIGNING_KEY is unset and no key is in the default store'
 elif [[ ! -f "$key_path" || -L "$key_path" ]]; then
   bad "ADK_PROMOTION_SIGNING_KEY does not name a regular file"
 else

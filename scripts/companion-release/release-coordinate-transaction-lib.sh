@@ -264,9 +264,7 @@ verify_remote_release() {
   git fetch --force origin "$release_ref:$verification_ref" >/dev/null 2>&1 || return 1
   [[ "$(git cat-file -t "$verification_ref")" == 'tag' ]] || return 1
   [[ "$(git rev-parse --verify "${verification_ref}^{commit}")" == "$source_commit" ]] || return 1
-  # The two checks above are what remains verifiable: an annotated tag object
-  # aimed at the frozen source. Signature verification was removed with the R2
-  # signer; see docs/runbooks/release-key-custody-loss.md.
+  env "${tag_git_config[@]}" git verify-tag "$verification_ref" >/dev/null || return 1
   release_tag_object=$remote_object
 }
 emit_receipt() {
