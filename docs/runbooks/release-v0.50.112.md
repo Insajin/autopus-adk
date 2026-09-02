@@ -1,5 +1,22 @@
 # Autopus ADK v0.50.112 Release
 
+> **BURNED 2026-09-02.** `v0.50.112` is failed release history. The tag object
+> `8be0cfb67c596448a6abd0de237e9db6d6eadd30` and the evidence tag
+> `omp-context-evidence-v0.50.112` exist and must never be moved, deleted,
+> recreated, or reused. GitHub release ID `381031316` remains an unpublished
+> draft with zero assets. The `release` job was skipped because its `needs` gate
+> failed: CI concluded failure at the tagged commit.
+>
+> Nothing was published, so no consumer saw a partial release. What was lost is
+> the coordinate. The next attempt is `v0.50.113`.
+>
+> Why it burned, plainly: CI had been failing on `main` for every run that day,
+> and nothing in the preflight looked at CI. The local Makefile lanes, the
+> release script tests, and the eleven hardening suites were all green, which is
+> what made the gap invisible — they are not the gate. `release.yaml` declares
+> `needs: [ci, security, omp-production-evidence]`, so CI is the gate, and
+> `preflight-release.sh` now refuses when CI is not green at the release commit.
+
 ## Purpose and stop conditions
 
 This document is a procedure, not proof that v0.50.112 evidence or a release already exists. Record every live result during execution. Stop on any mismatch. Never repair a mismatch by moving, deleting, overwriting, or reusing an existing tag, evidence tag, release, or predecessor coordinate.
@@ -207,7 +224,7 @@ The pin is therefore back at the version the contract names. Advancing to 18.x i
 The gateway the procedure asks for is OMP's own: `omp auth-gateway` is a loopback forward proxy backed by `omp auth-broker`, the OMP credential vault. A subscription account already lives in that vault, so nothing has to be retyped per release. Bring the pair up once:
 
 ```bash
-scripts/companion-release/install-auth-services.sh
+scripts/release-tools/install-auth-services.sh
 
 export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
 export ADK_GATEWAY_URL=http://127.0.0.1:47312   # put these two in your shell profile
@@ -222,8 +239,8 @@ Both bind loopback only and keep their bearer auth — the gateway answers `401`
 Then every attempt is one command with no arguments:
 
 ```bash
-scripts/companion-release/release-prep.sh --preflight
-scripts/companion-release/release-prep.sh --apply
+scripts/release-tools/release-prep.sh --preflight
+scripts/release-tools/release-prep.sh --apply
 ```
 
 Verified on 2026-09-02: broker ready with the local vault, gateway `ready: true`, `brokerAuthenticated: true`, and the wrapper reporting `--preflight via omp auth-gateway with provider=openai-codex model=gpt-5.6-sol omp=omp/18.1.2` before reaching prep's own source checks.
@@ -234,7 +251,7 @@ What the ADK carries is the gateway's inbound bearer token, from `omp auth-gatew
 
 ### Prep invocation, one command with an env file
 
-`scripts/companion-release/release-prep.sh --preflight` resolves every derivable value and calls `prepare-release.sh`. Create the env file once:
+`scripts/release-tools/release-prep.sh --preflight` resolves every derivable value and calls `prepare-release.sh`. Create the env file once:
 
 ```bash
 install -m 0600 /dev/null ~/.config/autopus/release-keys/prep-env.sh
@@ -307,7 +324,7 @@ Run both in one line so the timestamp is fresh in the tty that will use it:
 ```bash
 export OMP_AUTH_BROKER_URL=http://127.0.0.1:47311
 export ADK_GATEWAY_URL=http://127.0.0.1:47312
-sudo -v && scripts/companion-release/release-prep.sh --apply | tee /tmp/prep-apply.log
+sudo -v && scripts/release-tools/release-prep.sh --apply | tee /tmp/prep-apply.log
 ```
 
 Do not widen the sudo policy to `timestamp_type=global` to make this work from an automated session. That would let any process on the machine reuse a release operator's authorization, which is a larger hole than the convenience is worth.

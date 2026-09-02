@@ -175,7 +175,11 @@ fi
 check_release_prep_inputs
 
 section "release script contracts"
-for script in scripts/companion-release/*.sh; do
+# Both trees are checked: companion-release holds the evidence-producing scripts,
+# release-tools holds the operator tooling. The split exists because a security
+# test treats everything under companion-release as production evidence code and
+# forbids fixture references there, which operator tooling legitimately needs.
+for script in scripts/companion-release/*.sh scripts/release-tools/*.sh; do
   bash -n "$script" || bad "$script does not parse"
 done
 pass 'release scripts parse'

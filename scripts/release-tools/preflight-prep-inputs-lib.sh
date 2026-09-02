@@ -117,6 +117,23 @@ check_release_prep_inputs() {
     warn 'no credential source: bring up the gateway or export AUTOPUS_OMP_CONTEXT_PROVIDER_*'
   fi
 
+  # CI is the release job's gate: release.yaml declares needs [ci, security,
+  # omp-production-evidence], so a red CI at the tagged commit means the release
+  # job is skipped and the tag is burned. v0.50.112 was lost exactly this way —
+  # the local Makefile lanes and the release script tests were green while CI had
+  # been failing on main all day, and nothing here looked.
+  head_commit=$(git rev-parse --verify HEAD 2>/dev/null || printf '')
+  ci_conclusion=$(gh run list --repo "$repository" --workflow CI --limit 20 \
+    --json headSha,conclusion,status --jq \
+    "[.[] | select(.headSha == \"${head_commit}\")] | .[0] | \"\(.status)/\(.conclusion)\"" \
+    2>/dev/null || printf '')
+  case "$ci_conclusion" in
+    completed/success) pass 'CI is green at the release commit' ;;
+    completed/*) bad "CI at the release commit concluded ${ci_conclusion#completed/}; the release job would be skipped and the tag burned" ;;
+    in_progress/* | queued/*) warn 'CI is still running at the release commit; wait for it before --apply' ;;
+    *) bad 'no CI run found for the release commit; push it and let CI finish before --apply' ;;
+  esac
+
   # --apply creates an isolated macOS user for the release canary through dscl,
   # so it demands noninteractive root and then refreshes the timestamp every 30
   # seconds. It checks with `sudo -n -v`, which fails rather than prompting, so a

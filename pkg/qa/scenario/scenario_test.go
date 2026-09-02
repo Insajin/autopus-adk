@@ -18,17 +18,6 @@ func writeScenario(t *testing.T, dir, name, body string) string {
 	return path
 }
 
-const minimalScenario = `schema_version: qamesh.scenario.v1
-id: %s
-title: t
-journey: browser-gui-explore
-screens:
-  - id: s
-    path: /
-    steps:
-      - expect_text: hello
-`
-
 // An ignored key is how a misspelled assertion becomes an always-green test, so
 // the loader must reject unknown fields rather than drop them.
 func TestLoadFileRejectsUnknownKeys(t *testing.T) {
