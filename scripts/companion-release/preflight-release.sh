@@ -23,6 +23,8 @@ warn() { printf '  warn  %s\n' "$1"; }
 bad() { printf '  FAIL  %s\n' "$1"; failures=$((failures + 1)); }
 section() { printf '\n%s\n' "$1"; }
 check() { if eval "$2" >/dev/null 2>&1; then pass "$1"; else bad "$1"; fi; }
+preflight_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+. "$preflight_dir/preflight-prep-inputs-lib.sh"
 
 section "tooling"
 for tool in git gh jq go gofmt cosign shasum; do
@@ -170,75 +172,7 @@ else
   bad 'cannot download the predecessor signature envelope'
 fi
 
-section "release prep inputs"
-# prepare-release.sh cannot start without these, and it discovers them one at a
-# time deep into its own argument parsing. Checking here costs a second.
-#
-# The OMP check deliberately does not look at `command -v omp`. Prep consumes the
-# published release asset, not whatever a package manager installed: a Homebrew
-# build of the same version hashes differently, so comparing against it reports a
-# mismatch that means nothing. What matters is that the pinned digest still
-# describes the upstream asset for the pinned version.
-omp_pin=$(awk -F"'" '/^readonly expected_omp_sha256=/ { print $2 }' \
-  scripts/companion-release/prepare-release.sh)
-omp_version_pin=$(awk -F"'" "/verified OMP version differs/ { print \$2 }" \
-  scripts/companion-release/prepare-release.sh | head -1)
-omp_tag="v${omp_version_pin#omp/}"
-if [[ -z "$omp_pin" || -z "$omp_version_pin" ]]; then
-  bad 'cannot read the OMP version and digest pins from prepare-release.sh'
-elif sums=$(gh release download "$omp_tag" --repo can1357/oh-my-pi \
-  -p 'SHA256SUMS.txt' -D "$work" --clobber 2>/dev/null && cat "$work/SHA256SUMS.txt"); then
-  upstream=$(awk '$2 == "omp-darwin-arm64" { print $1 }' <<<"$sums")
-  if [[ "$upstream" == "$omp_pin" ]]; then
-    pass "OMP pin ${omp_version_pin} matches the upstream darwin-arm64 asset"
-  else
-    bad "OMP pin ${omp_pin:0:12}… differs from upstream ${upstream:0:12}… for ${omp_tag}"
-  fi
-  latest=$(gh api repos/can1357/oh-my-pi/releases/latest --jq .tag_name 2>/dev/null || printf '')
-  if [[ -n "$latest" && "$latest" != "$omp_tag" ]]; then
-    warn "upstream latest is ${latest}; the pin is ${omp_tag}. Advancing the pin changes the evidence oracle, so decide it rather than drift into it"
-  fi
-else
-  bad "cannot read upstream SHA256SUMS.txt for ${omp_tag}"
-fi
-
-# Signing keys are checked by public half only; nothing secret is read out.
-#
-# The default store is checked before reporting anything missing. A release was
-# nearly re-engineered around a "destroyed" key that was sitting here, so this
-# looks before it believes.
-readonly key_store="${HOME}/.config/autopus/release-keys"
-readonly k3_public='YkTuNcfWGTLgTglPmZq/Dj4OXwcoUwnkM2ExIGIz+jM='
-readonly r2_fingerprint='SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ'
-
-r2_key="${ADK_TAG_SIGNING_KEY:-$key_store/release-tag-signing-2026-q3-r2}"
-if [[ ! -f "$r2_key" || -L "$r2_key" ]]; then
-  bad "R2 tag signing key not found at $r2_key"
-elif [[ "$(ssh-keygen -y -f "$r2_key" 2>/dev/null | ssh-keygen -lf - -E sha256 2>/dev/null | awk '{print $2}')" == "$r2_fingerprint" ]]; then
-  pass 'R2 tag signing key present and matches the pinned fingerprint'
-else
-  bad "key at $r2_key is not R2"
-fi
-
-key_path="${ADK_PROMOTION_SIGNING_KEY:-$key_store/omp-context-promotion-2026-q3-k3.b64}"
-if [[ -z "$key_path" ]]; then
-  warn 'ADK_PROMOTION_SIGNING_KEY is unset and no key is in the default store'
-elif [[ ! -f "$key_path" || -L "$key_path" ]]; then
-  bad "ADK_PROMOTION_SIGNING_KEY does not name a regular file"
-else
-  derived=$(python3 - "$key_path" <<'PY' 2>/dev/null || printf ''
-import base64, pathlib, sys
-raw = pathlib.Path(sys.argv[1]).read_bytes().strip()
-dec = base64.b64decode(raw, validate=True)
-print(base64.b64encode(dec[32:]).decode() if len(dec) == 64 else '')
-PY
-  )
-  if [[ "$derived" == "$k3_public" ]]; then
-    pass 'ADK_PROMOTION_SIGNING_KEY is the K3 promotion key'
-  else
-    bad 'ADK_PROMOTION_SIGNING_KEY is not the K3 promotion key'
-  fi
-fi
+check_release_prep_inputs
 
 section "release script contracts"
 for script in scripts/companion-release/*.sh; do

@@ -200,6 +200,51 @@ What this does not settle is oracle equivalence. The 40-call cohort's verdict de
 
 `preflight-release.sh` now compares the pin to the upstream asset and warns when upstream has moved past it. The warning is deliberate rather than an auto-bump: advancing the oracle is a decision each time.
 
+### Prep invocation, resolved
+
+Every value that could be read from the repository, the published predecessor, or the operator key store is filled in below. Two are left blank because they are operator infrastructure, not repository state: the gateway must be running and the credential must be loaded out of band. `preflight-release.sh` reports both.
+
+```bash
+# Supply these two. Prep refuses anything that is not exact loopback HTTP, and
+# the credential must never appear in a command line.
+GATEWAY_URL='http://127.0.0.1:PORT'
+CREDENTIAL_LOCATOR='AUTOPUS_OMP_CONTEXT_PROVIDER_APPROVED'   # the variable already holds it
+
+# Resolved and verified 2026-09-02.
+PROVIDER='openai-codex'                      # from the A23 signed report
+MODEL='gpt-5.6-sol'                          # current configured model
+MODEL_CONTEXT_WINDOW='1050000'
+OMP_EXECUTABLE="$HOME/.cache/autopus/release/omp-v18.1.2-darwin-arm64"
+ORACLE_POLICY_DIGEST='sha256:6db5c3ceee865ef2adcd16c96506cd7f4ca40005e6c7ea2b2613956564ed23a8'
+R2_PRIVATE_KEY="$HOME/.config/autopus/release-keys/release-tag-signing-2026-q3-r2"
+K3_PRIVATE_KEY="$HOME/.config/autopus/release-keys/omp-context-promotion-2026-q3-k3.b64"
+
+release_args=(
+  --endpoint "$GATEWAY_URL"
+  --credential-locator "$CREDENTIAL_LOCATOR"
+  --provider "$PROVIDER"
+  --model "$MODEL"
+  --model-context-window "$MODEL_CONTEXT_WINDOW"
+  --omp "$OMP_EXECUTABLE"
+  --oracle-policy-digest "$ORACLE_POLICY_DIGEST"
+  --tag-signing-key "$R2_PRIVATE_KEY"
+  --promotion-signing-key "$K3_PRIVATE_KEY"
+)
+scripts/companion-release/prepare-release.sh "${release_args[@]}" --preflight
+```
+
+Where each resolved value came from, so none of them is a guess:
+
+| Value | Source |
+|---|---|
+| `PROVIDER` | `provider` field of the A23 promotion report, published as a release asset |
+| `MODEL`, `MODEL_CONTEXT_WINDOW` | `~/.codex/config.toml`, the configured model for this machine |
+| `OMP_EXECUTABLE` | the upstream `omp-darwin-arm64` for the pinned version, staged and digest-verified |
+| `ORACLE_POLICY_DIGEST` | `oracle_policy_digest` in the active static policy variable; unchanged because the judging parameters were not touched |
+| `R2_PRIVATE_KEY`, `K3_PRIVATE_KEY` | operator key store, both verified by fingerprint or public half |
+
+`MODEL` is the one value worth a second look before applying. A23's report pins a `model_scope_digest` but does not name the model, so a different model produces different evidence rather than a failure. The current model is the deliberate choice here, consistent with advancing the OMP oracle; if that is wrong, change it before prep rather than after.
+
 ### Content gates
 
 Freeze `origin/main` only after all of these pass on the exact release commit.
