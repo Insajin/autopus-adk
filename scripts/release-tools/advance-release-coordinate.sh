@@ -60,6 +60,7 @@ readonly -a replace_targets=(
   # validate-source.sh and the cosign identity. A missed file here is silent
   # drift that only the Go contract tests catch, which is far too late.
   'scripts/companion-release/verify-current-release-signatures.sh'
+  'scripts/release-tools/preflight-release.sh'
 )
 
 # Append-only history, deliberately NOT substituted. The lineage coordinates

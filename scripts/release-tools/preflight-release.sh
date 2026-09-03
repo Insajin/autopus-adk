@@ -12,8 +12,8 @@ set -euo pipefail
 umask 077
 
 readonly repository='Insajin/autopus-adk'
-readonly release_tag="${1:-v0.50.113}"
-readonly predecessor_tag="${2:-v0.50.111}"
+readonly release_tag="${1:-v0.50.114}"
+readonly predecessor_tag="${2:-v0.50.113}"
 readonly release_ref="refs/tags/${release_tag}"
 readonly version="${release_tag#v}"
 

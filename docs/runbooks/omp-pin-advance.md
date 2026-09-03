@@ -66,6 +66,37 @@ So the floor is validated where it is measured:
 A failed cohort costs the coordinate, so treat step 4 as expected rather than
 exceptional when the OMP major version moves.
 
+## Measured 2026-09-03: omp/18.1.5 is incompatible
+
+The v0.50.114 attempt advanced the pin to omp/18.1.5, passed every local gate,
+passed CI, passed preflight with zero failures, and then failed closed inside
+the cohort:
+
+```
+observe-session call 6 failed closed: managed active OMP manual compaction response is invalid
+error_code=runtime_failed error_stage=call failed_sequence=6
+transcript_records=7/42
+```
+
+**No tag was created and the coordinate survived.** The canary runs before
+tagging, which is why a wrong pin costs 25 minutes and 6 provider calls rather
+than a coordinate.
+
+What this proved: `snapcompact-image-schema=omp-v17.2.7` in the active policy
+identity is not decoration. The manual compaction response shape is
+version-coupled, and 18.1.5 changed it. `negotiate_protocol` still advertises
+v2, so the handshake probe in `advance-omp-pin.sh` cannot see the difference —
+manual compaction needs a live provider session with history to exercise.
+
+So the script now refuses 18.1.5 by name with that observation, and the honest
+boundary is stated rather than implied: **the handshake probe proves the launch
+contract, the cohort proves the compaction contract.** Anything the probe cannot
+reach costs one cohort run to learn, once.
+
+Adapting the harness to 18.1.5's compaction response is a separate task. It
+changes the evidence oracle, so it needs its own cohort run and its own
+`min_reduction_basis_points` measurement.
+
 ## Why not drop the pin and measure at release time
 
 Because then nothing in the repository states which executable the evidence will

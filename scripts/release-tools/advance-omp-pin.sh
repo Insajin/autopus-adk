@@ -38,6 +38,25 @@ if [[ "$from_version" == "$to_version" ]]; then
   exit 0
 fi
 
+# Versions this repository measured as incompatible, with the observation that
+# proved it. The probe below cannot reach these: manual compaction needs a live
+# provider session, so the 40-call cohort in --apply is the only place the
+# compaction protocol is exercised. Paying that cost twice for the same version
+# is waste, so a known failure refuses here with its reason.
+case "$to_version" in
+  18.1.5)
+    fail "$(printf '%s\n' \
+      "omp/18.1.5 was measured incompatible on 2026-09-03." \
+      "  The v0.50.114 canary failed closed at call 6 of 42:" \
+      "    managed active OMP manual compaction response is invalid" \
+      "  That is the contract snapcompact-image-schema names in the active" \
+      "  policy identity, and it is not what negotiate_protocol advertises." \
+      "  Adapting the harness to 18.1.5's compaction response is its own task;" \
+      "  it changes the evidence oracle, so it needs its own cohort run." \
+      "  No tag was created and the coordinate survived.")"
+    ;;
+esac
+
 # The pin is version plus bytes. Measure the bytes from the immutable upstream
 # asset rather than trusting a digest someone typed.
 work=$(mktemp -d "${TMPDIR:-/tmp}/omp-pin.XXXXXX")
