@@ -211,9 +211,19 @@ publish_cask() {
     (.object.url | length) > 0
   ' "$final_ref_response" >/dev/null || fail "Homebrew tap ${label} head moved after publication"
 
-  api_get "$remote_path" "$response"
-  decode_api_content "$response" "$current"
-  [[ "$(jq -er '.sha' "$response")" == "$new_blob" ]] && cmp -s "$target" "$current" \
-    || fail "Homebrew tap ${label} differs after publication"
+  # The contents API is read-through and lagged behind the ref update we just
+  # made: v0.50.113 published the correct Cask at 02:01:47 and this read failed
+  # two seconds later against the previous blob. Verifying the published bytes
+  # is the point of this block, so retry the read rather than weaken it. The
+  # ref check above already proved the branch head is the commit we wrote.
+  for attempt in 1 2 3 4 5 6 7 8 9 10; do
+    api_get "$remote_path" "$response"
+    decode_api_content "$response" "$current"
+    if [[ "$(jq -er '.sha' "$response")" == "$new_blob" ]] && cmp -s "$target" "$current"; then
+      break
+    fi
+    [[ "$attempt" -lt 10 ]] || fail "Homebrew tap ${label} differs after publication"
+    sleep 3
+  done
   printf 'homebrew cask publication: %s published and verified\n' "$label"
 }
