@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **파싱 계약을 타이밍 계약으로 바꿔놓던 프로브 예산을 고친다** (2026-09-03): `TestLatestCLIContract_MixedInstall/OMP_native_provider-free_surface`가 CI에서만 실패하며 모든 capability를 `response_missing`으로 보고했다. `ProbeOMPReadiness`의 기본 예산 5초는 `auto doctor`의 UX 경계로 타당하지만, 그 테스트는 실제 `/bin/sh` 픽스처를 스폰하고 공유 러너가 포화되면 5초를 넘긴다. 검사 대상은 프레임 파싱과 capability 유도이지 지연 시간이 아니므로 테스트에만 90초를 고정했다. 프로덕션 경계는 그대로다. 형제 테스트는 in-process `Runner`를 주입해 subprocess가 없어 영향이 없다.
+
 - **v0.50.113 발행 완료, Homebrew 발행 후 검증의 경합을 고친다** (2026-09-03): A24 = v0.50.113이 발행됐다 - 자산 15개, immutable, draft 아님, release `381657693`, 태그 객체 `158269c057e3e45f0a2d5353a1fb2992878bc9f3`, 소스 `bc2147a8`. Homebrew tap도 올바르게 발행됐고(`166e3efc`, Cask digest가 발행 자산과 일치) 그런데 릴리즈 job이 빨갛다. 발행 직후 contents API가 이전 blob을 돌려주는 최종 일관성 경합이다 - tap head는 02:01:47, 검증 실패는 02:01:49였다. 발행된 바이트를 검증하는 것이 그 블록의 목적이므로 검사를 약화시키지 않고 읽기를 최대 10회 3초 간격으로 재시도한다. ref head 검사는 이미 우리가 쓴 커밋임을 증명한다.
 - **OMP 핀 표류를 가드로 막고 이동을 한 명령으로 만든다** (2026-09-03): oh-my-pi가 며칠 사이 v17.2.7 -> v18.0.11 -> v18.1.2 -> v18.1.4 -> v18.1.5로 올라가는데, 핀은 파생 불가능한 7곳(셸 리터럴 2, 다운로드 URL, staging 경로, execsmoke의 Go 상수, active policy identity의 라벨)에 손으로 박혀 있었고 **합치 가드가 없었다** - 릴리즈 좌표를 태운 것과 같은 구조다. `TestOMPPinAgreesEverywhere`가 7곳이 어긋나는 순간 실패하고, `TestOMPPinDigestIsDeclaredExactlyOnce`가 digest 사본을 금지하며, `advance-omp-pin.sh`가 함께 옮긴다. 스크립트는 후보 바이너리가 계약을 증명하기 전에는 아무것도 옮기지 않는다: 자산 digest 실측, 자체 보고 버전 일치, 그리고 RPC 핸드셰이크가 managed protocol v2를 광고하는지 확인한다(`initializeManaged`가 런타임에 요구하는 것과 같은 조건). v18.1.5 대상 dry-run으로 실측 검증했다. 핀이 실제로 사는 것은 좁다 - 프로토콜 계약은 이미 런타임 협상이 집행하고, 핀은 evidence가 이름 붙일 실행 파일을 릴리즈 전에 선언한다.
 

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -48,9 +49,16 @@ esac
 `, argsPath, inputPath, rpcOutput)
 	require.NoError(t, os.WriteFile(executable, []byte(script), 0o755))
 
+	// The contract under test is frame parsing and capability derivation, not
+	// latency. ProbeOMPReadiness defaults to a 5s budget because `auto doctor`
+	// needs a UX bound, and that budget lost to a shared CI runner spawning
+	// /bin/sh plus cat: every capability came back response_missing while the
+	// same fixture passed locally. Pin a generous budget so a saturated runner
+	// cannot turn a parsing contract into a timing one.
 	report := omp.ProbeOMPReadiness(context.Background(), omp.OMPReadinessOptions{
 		Executable: executable,
 		Root:       root,
+		Timeout:    90 * time.Second,
 	})
 	require.Equal(t, "omp/18.0.5", report.Version)
 	for _, capability := range report.Capabilities {
