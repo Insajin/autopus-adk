@@ -118,6 +118,8 @@ done
 printf 'advance omp pin: moved %d file(s) to omp/%s\n' "$changed" "$to_version"
 printf 'Run these before the release:\n'
 printf '  go test ./internal/companionmanifest/ -run TestOMPPin\n'
+printf '  go test ./internal/cli/ -run TestWorkflowContextImplementationIdentityCommand\n'
+printf '    (the policy identity digest is derived from the pin; re-measure and update it)\n'
 printf '  bash scripts/companion-release/tests/release-exec-smoke-hardening-test.sh\n'
 printf '  bash scripts/release-tools/preflight-release.sh\n'
 printf 'The reduction floor is measured, not declared: if omp/%s compacts less\n' "$to_version"

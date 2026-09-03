@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **좌표를 A25 = v0.50.114로 올리고 이력 파일 분류를 고친다** (2026-09-03): 발행된 A24를 상대로 좌표를 처음 올리면서 `advance-release-coordinate.sh`의 근본 결함이 드러났다 - 이력 파일을 치환 대상에 넣어 **발행된 A24 행을 덮었다**. `produce-public-key-receipt.sh`의 `v0.50.113 0.50.113 A24` 행이 `v0.50.114 0.50.114 A24`가 되고, `validate-source.sh`의 phase arm과 `A24_TAG`도 같은 방식으로 사라졌다. 치환은 **소각 좌표에만** 맞다. 이제 스크립트가 `gh api releases/tags/<FROM>`으로 발행 여부를 실측해 갈라진다: 발행됐으면 이력을 보존하고 새 phase 선언을 손으로 요구하며(전임자 핀은 불변 릴리즈에서 측정해야 하므로), 미발행이면 제자리 이동한다. A24 신뢰 핀 9개(checksums, 아카이브 4, manifest 2, tag object, tree)를 release 381657693에서 실측했고, tap 전임자도 실측한 `166e3efc`/`120056555d09`로 옮겨 렌더가 발행 바이트와 일치함을 확인했다. `pipelineOMPActivePolicyIdentity`가 바뀌어 파생 digest도 재측정했다(`f9eecd3d`).
+
 - **OMP 핀을 omp/18.1.5로 올린다** (2026-09-03): `advance-omp-pin.sh`로 5개 파일을 함께 옮겼다. 후보가 먼저 계약을 증명했다 - digest 실측 `7e6c52be`, 자체 보고 `omp/18.1.5`, RPC 핸드셰이크가 managed protocol v2 광고. 첫 실사용에서 가드 밖에 있던 두 곳이 드러났다: `release-exec-smoke-hardening-test.sh`가 shipped materializer의 URL과 digest를 assert하는데 대상 목록에 없었다(이제 둘 다 추가), 그리고 `execsmoke/verified_exec_test.go`의 픽스처 7곳이 `omp/17.2.7`을 리터럴로 담아 `pinnedOMPVersion`과 어긋났다 - 리터럴 대신 상수에서 만들도록 바꿔 다시 표류하지 않는다. 릴리즈 하드닝 11/11 통과. reduction floor는 아직 미측정이며 `--apply`의 cohort가 판정한다.
 
 - **파싱 계약을 타이밍 계약으로 바꿔놓던 프로브 예산을 고친다** (2026-09-03): `TestLatestCLIContract_MixedInstall/OMP_native_provider-free_surface`가 CI에서만 실패하며 모든 capability를 `response_missing`으로 보고했다. `ProbeOMPReadiness`의 기본 예산 5초는 `auto doctor`의 UX 경계로 타당하지만, 그 테스트는 실제 `/bin/sh` 픽스처를 스폰하고 공유 러너가 포화되면 5초를 넘긴다. 검사 대상은 프레임 파싱과 capability 유도이지 지연 시간이 아니므로 테스트에만 90초를 고정했다. 프로덕션 경계는 그대로다. 형제 테스트는 in-process `Runner`를 주입해 subprocess가 없어 영향이 없다.

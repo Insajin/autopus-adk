@@ -15,14 +15,14 @@ import (
 )
 
 var currentReleaseArchives = []string{
-	"autopus-adk_0.50.113_darwin_amd64.tar.gz",
-	"autopus-adk_0.50.113_darwin_arm64.tar.gz",
-	"autopus-adk_0.50.113_linux_amd64.tar.gz",
-	"autopus-adk_0.50.113_linux_arm64.tar.gz",
-	"autopus-adk_0.50.113_windows_amd64.tar.gz",
-	"autopus-adk_0.50.113_windows_amd64.zip",
-	"autopus-adk_0.50.113_windows_arm64.tar.gz",
-	"autopus-adk_0.50.113_windows_arm64.zip",
+	"autopus-adk_0.50.114_darwin_amd64.tar.gz",
+	"autopus-adk_0.50.114_darwin_arm64.tar.gz",
+	"autopus-adk_0.50.114_linux_amd64.tar.gz",
+	"autopus-adk_0.50.114_linux_arm64.tar.gz",
+	"autopus-adk_0.50.114_windows_amd64.tar.gz",
+	"autopus-adk_0.50.114_windows_amd64.zip",
+	"autopus-adk_0.50.114_windows_arm64.tar.gz",
+	"autopus-adk_0.50.114_windows_arm64.zip",
 }
 
 type currentReleaseAsset struct {
@@ -120,7 +120,7 @@ func newCurrentReleaseFixture(t *testing.T) *currentReleaseFixture {
 		signatureLog: filepath.Join(state, "signature.log"),
 		verifierLog:  filepath.Join(state, "verifier.log"), checksums: assetBodies["checksums.txt"],
 		reportSHA256: fmt.Sprintf("%x", reportDigest), attestationSHA256: fmt.Sprintf("%x", attestationDigest),
-		release: currentReleaseDocument{ID: 410113, TagName: "v0.50.113",
+		release: currentReleaseDocument{ID: 410114, TagName: "v0.50.114",
 			TargetCommitish: strings.Repeat("c", 40), Immutable: true, Assets: assets},
 	}
 	fixture.release.Author.ID = 204883817
@@ -196,7 +196,7 @@ func (f *currentReleaseFixture) run() (string, error) {
 	command.Env = []string{
 		"PATH=" + filepath.Join(f.root, "bin") + string(os.PathListSeparator) + os.Getenv("PATH"),
 		"HOME=" + f.root, "TMPDIR=" + f.root, "GITHUB_TOKEN=fixture-token",
-		"GH_TOKEN=fixture-fallback-token", "COMPANION_RELEASE_ID=410113",
+		"GH_TOKEN=fixture-fallback-token", "COMPANION_RELEASE_ID=410114",
 		"COMPANION_SOURCE_COMMIT=" + strings.Repeat("c", 40),
 		"COMPANION_SOURCE_TREE=" + strings.Repeat("d", 40),
 		"OMP_CONTEXT_EVIDENCE_REPORT_SHA256=" + f.reportSHA256,
@@ -222,7 +222,7 @@ set -euo pipefail
 endpoint=''
 while (($#)); do case "$1" in -H) shift 2 ;; *) endpoint=$1; shift ;; esac; done
 case "$endpoint" in
-  repos/Insajin/autopus-adk/releases/tags/v0.50.113) exec cat "$MOCK_CURRENT_RELEASE_STATE/release.json" ;;
+  repos/Insajin/autopus-adk/releases/tags/v0.50.114) exec cat "$MOCK_CURRENT_RELEASE_STATE/release.json" ;;
   repos/Insajin/autopus-adk/releases/assets/*) exec cat "$MOCK_CURRENT_RELEASE_STATE/assets/${endpoint##*/}" ;;
   *) exit 64 ;;
 esac

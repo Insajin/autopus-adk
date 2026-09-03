@@ -31,6 +31,7 @@ readonly from_version="${from_tag#v}" to_version="${to_tag#v}"
 
 repo_root=$(git rev-parse --show-toplevel) || fail 'not a git repository'
 cd "$repo_root"
+readonly repository='Insajin/autopus-adk'
 
 # Replace: each of these names the release being shipped, so exactly one value
 # is correct at a time.
@@ -54,15 +55,28 @@ readonly -a replace_targets=(
   'scripts/companion-release/build-omp-context-candidate.sh'
   'scripts/companion-release/tests/testdata/mock-release-prep-gh.sh'
   'scripts/companion-release/tests/testdata/mock-tap-gh.sh'
-  # These three carry the coordinate as data rather than as a trigger, and all
-  # three were missed on the v0.50.112 -> v0.50.113 move: the phase case arm in
-  # validate-source.sh, the A24_TAG pair in the lineage coordinates, and the
-  # producer table row. A missed file here is silent drift that only the Go
-  # contract tests catch, which is far too late.
+  # These carry the coordinate as data rather than as a trigger, and both were
+  # missed on the v0.50.112 -> v0.50.113 move: the phase case arm in
+  # validate-source.sh and the cosign identity. A missed file here is silent
+  # drift that only the Go contract tests catch, which is far too late.
+  'scripts/companion-release/verify-current-release-signatures.sh'
+)
+
+# Append-only history, deliberately NOT substituted. The lineage coordinates
+# keep one declaration per phase whose predecessor pins are measured from the
+# immutable release, so a new phase cannot be derived from a version string.
+#
+# Substituting this file is safe only while the FROM coordinate was never
+# published. It was safe for the burned v0.50.112 and it destroyed history the
+# first time it ran against the published v0.50.113: A24_TAG became v0.50.114
+# and the shipped coordinate disappeared. So the published state decides, and it
+# is measured rather than assumed.
+#
+# produce-public-key-receipt.sh is also append-only but needs no measurement,
+# so its own block below appends the triple and refuses out-of-order rows.
+readonly -a history_files=(
   'scripts/companion-release/validate-source.sh'
   'scripts/companion-release/verify-public-key-lineage-coordinates.sh'
-  'scripts/companion-release/produce-public-key-receipt.sh'
-  'scripts/companion-release/verify-current-release-signatures.sh'
 )
 
 # Test files are deliberately absent from the list above. Each of them mixes
@@ -82,6 +96,39 @@ readonly -a review_targets=(
 for target in "${replace_targets[@]}"; do
   [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target $target"
 done
+for target in "${history_files[@]}"; do
+  [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target $target"
+done
+
+# Measure, do not assume. A published FROM means its rows are proof someone can
+# still verify, so they stay and the new phase is added beside them. An
+# unpublished FROM was a burned attempt and its row is a placeholder to move.
+from_published=0
+if gh api "repos/${repository}/releases/tags/${from_tag}" \
+  --jq 'select(.draft == false and (.assets | length) > 0) | .id' >/dev/null 2>&1; then
+  from_published=1
+fi
+if [[ "$from_published" -eq 1 ]]; then
+  printf '  history  %s is published; its rows stay and %s is added beside them\n' \
+    "$from_tag" "$to_tag"
+  for target in "${history_files[@]}"; do
+    if grep -qF -- "$to_version" "$target"; then
+      printf '  present  %s already declares %s\n' "$target" "$to_version"
+      continue
+    fi
+    fail "$(printf '%s\n' \
+      "${target} has no ${to_version} declaration and ${from_tag} is published." \
+      "  Add the new phase by hand: its predecessor pins are measured from the" \
+      "  immutable release, not derived from a version string. See" \
+      "  docs/runbooks/omp-pin-advance.md for the measurement pattern.")"
+  done
+else
+  printf '  history  %s was never published; moving its rows in place\n' "$from_tag"
+  for target in "${history_files[@]}"; do
+    perl -pi -e "s/\Q${from_tag}\E/${to_tag}/g; s/\Q${from_version}\E/${to_version}/g" "$target"
+    printf '  updated  %s\n' "$target"
+  done
+fi
 
 changed=0
 for target in "${replace_targets[@]}"; do

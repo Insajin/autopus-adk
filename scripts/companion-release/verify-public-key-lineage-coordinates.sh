@@ -42,6 +42,21 @@ readonly A23_LINUX_ARM64_ARCHIVE_SHA256='006cc1b8bcd9f4bbbbdaf051a1cef62fb157874
 # rather than leaving the pin empty and skipping the binding check.
 readonly A23_AMD64_MANIFEST_SHA256='7c60a437970e7e7c157386c883ea47cadffbc559af12311726473879b34a4325'
 readonly A23_ARM64_MANIFEST_SHA256='b2a6c5c98a9691ee482748ec7946b0dcd0d10cb7d5c0e11eb83720ca40bd7c3d'
+readonly A24_REPOSITORY='Insajin/autopus-adk' A25_TAG='v0.50.114' A25_VERSION='0.50.114'
+# A24 published the same fifteen-asset set as A23, all measured from the
+# immutable release 381657693. The two manifest digests come from inside the
+# darwin archives, where the companion manifest travels.
+readonly A24_RELEASE_ID='381657693'
+readonly A24_COMMIT_SHA='bc2147a875b49e9fca75db4307455f83512837d6'
+readonly A24_TREE_SHA='35d1134cc4197baca4b373d9102c780565346f92'
+readonly A24_TAG_OBJECT_SHA='158269c057e3e45f0a2d5353a1fb2992878bc9f3'
+readonly A24_CHECKSUMS_SHA256='558b9c7e0a8806c890abea8cc053325a15afd46deba5edf20b0f2e2ce89415b7'
+readonly A24_AMD64_ARCHIVE_SHA256='3ac160607bf77bf762b7101d5768b72c6909b72601902554dcd35f39363e2e64'
+readonly A24_ARM64_ARCHIVE_SHA256='d82c75b347f78a0370bfa330f5da4e075e54474aa6535f69d5ee72bf1bfce64b'
+readonly A24_LINUX_AMD64_ARCHIVE_SHA256='4354d4f9153d8a7567cf5c7fd03bce0344b9474bed5488a0183d3c5755d6b482'
+readonly A24_LINUX_ARM64_ARCHIVE_SHA256='09d6454488109071d20e29fe44be49751900d895d4bc03f5695bc83a26a033a5'
+readonly A24_AMD64_MANIFEST_SHA256='1d5e74fa32f6a490e55c761a495254d8fb82ba05ff65619f1c2b0d85ef3343df'
+readonly A24_ARM64_MANIFEST_SHA256='22340ec288ebed9a82c53e3550dc618a241c6c31bccedbe09a022b5e3df284cd'
 readonly A0_EVIDENCE_SOURCE='immutable A0 GitHub release'
 
 require_environment GITHUB_REF_NAME
@@ -131,6 +146,11 @@ elif [[ "$GITHUB_REF_NAME" == "$A24_TAG" && "$COMPANION_VERSION" == "$A24_VERSIO
   # A23 published no standalone companion manifest asset, but the manifest
   # travels inside both darwin archives, so the pins are measured from there.
   prior_tag_object="$A23_TAG_OBJECT_SHA" prior_checksums="$A23_CHECKSUMS_SHA256" prior_amd64_archive="$A23_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A23_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A23_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A23_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A23_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A23_ARM64_MANIFEST_SHA256"
+elif [[ "$GITHUB_REF_NAME" == "$A25_TAG" && "$COMPANION_VERSION" == "$A25_VERSION" ]]; then
+  release_phase='A25' prior_phase='A24' prior_repository="$A24_REPOSITORY" prior_evidence_source='immutable A24 GitHub release' prior_tag="$A24_TAG" prior_version="$A24_VERSION" prior_commit="$A24_COMMIT_SHA" prior_release_id="$A24_RELEASE_ID" prior_tree="$A24_TREE_SHA"
+  # A24 shipped the same shape as A23: four archives, checksums, and the
+  # companion manifest inside each darwin bundle.
+  prior_tag_object="$A24_TAG_OBJECT_SHA" prior_checksums="$A24_CHECKSUMS_SHA256" prior_amd64_archive="$A24_AMD64_ARCHIVE_SHA256" prior_arm64_archive="$A24_ARM64_ARCHIVE_SHA256" prior_linux_amd64_archive="$A24_LINUX_AMD64_ARCHIVE_SHA256" prior_linux_arm64_archive="$A24_LINUX_ARM64_ARCHIVE_SHA256" prior_amd64_manifest="$A24_AMD64_MANIFEST_SHA256" prior_arm64_manifest="$A24_ARM64_MANIFEST_SHA256"
 else
-  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24 policy'
+  fail prior_release_identity_mismatch 'release is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24/A25 policy'
 fi

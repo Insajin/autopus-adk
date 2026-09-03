@@ -23,25 +23,25 @@ mkdir -m 0700 "$state" "$temp/bin"
 install -m 0700 "$tests_dir/testdata/mock-tap-gh.sh" "$temp/bin/gh"
 checksums="$temp/checksums.txt"
 {
-  printf '%064d  autopus-adk_0.50.113_darwin_amd64.tar.gz\n' 1
-  printf '%064d  autopus-adk_0.50.113_darwin_arm64.tar.gz\n' 2
-  printf '%064d  autopus-adk_0.50.113_linux_amd64.tar.gz\n' 3
-  printf '%064d  autopus-adk_0.50.113_linux_arm64.tar.gz\n' 4
+  printf '%064d  autopus-adk_0.50.114_darwin_amd64.tar.gz\n' 1
+  printf '%064d  autopus-adk_0.50.114_darwin_arm64.tar.gz\n' 2
+  printf '%064d  autopus-adk_0.50.114_linux_amd64.tar.gz\n' 3
+  printf '%064d  autopus-adk_0.50.114_linux_arm64.tar.gz\n' 4
 } >"$checksums"
 
-# A24 updates only the Cask from the exact A23 tap head and keeps Formula frozen.
-# The digests are A23's published archive digests, so rendering them has to
+# A25 updates only the Cask from the exact A24 tap head and keeps Formula frozen.
+# The digests are A24's published archive digests, so rendering them has to
 # reproduce the live tap blob byte for byte. That equality is what proves the
 # PRIOR_* pins name the tap this release actually builds on.
 source "$script_dir/publish-homebrew-formula-bridge-render.sh"
-render_homebrew_cask "$temp/prior-cask.rb" 0.50.111 \
-  '366d3329081649f322ca29a1e33406c7bcf9f08bd490ec740306b5c8bcc12982' \
-  'a0a06284a86dfaf2175b9c8114dc6f5c72bdf4553637605455b44f85cf59973b' \
-  '62e979308e09b28fa9976fd65172ed8483ed30b6bd0adcb68071c6fd61853207' \
-  '006cc1b8bcd9f4bbbbdaf051a1cef62fb1578747c170a9019934b43d33c495cf'
+render_homebrew_cask "$temp/prior-cask.rb" 0.50.113 \
+  '3ac160607bf77bf762b7101d5768b72c6909b72601902554dcd35f39363e2e64' \
+  'd82c75b347f78a0370bfa330f5da4e075e54474aa6535f69d5ee72bf1bfce64b' \
+  '4354d4f9153d8a7567cf5c7fd03bce0344b9474bed5488a0183d3c5755d6b482' \
+  '09d6454488109071d20e29fe44be49751900d895d4bc03f5695bc83a26a033a5'
 [[ "$(git -C "$temp" hash-object "$temp/prior-cask.rb")" == \
    "$prior_cask_blob" ]] \
-  || fail 'rendered A23 Cask bytes differ from the pinned predecessor blob'
+  || fail 'rendered A24 Cask bytes differ from the pinned predecessor blob'
 render_homebrew_formula_bridge "$temp/frozen-formula.rb" v0.50.71 0.50.71 \
   "$(printf '%064d' 1)" "$(printf '%064d' 2)" \
   "$(printf '%064d' 3)" "$(printf '%064d' 4)"
@@ -52,9 +52,9 @@ jq -n --arg content "$(base64 <"$temp/frozen-formula.rb" | tr -d '\r\n')" \
 jq -n --arg sha "$prior_tap_commit" '{ref:"refs/heads/main",object:{type:"commit",sha:$sha,url:"https://example.invalid/prior-commit"}}' \
   >"$state/branch.json"
 cp "$state/formula.json" "$temp/formula-before.json"
-bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.113
+bridge_env=(PATH="$temp/bin:$PATH" MOCK_TAP_STATE="$state" GITHUB_REF_NAME=v0.50.114
   MOCK_TAP_PRIOR_COMMIT="$prior_tap_commit"
-  COMPANION_VERSION=0.50.113 COMPANION_HOMEBREW_POLICY=cask-only
+  COMPANION_VERSION=0.50.114 COMPANION_HOMEBREW_POLICY=cask-only
   COMPANION_CHECKSUMS_PATH="$checksums" HOMEBREW_TAP_TOKEN=fixture)
 env "${bridge_env[@]}" bash "$script_dir/publish-homebrew-formula-bridge.sh"
 [[ "$(<"$state/ref-update.calls")" == 1 &&
