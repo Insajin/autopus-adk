@@ -1,4 +1,42 @@
-# Autopus ADK v0.50.113 Release
+# Autopus ADK v0.50.114 Release
+
+## SHIPPED 2026-09-03 (A25)
+
+`v0.50.114` is published and immutable, and the release workflow is fully green
+for the first time in this lineage — v0.50.113 published correctly but its run
+ended red on a Homebrew read race, which is fixed.
+
+| Coordinate | Value |
+|---|---|
+| Release | `382345734`, `draft=false`, `immutable=true`, 15 assets |
+| Tag object | `7667c522042e58914f90919a5a283cef1acd533f` |
+| Source commit | `a6d199fb5a7b27721026916fcd75dffb58a4e228` |
+| Source tree | `61dad3b64bc180a7582f967b47da98762c979b3c` |
+| Evidence tag object | `0402d42112fd7f314f58c3c312590cac71707a42` |
+| Report sha256 | `b56b39d08ded550c04f1342c6ed51a1e54d2de37d1f21a4c1f269f1c8f508b0a` |
+| Attestation sha256 | `adce549783e2abac6085677ebd4e71be67c6f53774a7a99f166ad65808e4658f` |
+| Homebrew tap | `7ea4a82e70fa` "Publish signed Cask for v0.50.114" |
+| Tag ruleset `22169931` | sealed, verifier `--sealed` passes |
+| OMP pin | `omp/17.2.7` — cohort 42/42 |
+
+The cohort ran clean at 42/42, which is the reduction floor holding on the same
+oracle that shipped A24.
+
+### The omp/18.1.5 attempt cost 25 minutes, not a coordinate
+
+The first v0.50.114 attempt carried `omp/18.1.5`. It passed every local gate,
+CI, and preflight, then failed closed inside the cohort at call 6 of 42 with
+`managed active OMP manual compaction response is invalid`. No tag was created.
+The canary runs before tagging, and that ordering is what kept the coordinate.
+See `docs/runbooks/omp-pin-advance.md` for the measurement and the three
+remaining candidates.
+
+### What kept refusing the start
+
+`source is not exact origin/main`, three times. Every refusal was correct: this
+repository takes commits every twenty minutes or so, and the release only starts
+from a commit that is exactly the tip with CI green there. Hold pushes for the
+apply window rather than fighting the guard.
 
 > **PREDECESSOR ATTEMPT BURNED 2026-09-02.** `v0.50.112` is failed release history. The tag object
 > `8be0cfb67c596448a6abd0de237e9db6d6eadd30` and the evidence tag
