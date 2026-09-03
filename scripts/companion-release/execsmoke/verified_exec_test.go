@@ -18,7 +18,7 @@ func TestRunVerifiedExecSmoke_ExactBodyFreeOutput_Succeeds(t *testing.T) {
 		timeout: 2 * time.Second, pipeWait: 100 * time.Millisecond,
 		extraEnvironment: []string{
 			"AUTOPUS_EXEC_SMOKE_FIXTURE=verified-exec-output",
-			`AUTOPUS_VERIFIED_EXEC_OUTPUT={"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`,
+			`AUTOPUS_VERIFIED_EXEC_OUTPUT={"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`,
 		},
 	})
 	if err != nil {
@@ -31,13 +31,13 @@ func TestRunVerifiedExecSmoke_MalformedOrMismatchedOutput_Fails(t *testing.T) {
 	policy := ompCanaryPolicy{version: pinnedOMPVersion, sha256: "sha256:" + strings.Repeat("a", 64)}
 	tests := []string{
 		`not-json`,
-		`{"schema_version":"wrong","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`,
+		`{"schema_version":"wrong","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":true,"effective_user":"nobody"}`,
 		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.6","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0}`,
-		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("b", 64) + `","rpc_ready":true,"provider_calls":0}`,
-		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":false,"provider_calls":0}`,
-		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":1}`,
-		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"extra":true}`,
-		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"omp/17.2.7","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":false,"effective_user":"nobody"}`,
+		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("b", 64) + `","rpc_ready":true,"provider_calls":0}`,
+		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":false,"provider_calls":0}`,
+		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":1}`,
+		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"extra":true}`,
+		`{"schema_version":"workflow-context-verified-exec-smoke/v1","omp_version":"` + pinnedOMPVersion + `","omp_executable_sha256":"sha256:` + strings.Repeat("a", 64) + `","rpc_ready":true,"provider_calls":0,"uid_isolated":false,"effective_user":"nobody"}`,
 	}
 	for _, output := range tests {
 		if err := validateVerifiedExecSmokeOutput([]byte(output+"\n"), policy); !errors.Is(err, errVerifiedExecOutput) {

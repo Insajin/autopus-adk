@@ -86,6 +86,7 @@ readonly -a targets=(
   'scripts/companion-release/materialize-omp-release-canary.sh'
   'scripts/companion-release/execsmoke/main.go'
   'internal/cli/pipeline_omp_context_active_process.go'
+  'scripts/companion-release/tests/release-exec-smoke-hardening-test.sh'
 )
 for target in "${targets[@]}"; do
   [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target ${target}"

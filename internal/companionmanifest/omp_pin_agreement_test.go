@@ -63,6 +63,15 @@ func ompPinVersionSites() []ompPinSite {
 			file:    "internal/cli/pipeline_omp_context_active_process.go",
 			pattern: `snapcompact-image-schema=omp-v([0-9]+\.[0-9]+\.[0-9]+)`,
 		},
+		{
+			// The hardening test asserts the shipped materializer URL, so it is
+			// an armed site rather than a fixture. It sat outside this list and
+			// outside the advance script, and the first real pin move left it
+			// behind — which is exactly what this guard exists to catch.
+			name:    "exec smoke hardening url assertion",
+			file:    "scripts/companion-release/tests/release-exec-smoke-hardening-test.sh",
+			pattern: `download/v([0-9]+\.[0-9]+\.[0-9]+)/omp-darwin-arm64`,
+		},
 	}
 }
 
