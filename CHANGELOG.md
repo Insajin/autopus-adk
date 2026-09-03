@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **v0.50.113 발행 완료, Homebrew 발행 후 검증의 경합을 고친다** (2026-09-03): A24 = v0.50.113이 발행됐다 - 자산 15개, immutable, draft 아님, release `381657693`, 태그 객체 `158269c057e3e45f0a2d5353a1fb2992878bc9f3`, 소스 `bc2147a8`. Homebrew tap도 올바르게 발행됐고(`166e3efc`, Cask digest가 발행 자산과 일치) 그런데 릴리즈 job이 빨갛다. 발행 직후 contents API가 이전 blob을 돌려주는 최종 일관성 경합이다 - tap head는 02:01:47, 검증 실패는 02:01:49였다. 발행된 바이트를 검증하는 것이 그 블록의 목적이므로 검사를 약화시키지 않고 읽기를 최대 10회 3초 간격으로 재시도한다. ref head 검사는 이미 우리가 쓴 커밋임을 증명한다.
+- **OMP 핀 표류를 가드로 막고 이동을 한 명령으로 만든다** (2026-09-03): oh-my-pi가 며칠 사이 v17.2.7 -> v18.0.11 -> v18.1.2 -> v18.1.4 -> v18.1.5로 올라가는데, 핀은 파생 불가능한 7곳(셸 리터럴 2, 다운로드 URL, staging 경로, execsmoke의 Go 상수, active policy identity의 라벨)에 손으로 박혀 있었고 **합치 가드가 없었다** - 릴리즈 좌표를 태운 것과 같은 구조다. `TestOMPPinAgreesEverywhere`가 7곳이 어긋나는 순간 실패하고, `TestOMPPinDigestIsDeclaredExactlyOnce`가 digest 사본을 금지하며, `advance-omp-pin.sh`가 함께 옮긴다. 스크립트는 후보 바이너리가 계약을 증명하기 전에는 아무것도 옮기지 않는다: 자산 digest 실측, 자체 보고 버전 일치, 그리고 RPC 핸드셰이크가 managed protocol v2를 광고하는지 확인한다(`initializeManaged`가 런타임에 요구하는 것과 같은 조건). v18.1.5 대상 dry-run으로 실측 검증했다. 핀이 실제로 사는 것은 좁다 - 프로토콜 계약은 이미 런타임 협상이 집행하고, 핀은 evidence가 이름 붙일 실행 파일을 릴리즈 전에 선언한다.
 
 - **ETXTBSY 재시도를 호출자 timeout으로 묶는다** (2026-09-02): `TestProbeModelCatalogRetriesTextFileBusy`가 CI에서만 실패했다. 재시도가 5회 × 10ms = 40ms 고정 예산이고 테스트는 실행 파일을 25ms 잡는데, 부하 걸린 러너에서 25ms 해제가 40ms 이후로 밀리면 진다. ETXTBSY는 다른 프로세스가 실행 파일을 쓰기로 여는 동안만 지속되므로 고정 횟수로 예측할 수 없다. 시도 상한을 없애고 이미 존재하는 호출자 timeout이 경계가 되게 했다. 프로덕션에서도 더 정확하다.
 

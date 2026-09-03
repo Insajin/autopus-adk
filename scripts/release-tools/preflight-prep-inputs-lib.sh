@@ -52,7 +52,7 @@ check_release_prep_inputs() {
   fi
   latest=$(gh api repos/can1357/oh-my-pi/releases/latest --jq .tag_name 2>/dev/null || printf '')
   if [[ -n "$latest" && -n "$omp_tag" && "$latest" != "$omp_tag" ]]; then
-    warn "upstream latest is ${latest}; the pin is ${omp_tag}. The pin is a protocol contract, not just a version, so advancing it is its own task"
+    warn "upstream latest is ${latest}; the pin is ${omp_tag}. Advancing is its own task because the reduction floor is measured in the canary, not declared: run scripts/release-tools/advance-omp-pin.sh ${latest#v}"
   fi
 
   # Signing keys are checked by public half only; nothing secret is read out.
