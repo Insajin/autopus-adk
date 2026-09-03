@@ -17,6 +17,48 @@
 > `needs: [ci, security, omp-production-evidence]`, so CI is the gate, and
 > `preflight-release.sh` now refuses when CI is not green at the release commit.
 
+## SHIPPED 2026-09-03
+
+`v0.50.113` is published and immutable. A24 is closed.
+
+| Coordinate | Value |
+|---|---|
+| Release | `381657693`, `draft=false`, `immutable=true`, 15 assets |
+| Tag object | `158269c057e3e45f0a2d5353a1fb2992878bc9f3` |
+| Source commit | `bc2147a875b49e9fca75db4307455f83512837d6` |
+| Source tree | `35d1134cc4197baca4b373d9102c780565346f92` |
+| Evidence tag object | `7b8e84777428ed7177487e42ea12f2fe4abcde8d` |
+| Report sha256 | `8a06088289163f2945cd560be6b0f96e5554e37b35850f353797f3115762e761` |
+| Attestation sha256 | `b125d5ccdbdd0eb68d410eda3408982839391c26238be02e98d0fc1d7d5e0215` |
+| Static policy sha256 | `e3387bd0945141ad1f836aa222c65101b54c7fd4709ef7efa89832867a811dd3` |
+| Homebrew tap | `166e3efc1d7b` "Publish signed Cask for v0.50.113" |
+| Tag ruleset `22081360` | sealed (`bypass_actors == []`), verifier `--sealed` passes |
+
+The tag signature reads `verified=false reason=no_user` on the GitHub API
+because the R2 key is not registered to a GitHub account. That is the same
+result `v0.50.111` returns, and it is not the authority: the release procedure
+verifies the tag against the pinned R2 public half, which reported
+`Good "git" signature ... SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ`.
+
+### The release run is red and the release is still correct
+
+Run `33701483875` shows `release` failed at `Publish Homebrew Cask`. The Cask
+was published correctly at 02:01:47; the post-publication read at 02:01:49 got
+the previous blob from the read-through contents API and the verification had
+no retry. Measured after the fact: the live Cask carries `version "0.50.113"`
+and the exact darwin digests of the published assets. The retry is now in
+`publish-homebrew-formula-bridge-git.sh`, so the next release will not report a
+correct publication as a failure.
+
+Nothing after that step was skipped — it is the last substantive step, and
+`Verify current immutable release evidence` had already passed.
+
+### What burned v0.50.112, in one line
+
+CI was red at the tagged commit, the `release` job needs it green, and nothing
+in the preflight looked at CI. `preflight-release.sh` now refuses when CI is
+not green at the release commit.
+
 ## Prep state, verified 2026-09-02
 
 Everything below `--apply` is done and measured. The remaining step needs a
