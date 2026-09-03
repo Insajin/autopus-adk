@@ -93,6 +93,34 @@ boundary is stated rather than implied: **the handshake probe proves the launch
 contract, the cohort proves the compaction contract.** Anything the probe cannot
 reach costs one cohort run to learn, once.
 
+### Narrowed by measurement, 2026-09-03
+
+Both versions return the identical no-op response on an empty session, so the
+no-op branch is not the difference:
+
+```
+17.2.7: {"command":"compact","success":false,"error":"Nothing to compact (session too small)"}
+18.1.5: {"command":"compact","success":false,"error":"Nothing to compact (session too small)"}
+```
+
+That leaves three candidates inside the real compaction path in
+`pipeline_omp_context_active_lifecycle.go`, all reachable only with a session
+that has enough history to actually compact:
+
+1. `success` is false with an error text the no-op branch does not match, so the
+   frame falls through to the manual check and is rejected for `!frame.Success`.
+2. the pre or post compaction ACK never arrived, so `preACKed`/`postACKed` is
+   false when the response lands.
+3. `data.summary` is absent or renamed, so `validPipelineOMPActiveManualResult`
+   returns false.
+
+One experiment settles it: drive a managed session against 18.1.5 with enough
+turns to trigger compaction and capture the `compact` response frame verbatim.
+That costs real provider calls, which is why it belongs to the adaptation task
+rather than to a pin move. `workflow_context_runtime_managed_rpc_product.go`
+already prints `id`, `want`, and `success` on failure, so the product path is
+the cheaper instrument if it reproduces.
+
 Adapting the harness to 18.1.5's compaction response is a separate task. It
 changes the evidence oracle, so it needs its own cohort run and its own
 `min_reduction_basis_points` measurement.
