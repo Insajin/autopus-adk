@@ -114,6 +114,36 @@ that has enough history to actually compact:
 3. `data.summary` is absent or renamed, so `validPipelineOMPActiveManualResult`
    returns false.
 
+Two of the three were eliminated by measurement on 2026-09-03, at no provider
+cost, by comparing the two binaries directly:
+
+| Checked | 17.2.7 | 18.1.5 | Verdict |
+|---|---|---|---|
+| `"summary"` in compaction result | present | present | candidate 3 eliminated |
+| `Nothing to compact (session too small)` | present | present | no-op text unchanged |
+| `Nothing to compact (no messages yet)` | present | present | second no-op text, matched by neither harness branch |
+| `snapcompact`, `auto_compaction_end`, `compactionSummary` | present | present | frame vocabulary unchanged |
+| `session_before_compact`, `session_compact` hooks | present | present | ACK hook names unchanged |
+| `negotiate_protocol` v2 | advertised | advertised | launch contract unchanged |
+
+Three live attempts to reach a real compaction cost about ten provider calls and
+all returned `Nothing to compact (session too small)`: short prose over three or
+four turns does not approach the threshold, even with `contextWindow` lowered to
+16384 in the experiment's own models.yml. The cohort reaches compaction because
+it runs real tasks with tool output over many turns, which is the workload, not
+a threshold trick.
+
+So the instrument was fixed instead. The rejection in
+`pipeline_omp_context_active_lifecycle.go` now names the failing gate:
+
+```
+managed active OMP manual compaction response is invalid: id_match=%t command=%q
+success=%t already_responded=%t pre_acked=%t post_acked=%t summary_valid=%t error=%q
+```
+
+It stays body-free — no transcript, no summary text, only which gate failed.
+The next 18.1.5 cohort attempt yields the answer in one run rather than none.
+
 One experiment settles it: drive a managed session against 18.1.5 with enough
 turns to trigger compaction and capture the `compact` response frame verbatim.
 That costs real provider calls, which is why it belongs to the adaptation task

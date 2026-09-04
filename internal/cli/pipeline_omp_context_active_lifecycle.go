@@ -79,7 +79,18 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			}
 			if frame.ID != id || frame.Command != "compact" || !frame.Success || responded ||
 				!preACKed || !postACKed || !validPipelineOMPActiveManualResult(frame.Data) {
-				return false, errors.New("managed active OMP manual compaction response is invalid")
+				// The bare form of this error cost a whole cohort run to learn
+				// nothing: omp/18.1.5 failed here at call 6 of 42 and the message
+				// named no field. Reaching a real compaction needs cohort-scale
+				// history, so one run has to yield the answer. The error text is
+				// body-free — no transcript, no summary, only which gate failed.
+				return false, fmt.Errorf(
+					"managed active OMP manual compaction response is invalid: "+
+						"id_match=%t command=%q success=%t already_responded=%t "+
+						"pre_acked=%t post_acked=%t summary_valid=%t error=%q",
+					frame.ID == id, frame.Command, frame.Success, responded,
+					preACKed, postACKed, validPipelineOMPActiveManualResult(frame.Data),
+					frame.Error)
 			}
 			responded = true
 			nativeResult = frame.Data
