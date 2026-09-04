@@ -208,6 +208,59 @@ The adaptation above is kept regardless: a legitimate refusal should never read
 as a protocol violation, 17.2.7 never emits the new message so its behaviour is
 unchanged, and the failure now lands on the honest gate.
 
+## Settled 2026-09-03: 18.1.5 measurably does not reduce context
+
+The same plan generator, the same 20 task pairs, the same gateway and model, run
+back to back with only the OMP binary swapped:
+
+| | omp/17.2.7 | omp/18.1.5 |
+|---|---|---|
+| calls completed | 40 | 40 |
+| compaction cycles | **8** | **2** |
+| pre/post ACKs | 8 / 8 | — |
+| pairs, AB/BA balance | 20, 10/10 | 20, 10/10 |
+| integrity / security / quality failures | 0 / 0 / 0 | 0 / 0 / 0 |
+| fallback, rollback verified | true, true | true, true |
+| **median reduction** | **passed 2000 bp** | **0 bp** |
+| verdict | gates pass | one gate fails |
+
+The gate diagnostic reports it exactly:
+
+```
+OMP context promotion cohort gates failed: pairs=20/20 ab=10/10 ba=10/10
+observed_ab=10 observed_ba=10 compactions=2/2 integrity_failures=0
+security_failures=0 quality_regressions=0 fallback_verified=true
+rollback_verified=true median_reduction_bp=0/2000
+```
+
+`compactions=2/2` met the minimum. Everything else passed. The only failure is
+`median_reduction_bp=0/2000`: the compactions 18.1.5 does perform reduce context
+by zero basis points in the metric the promotion evidence attests, while 17.2.7
+compacts four times as often and clears the 20% floor on the same histories.
+
+### What this closes
+
+**Advancing the pin to 18.1.x is refused on merit, not on a harness gap.**
+
+The workload option is dead: 18.1.5 ran the identical workload that gives 17.2.7
+eight compactions and a passing median. There is nothing to make heavier.
+
+The oracle option is worse than it looked: relaxing the floor would not admit a
+version that reduces slightly less, it would admit one that reduces **zero** in
+the attested metric. `MinReductionBasisPoints != 2000` is a hard constant in
+`omp_context_promotion_report_verify.go` precisely so that this decision cannot
+be made by editing a policy field.
+
+So this is an upstream question, not a harness change: 18.1.x's snapcompact
+either does something different or produces a shape the measurement no longer
+sees as reduction. Until that is answered upstream, `advance-omp-pin.sh` refuses
+18.1.5 by name and the pin stays at omp/17.2.7.
+
+The refusal-class adaptation is kept regardless. It is correct on its own terms —
+a legitimate refusal is not a protocol violation, 17.2.7 never emits the new
+message, and without it the failure hides behind a misleading error instead of
+landing on `median_reduction_bp=0/2000`.
+
 ## Why not drop the pin and measure at release time
 
 Because then nothing in the repository states which executable the evidence will
