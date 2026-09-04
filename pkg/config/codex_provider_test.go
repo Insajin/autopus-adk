@@ -145,13 +145,13 @@ func TestResolveCodexProviderProfileUsesCatalogResolution(t *testing.T) {
 
 	entry := ApplyCodexProviderProfile(
 		CodexProviderEntryForQuality(QualityConf{Default: "ultra"}),
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortUltra},
 	)
-	catalog := []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]}]}`)
+	catalog := []byte(`{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]}]}`)
 
 	got, resolution := ResolveCodexProviderProfile(entry, catalog)
 	assert.Equal(t, CodexResolutionEffortUnavailable, resolution.Reason)
-	assert.Contains(t, got.Args, CodexSolModel)
+	assert.Contains(t, got.Args, CodexAstraModel)
 	assert.Contains(t, got.Args, `model_reasoning_effort="max"`)
 	assert.Contains(t, got.PaneArgs, `model_reasoning_effort="max"`)
 }

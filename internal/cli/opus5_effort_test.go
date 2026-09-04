@@ -30,6 +30,23 @@ func TestResolveEffort_UltraOpus5UsesMax(t *testing.T) {
 	}
 }
 
+func TestResolveEffort_BalancedOpus5UsesHigh(t *testing.T) {
+	t.Parallel()
+
+	for _, model := range []string{"claude-opus-5", "opus-5", "opus"} {
+		result, err := ResolveEffort(EffortResolveInput{
+			FlagQuality: "balanced",
+			Model:       model,
+		})
+		if err != nil {
+			t.Fatalf("ResolveEffort(%s): %v", model, err)
+		}
+		if result.Effort != EffortHigh {
+			t.Errorf("ResolveEffort(%s) = %q, want %q", model, result.Effort, EffortHigh)
+		}
+	}
+}
+
 func TestResolveEffort_UltraOpus48RemainsMaxCapable(t *testing.T) {
 	t.Parallel()
 

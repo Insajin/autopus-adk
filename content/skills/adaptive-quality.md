@@ -14,14 +14,14 @@ level1_metadata: "adaptive quality, complexity assessment, execution profiles, c
 
 ## Overview
 
-Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity determines the execution profile used for each `Agent()` call. High-complexity tasks still receive the strongest reasoning path, while routine tasks stay on the standard path. In this workspace, Claude no longer falls back to haiku; Codex maps managed workers to Sol/Terra/Luna, while new projects leave the primary session on the user's model unless `supervisor_model_policy: quality` is selected; OpenCode keeps its configured default model.
+Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, task complexity informs the role profile selected for each `Agent()` call. High-judgment tasks use the strongest assigned tier, while routine tasks stay on the standard path. The shared order is `fable` > `opus` > `sonnet` > `haiku`; the shipped Ultra and Balanced presets do not assign Haiku.
 
 ## Relationship to Quality Mode
 
 | Mode | Behavior |
 |------|----------|
-| **Ultra** | ALL tasks use the premium execution path. Complexity is IGNORED. |
-| **Balanced** | Complexity determines the execution profile. Adaptive Quality applies. |
+| **Ultra** | Uses the fixed role profile: reasoning core=`fable`, remaining roles=`opus`. Complexity is IGNORED. |
+| **Balanced** | Uses `fable`/`opus`/`sonnet` by role and task complexity. Adaptive Quality applies. |
 | **Solo** | No Agent() calls. Not applicable. |
 
 Adaptive Quality is **not** a replacement for Quality Mode — it is a refinement that operates exclusively within Balanced mode.
@@ -76,22 +76,36 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 ## Execution Profile Table
 
-| Complexity | Balanced | Ultra |
+| Assignment | Balanced | Ultra |
 |-----------|----------|-------|
-| HIGH | opus | opus |
-| MEDIUM | sonnet (default) | opus |
-| LOW | sonnet (default) | opus |
+| Strategic judgment | `fable`: planner, architect, security-auditor | `fable`: planner, architect, spec-writer, security-auditor, reviewer, debugger, deep-worker |
+| Implementation, review, and deep work | `opus`: spec-writer, deep-worker, executor, reviewer, debugger | `opus`: every role outside the seven-role reasoning core |
+| Routine and default work | `sonnet`: remaining roles | follows the Ultra role profile; complexity does not lower the tier |
 
 Platform note:
-- Claude: HIGH=`opus`, MEDIUM/LOW=`sonnet`
-- Codex: Balanced uses Sol/`xhigh` for quality-managed strategic and Opus-tier work, Terra with role effort for Sonnet-tier work, and Luna with role effort for Haiku-tier work. Ultra uses Sol/`ultra` for a quality-managed supervisor and orchestra, Sol/`max` for `planner`, `architect`, and `security-auditor`, and Sol/`xhigh` for every other managed agent. An `inherit` supervisor keeps the user's Codex runtime default in either mode.
-- OpenCode: keep the configured default runtime model; LOW/MEDIUM/HIGH should be differentiated by reasoning effort until user-facing model overrides are added
+- Claude maps `fable`, `opus`, `sonnet`, and `haiku` to Claude Fable 5.1, Opus 5, Sonnet 5, and Haiku 4.5. The shipped presets do not assign Haiku.
+- Codex maps `fable` to Astra/`max`, `opus` to Sol/`xhigh`, `sonnet` to Terra with role effort, and `haiku` to Luna with role effort. Quality-managed supervisors and orchestras use Astra.
+- Gemini maps `fable`/`opus`/`sonnet` to `gemini-3.1-pro` and `haiku` to `gemini-3.8-flash`.
+- OpenCode keeps the configured default runtime model; tier changes act as reasoning-profile hints until explicit model overrides are available.
 
-## Claude Opus 5 (Default Opus Path)
+## Claude Fable 5.1 / Opus 5
 
-Autopus uses the fixed `claude-opus-5` model ID for Claude Ultra agents,
-Balanced strategic agents, and high-complexity Claude routing. Claude Code's
-`opus` alias is provider- and version-dependent:
+Autopus projects the top two shared tiers onto fixed Claude model IDs. The
+`fable` tier resolves to `claude-fable-5-1`; the `opus` tier resolves to
+`claude-opus-5`. This keeps generated agent definitions and cost estimates
+deterministic even when Claude Code aliases change over time.
+
+| Tier | Full model ID | Claude Code aliases | Minimum Claude Code version | Price per million tokens |
+|------|---------------|---------------------|-----------------------------|--------------------------|
+| `fable` | `claude-fable-5-1` | `fable`, `best` | `2.1.170` | $10 input / $50 output |
+| `opus` | `claude-opus-5` | `opus` | `2.1.219` | $5 input / $25 output |
+
+`best` is entitlement-dependent and can resolve to the latest Opus when Fable
+is unavailable. Deterministic routing and pricing therefore use
+`claude-fable-5-1`, not the dynamic alias. The legacy full ID
+`claude-fable-5` remains accepted for existing workflow definitions.
+
+Claude Code's `opus` alias is provider- and version-dependent:
 
 | Claude Code provider | `opus` on v2.1.219+ | Before v2.1.219 |
 |----------------------|---------------------|-----------------|
@@ -101,18 +115,9 @@ Balanced strategic agents, and high-complexity Claude routing. Claude Code's
 | Google Cloud Agent Platform | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
 | Microsoft Foundry | Opus 4.6 | Opus 4.6 |
 
-| Surface | Value |
-|---------|-------|
-| Full model ID | `claude-opus-5` |
-| Claude Code alias | `opus` |
-| Minimum Claude Code version | `2.1.219` |
-| Price per million tokens | $5 input / $25 output |
-| Native limits | 1M-token context / 128k-token output |
-| Effort levels | `low`, `medium`, `high`, `xhigh`, `max` |
-
 Opus 5 is a drop-in upgrade from Opus 4.8 at the same standard price.
-Adaptive thinking is enabled by default and the default effort is `high`. If a direct API
-integration explicitly sends `thinking: {"type": "disabled"}`, effort must be
+Adaptive thinking is enabled by default and the default effort is `high`. If a
+direct API integration explicitly sends `thinking: {"type": "disabled"}`, effort must be
 `high` or lower: disabled thinking with `xhigh` or `max` returns HTTP 400.
 Autopus does not add a thinking-disable flag to Claude Code argv.
 
@@ -122,26 +127,6 @@ fallback for Opus 5 refusals, so compatibility entries for
 [Claude Code model configuration](https://code.claude.com/docs/en/model-config),
 [models overview](https://platform.claude.com/docs/en/about-claude/models/overview),
 and [Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide).
-
-## Claude Fable 5 (Explicit Opt-In)
-
-Fable 5 is an explicit Claude Code choice, not an Autopus quality default. Keep the
-Opus/Sonnet mappings above unless the user or provider configuration selects Fable.
-
-| Surface | Value |
-|---------|-------|
-| Full model ID | `claude-fable-5` |
-| Claude Code aliases | `fable`, `best` |
-| `best` behavior | Fable when the organization has access; otherwise the latest Opus |
-| Minimum Claude Code version | `2.1.170` |
-| Price per million tokens | $10 input / $50 output |
-| Native limits | 1M-token context / 128k-token output |
-
-Fable access is entitlement-dependent and is not available for organizations with
-Zero Data Retention (ZDR). The `fable` and `best` aliases are convenient Claude Code
-inputs, but deterministic cost estimates require the resolved full model ID.
-See the official [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
-and [Fable 5 introduction](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5).
 
 ## Effort Mapping (SPEC-CC21-001)
 
@@ -157,15 +142,17 @@ Quality Mode defaults:
 
 | Mode | Model / Tier | Effort |
 |------|--------------|--------|
+| Any | Fable 5.1 | `max` |
 | Ultra | Opus 5 / Opus 4.8 / Opus 4.7 | `max` |
 | Ultra | Opus 4.6 / Sonnet 5 | `high` |
-| Ultra | Haiku 4.5 | strip effort |
-| Balanced | HIGH complexity | `high` |
-| Balanced | MEDIUM / LOW complexity | `medium` |
+| Balanced | Opus tier | `high` |
+| Balanced | Sonnet tier | `medium` |
+| Any | Haiku 4.5 | strip effort |
 
 Claude model/API effort is the closed set `low`, `medium`, `high`, `xhigh`, and
-`max`. Opus 5 and Fable support all five and default to `high`. Claude Code also
-exposes `ultracode` as a session-only CLI value: it sends actual model effort
+`max`. Opus 5 and Fable 5.1 accept all five values and default to `high` outside
+the Autopus quality projection. Claude Code also exposes `ultracode` as a
+session-only CLI value: it sends actual model effort
 `xhigh` and adds dynamic workflow behavior. It is not a sixth model/API or
 persisted workflow effort. Main-session `ultracode` requires Claude Code
 `2.1.203` or later; reliable propagation to spawned agents and teams requires
@@ -180,15 +167,17 @@ Codex-specific rendering:
 | Mode | Agent / Tier | `model_reasoning_effort` |
 |------|--------------|--------------------------|
 | Any | supervisor (`supervisor_model_policy: inherit`, default) | User Codex runtime default |
-| Ultra | quality-managed supervisor / orchestra | Sol + `ultra` |
-| Ultra | `planner` / `architect` / `security-auditor` | Sol + `max` |
-| Ultra | every other managed agent | Sol + `xhigh` |
-| Balanced | quality-managed supervisor / orchestra / Opus-tier worker | Sol + `xhigh` |
-| Balanced | reviewer (Sonnet tier) | Terra + `high` |
-| Balanced | standard Sonnet-tier worker | Terra + `medium` |
-| Balanced | Haiku-tier worker | Luna + declared effort (capped at `max`) |
+| Ultra | quality-managed supervisor | Astra + `ultra` |
+| Ultra | quality-managed orchestra | Astra + `max` |
+| Ultra | Fable-tier worker | Astra + `max` |
+| Ultra | Opus-tier worker | Sol + `xhigh` |
+| Balanced | quality-managed supervisor / orchestra | Astra + `xhigh` |
+| Balanced | Fable-tier worker | Astra + `max` |
+| Balanced | Opus-tier worker | Sol + `xhigh` |
+| Balanced | Sonnet-tier worker | Terra + declared role effort |
+| Balanced | Haiku-tier worker | Luna + declared role effort (capped at `max`) |
 
-Codex custom agent files are loaded when a session starts. Run `auto quality provider codex <mode> --apply` to persist a Codex-only profile and refresh the current project's Codex managed agents, or `auto quality <mode> --apply` to change the global fallback and refresh every configured platform. Then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Sol profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
+Codex custom agent files are loaded when a session starts. Run `auto quality provider codex <mode> --apply` to persist a Codex-only profile and refresh the current project's Codex managed agents, or `auto quality <mode> --apply` to change the global fallback and refresh every configured platform. Then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Astra profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
 
 Unsupported env values must fail open to Quality Mode defaults. Use `auto effort detect` when the runtime needs the resolved value explicitly.
 
@@ -237,8 +226,8 @@ quality:
   presets:
     balanced:
       adaptive:
-        high: opus
-        medium: sonnet
+        high: fable
+        medium: opus
         low: sonnet
 ```
 
@@ -260,17 +249,16 @@ quality:
 cost = Σ(task_tokens × model_price_per_token)
 ```
 
-Where `model_price_per_token` is looked up from the pricing table in `pkg/cost/estimator.go`.
+Where `model_price_per_token` is looked up in `pkg/cost/pricing.go`.
 
-### Estimated Savings
+### Relative Cost
 
-| Scenario | Savings vs All-Opus |
-|----------|---------------------|
-| Typical project (mixed complexity) | 20–40% |
-| Mostly LOW tasks (refactoring, docs) | up to 60% |
-| Mostly HIGH tasks (new features) | < 5% |
+Fable 5.1 costs more per token than Opus 5, while Sonnet 5 costs less. Compare
+profiles using the actual role mix and token counts rather than assuming that
+either quality mode is uniformly cheaper.
 
-**Reference**: `pkg/cost/estimator.go` for current pricing tables and token estimation logic.
+**Reference**: `pkg/cost/pricing.go` for current pricing and
+`pkg/cost/estimator.go` for token estimation.
 
 ## Planner Integration
 
@@ -279,11 +267,11 @@ The planner executes complexity assessment during Phase 1 and annotates each tas
 ```
 Task T1: Add user authentication
   → file_count: 4, estimated_lines: 280
-  → Complexity: HIGH → model: opus
+  → Complexity: HIGH → strategic profile (fable)
 
 Task T2: Update error message string
   → file_count: 1, estimated_lines: 3
-  → Complexity: LOW → standard path (sonnet / lower reasoning effort)
+  → Complexity: LOW → standard profile (sonnet)
 ```
 
 The complexity annotation is included in the execution plan and passed to the orchestrator before Agent() calls are made.

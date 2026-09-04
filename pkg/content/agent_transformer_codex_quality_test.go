@@ -26,6 +26,12 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 		},
 	}
 	ultra := config.QualityConf{Default: "ultra"}
+	ultraFable := config.QualityConf{
+		Default: "ultra",
+		Presets: map[string]config.QualityPreset{
+			"ultra": {Agents: map[string]string{"planner": "fable"}},
+		},
+	}
 
 	tests := []struct {
 		name          string
@@ -71,20 +77,28 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 			wantEffort: "max",
 		},
 		{
-			name:          "ultra strategic worker uses max",
-			source:        codexProfileSource("planner", "opus", "max"),
-			quality:       ultra,
-			wantModel:     "gpt-5.6-sol",
-			wantEffort:    "max",
-			forbidEfforts: []string{"ultra"},
-		},
-		{
-			name:          "ultra general worker uses xhigh",
-			source:        codexProfileSource("executor", "sonnet", "medium"),
+			name:          "ultra planner without preset uses opus floor",
+			source:        codexProfileSource("planner", "sonnet", "max"),
 			quality:       ultra,
 			wantModel:     "gpt-5.6-sol",
 			wantEffort:    "xhigh",
 			forbidEfforts: []string{"max", "ultra"},
+		},
+		{
+			name:          "ultra haiku source uses opus floor",
+			source:        codexProfileSource("executor", "haiku", "low"),
+			quality:       ultra,
+			wantModel:     "gpt-5.6-sol",
+			wantEffort:    "xhigh",
+			forbidEfforts: []string{"max", "ultra"},
+		},
+		{
+			name:          "ultra explicit fable uses astra max",
+			source:        codexProfileSource("planner", "sonnet", "medium"),
+			quality:       ultraFable,
+			wantModel:     "gpt-6-astra",
+			wantEffort:    "max",
+			forbidEfforts: []string{"ultra"},
 		},
 	}
 

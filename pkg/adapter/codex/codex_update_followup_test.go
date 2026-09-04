@@ -27,7 +27,7 @@ func TestUpdate_PreservesUserConfiguredMediumEffortWhenQualityBecomesUltra(t *te
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
+	userConfig := strings.Replace(string(data), `model = "gpt-6-astra"`, `model = "gpt-5.4"`, 1)
 	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
 	require.Contains(t, userConfig, `model = "gpt-5.4"`)
 	require.Contains(t, userConfig, `model_reasoning_effort = "medium"`)

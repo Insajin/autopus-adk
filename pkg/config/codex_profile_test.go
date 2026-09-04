@@ -15,9 +15,9 @@ func TestQualityConfCodexSupervisorProfile(t *testing.T) {
 		quality QualityConf
 		want    CodexProfile
 	}{
-		{name: "balanced", quality: QualityConf{Default: "balanced"}, want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "ultra", quality: QualityConf{Default: "ultra"}, want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra}},
-		{name: "invalid falls back to balanced", quality: QualityConf{Default: "unsupported"}, want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "balanced", quality: QualityConf{Default: "balanced"}, want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh}},
+		{name: "ultra", quality: QualityConf{Default: "ultra"}, want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortUltra}},
+		{name: "invalid falls back to balanced", quality: QualityConf{Default: "unsupported"}, want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh}},
 	}
 
 	for _, tt := range tests {
@@ -34,11 +34,11 @@ func TestQualityConfCodexOrchestraProfile(t *testing.T) {
 	t.Parallel()
 
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh},
 		(QualityConf{Default: "balanced"}).CodexOrchestraProfile(),
 	)
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax},
 		(QualityConf{Default: "ultra"}).CodexOrchestraProfile(),
 	)
 }
@@ -50,12 +50,15 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 		Default: "balanced",
 		Presets: map[string]QualityPreset{
 			"balanced": {Agents: map[string]string{
-				"planner":  "opus",
+				"planner":  "fable",
+				"reviewer": "opus",
 				"executor": "sonnet",
 				"explorer": "haiku",
 			}},
 		},
 	}
+	ultra := DefaultFullConfig("profile").Quality
+	ultra.Default = "ultra"
 
 	tests := []struct {
 		name           string
@@ -65,21 +68,20 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 		declaredEffort string
 		want           CodexProfile
 	}{
-		{name: "balanced opus", quality: balanced, agent: "planner", fallbackTier: "sonnet", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "balanced fable", quality: balanced, agent: "planner", fallbackTier: "sonnet", declaredEffort: "low", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "balanced opus", quality: balanced, agent: "reviewer", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
 		{name: "balanced sonnet", quality: balanced, agent: "executor", fallbackTier: "opus", declaredEffort: "medium", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
 		{name: "balanced haiku", quality: balanced, agent: "explorer", fallbackTier: "opus", declaredEffort: "low", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortLow}},
-		{name: "fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "haiku", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
+		{name: "fable fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "fable", declaredEffort: "low", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "haiku fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "haiku", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
 		{name: "invalid effort defaults medium", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "invalid", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
 		{name: "balanced agents clamp declared ultra to max", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "ultra", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMax}},
-		{name: "ultra planner uses max", quality: QualityConf{Default: "ultra"}, agent: "planner", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
-		{name: "ultra architect uses max", quality: QualityConf{Default: "ultra"}, agent: "architect", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
-		{name: "ultra security auditor uses max", quality: QualityConf{Default: "ultra"}, agent: "security-auditor", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax}},
-		{name: "ultra executor uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "executor", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "ultra spec writer uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "spec-writer", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "ultra underscore security name uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "security_auditor", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "ultra unknown agent uses xhigh", quality: QualityConf{Default: "ultra"}, agent: "custom-agent", fallbackTier: "opus", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "ultra planner keeps fable", quality: ultra, agent: "planner", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "ultra executor keeps opus", quality: ultra, agent: "executor", fallbackTier: "sonnet", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "ultra underscore security name keeps fable", quality: ultra, agent: "security_auditor", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "ultra unknown agent floors sonnet fallback", quality: ultra, agent: "custom-agent", fallbackTier: "sonnet", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
 		{name: "invalid quality follows balanced", quality: QualityConf{Default: "invalid"}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortHigh}},
-		{name: "custom quality uses its role tier", quality: QualityConf{Default: "custom", Presets: map[string]QualityPreset{"custom": {Agents: map[string]string{"executor": "haiku"}}}}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
+		{name: "custom quality uses its role tier", quality: QualityConf{Default: "custom", Presets: map[string]QualityPreset{"custom": {Agents: map[string]string{"executor": "fable"}}}}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
 	}
 
 	for _, tt := range tests {
@@ -93,32 +95,39 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 	}
 }
 
-func TestQualityConfCodexUltraAgentProfileIgnoresTierAndDeclaredEffort(t *testing.T) {
+func TestQualityConfCodexUltraAgentProfileHonorsTierWithOpusFloor(t *testing.T) {
 	t.Parallel()
 
-	roles := []struct {
-		name   string
-		effort string
+	tiers := []struct {
+		tier string
+		want CodexProfile
 	}{
-		{name: "planner", effort: CodexEffortMax},
-		{name: "architect", effort: CodexEffortMax},
-		{name: "security-auditor", effort: CodexEffortMax},
-		{name: "executor", effort: CodexEffortXHigh},
-		{name: "custom-agent", effort: CodexEffortXHigh},
+		{tier: "fable", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{tier: "opus", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{tier: "sonnet", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{tier: "haiku", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{tier: "unknown", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{tier: "", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
 	}
-	tiers := []string{"opus", "sonnet", "haiku", "unknown", ""}
 	efforts := []string{CodexEffortLow, CodexEffortMedium, CodexEffortHigh, CodexEffortXHigh, CodexEffortMax, CodexEffortUltra, "unknown", ""}
 	ultra := QualityConf{Default: "ultra"}
 
-	for _, role := range roles {
-		want := CodexProfile{Model: CodexSolModel, Effort: role.effort}
-		for _, tier := range tiers {
-			for _, effort := range efforts {
-				assert.Equal(t, want, ultra.CodexAgentProfile(role.name, tier, effort),
-					"role=%s tier=%q declared_effort=%q", role.name, tier, effort)
-			}
+	for _, tt := range tiers {
+		for _, effort := range efforts {
+			assert.Equal(t, tt.want, ultra.CodexAgentProfile("custom-agent", tt.tier, effort),
+				"tier=%q declared_effort=%q", tt.tier, effort)
 		}
 	}
+}
+
+func TestCodexModelForTier(t *testing.T) {
+	t.Parallel()
+
+	assert.Equal(t, CodexAstraModel, CodexModelForTier("fable"))
+	assert.Equal(t, CodexSolModel, CodexModelForTier("opus"))
+	assert.Equal(t, CodexTerraModel, CodexModelForTier("sonnet"))
+	assert.Equal(t, CodexLunaModel, CodexModelForTier("haiku"))
+	assert.Equal(t, CodexTerraModel, CodexModelForTier("unknown"))
 }
 
 func TestParseCodexModelCatalog(t *testing.T) {
@@ -254,8 +263,8 @@ func TestCodexProviderEntryForQuality(t *testing.T) {
 		wantModel  string
 		wantEffort string
 	}{
-		{name: "balanced", quality: QualityConf{Default: "balanced"}, wantModel: CodexSolModel, wantEffort: CodexEffortXHigh},
-		{name: "ultra", quality: QualityConf{Default: "ultra"}, wantModel: CodexSolModel, wantEffort: CodexEffortMax},
+		{name: "balanced", quality: QualityConf{Default: "balanced"}, wantModel: CodexAstraModel, wantEffort: CodexEffortXHigh},
+		{name: "ultra", quality: QualityConf{Default: "ultra"}, wantModel: CodexAstraModel, wantEffort: CodexEffortMax},
 	}
 
 	for _, tt := range tests {

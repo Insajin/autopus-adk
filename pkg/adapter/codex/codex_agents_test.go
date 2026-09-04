@@ -41,7 +41,7 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 		content := string(f.Content)
 		assert.Contains(t, content, "name =", "TOML %s should have name field", f.TargetPath)
 		assert.Contains(t, content, "description =", "TOML %s should have description field", f.TargetPath)
-		assert.Contains(t, content, `model = "gpt-5.6-`, "TOML %s should use a GPT-5.6 role model", f.TargetPath)
+		assert.Contains(t, content, `model = "gpt-`, "TOML %s should use a managed GPT role model", f.TargetPath)
 		assert.Contains(t, content, "model_reasoning_effort =", "TOML %s should set effort explicitly", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions =", "TOML %s should have instructions", f.TargetPath)
 		assert.Contains(t, content, "developer_instructions = '''", "TOML %s should use literal multiline strings", f.TargetPath)
@@ -69,45 +69,51 @@ func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
 		byPath[f.TargetPath] = string(f.Content)
 	}
 
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model_reasoning_effort = "xhigh"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model = "gpt-5.6-sol"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "high"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model = "gpt-5.6-terra"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model_reasoning_effort = "max"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model = "gpt-6-astra"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "xhigh"`)
+	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model = "gpt-5.6-sol"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "xhigh"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-sol"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model_reasoning_effort = "medium"`)
 	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model = "gpt-5.6-terra"`)
 }
 
-func TestGenerateAgents_UltraQualityUsesSelectiveSolEffort(t *testing.T) {
+func TestGenerateAgents_UltraQualityUsesFableAndOpusProfiles(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
 	cfg := config.DefaultFullConfig("test-project")
 	cfg.Quality.Default = "ultra"
-	maxAgents := map[string]bool{
+	fableAgents := map[string]bool{
 		"architect.toml":        true,
+		"debugger.toml":         true,
+		"deep-worker.toml":      true,
 		"planner.toml":          true,
+		"reviewer.toml":         true,
 		"security-auditor.toml": true,
+		"spec-writer.toml":      true,
 	}
 
 	files, err := a.generateAgents(cfg)
 	require.NoError(t, err)
 
-	seenMaxAgents := make(map[string]bool, len(maxAgents))
+	seenFable := make(map[string]bool, len(fableAgents))
 	for _, f := range files {
 		content := string(f.Content)
-		effort := "xhigh"
+		model := config.CodexSolModel
+		effort := config.CodexEffortXHigh
 		name := filepath.Base(f.TargetPath)
-		if maxAgents[name] {
-			effort = "max"
-			seenMaxAgents[name] = true
+		if fableAgents[name] {
+			model = config.CodexAstraModel
+			effort = config.CodexEffortMax
+			seenFable[name] = true
 		}
-		assert.Contains(t, content, `model = "gpt-5.6-sol"`, "TOML %s should use Sol in ultra mode", f.TargetPath)
-		assert.Contains(t, content, `model_reasoning_effort = "`+effort+`"`, "TOML %s should use its ultra role effort", f.TargetPath)
+		assert.Contains(t, content, `model = "`+model+`"`, f.TargetPath)
+		assert.Contains(t, content, `model_reasoning_effort = "`+effort+`"`, f.TargetPath)
 		assert.NotContains(t, content, `model_reasoning_effort = "ultra"`, "managed workers must not auto-delegate", f.TargetPath)
 	}
-	assert.Equal(t, maxAgents, seenMaxAgents)
+	assert.Equal(t, fableAgents, seenFable)
 }
 
 func TestPrepareAgentFiles_NoDiskWrite(t *testing.T) {

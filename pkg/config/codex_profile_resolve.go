@@ -33,19 +33,17 @@ func (c CodexModelCatalog) Supports(model, effort string) bool {
 }
 
 // codexModelFallbackCandidates lists substitutes to try, best first, when the
-// requested model is absent from the runtime catalog.
-//
-// Only the frontier tier gains a same-generation step. An account that is not
-// entitled to the frontier model still has the current-generation balanced
-// model, which is a closer substitute than skipping a whole generation down to
-// the legacy slug. The balanced and small tiers keep legacy-only behaviour: the
-// small tier is explicitly the cheap model and is not a defensible stand-in for
-// a larger one.
+// requested model is absent. Astra and Sol descend through current-generation
+// tiers before crossing the generation boundary to legacy.
 func codexModelFallbackCandidates(requested string) []string {
-	if requested == CodexSolModel {
+	switch requested {
+	case CodexAstraModel:
+		return []string{CodexSolModel, CodexTerraModel, CodexLegacyModel}
+	case CodexSolModel:
 		return []string{CodexTerraModel, CodexLegacyModel}
+	default:
+		return []string{CodexLegacyModel}
 	}
-	return []string{CodexLegacyModel}
 }
 
 // ResolveCodexProfile resolves a requested profile against a runtime catalog.

@@ -93,14 +93,26 @@ CLI에서는 `claude-code`도 `claude`의 alias로 허용하지만 YAML에는 ca
 `quality.default`를 바꾸고 구성된 모든 플랫폼을 갱신합니다. 한 번의 실행에 지정한
 `--quality`는 두 persisted provider override보다 우선하며 YAML은 수정하지 않습니다.
 
-### Claude Opus 5 기본 경로
+### Claude Fable 5.1 / Opus 5 기본 경로
 
-Claude Ultra, Balanced 전략 역할, high-complexity 라우팅은 고정 모델 ID
-`claude-opus-5`를 사용합니다. Claude Code의 `opus` alias가 Opus 5를 선택하려면
-`2.1.219` 이상이 필요합니다. Opus 5를 고정한 `route_team` workflow는
-`auto workflow doctor --route route_team`에서 `2.1.219` 미만을
-fail-closed합니다. 모델을 고정하지 않는 `route_a`는 기존 최소 버전
+Autopus는 공통 모델 티어를 `fable` > `opus` > `sonnet` > `haiku` 순서로
+사용합니다. Ultra에서는 planner, architect, spec-writer, security-auditor,
+reviewer, debugger, deep-worker를 Fable에 할당하고 나머지 역할을 Opus에
+할당합니다. Balanced에서는 planner, architect, security-auditor를 Fable에,
+구현·리뷰·심층 작업 역할을 Opus에, 나머지 역할을 Sonnet에 할당합니다. 기본
+Ultra와 Balanced 프리셋은 Haiku를 사용하지 않습니다.
+
+| 티어 | 전체 모델 ID | Claude Code alias | 최소 Claude Code 버전 | MTok당 가격 |
+|------|--------------|-------------------|--------------------------|-------------|
+| `fable` | `claude-fable-5-1` | `fable`, `best` | `2.1.170` | 입력 $10 / 출력 $50 |
+| `opus` | `claude-opus-5` | `opus` | `2.1.219` | 입력 $5 / 출력 $25 |
+
+`route_team` workflow는 두 모델 ID를 고정하므로
+`auto workflow doctor --route route_team`에서 더 높은 요구 버전인 `2.1.219`
+미만을 fail-closed합니다. 모델을 고정하지 않는 `route_a`는 기존 최소 버전
 `2.1.154`를 유지합니다.
+
+Claude Code의 `opus` alias는 provider와 버전에 따라 달라집니다.
 
 | Claude Code provider | `opus` on v2.1.219+ | Before v2.1.219 |
 |----------------------|---------------------|-----------------|
@@ -110,48 +122,34 @@ fail-closed합니다. 모델을 고정하지 않는 `route_a`는 기존 최소 �
 | Google Cloud Agent Platform | Opus 5 | Opus 4.8 on v2.1.207–v2.1.218; Opus 4.6 before v2.1.207 |
 | Microsoft Foundry | Opus 4.6 | Opus 4.6 |
 
-Opus 5의 공식 가격은 입력 $5/MTok·출력 $25/MTok이며 native context는 1M
-tokens, 최대 output은 128k tokens입니다. `low`, `medium`, `high`, `xhigh`,
-`max` effort를 지원하고 기본 effort는 `high`입니다. Opus 4.8에서 같은 가격의
-drop-in upgrade이지만 adaptive thinking이 기본 활성화됩니다. 직접 API를 연결할
-때 `thinking: {"type": "disabled"}`와 `xhigh` 또는 `max`를 함께 보내면 HTTP 400이므로,
-Autopus는 Claude Code argv에 thinking-disable flag를 추가하지
-않습니다. Opus 4.8은 명시적으로 계속 선택할 수 있고 Opus 5 사이버보안 거부의
-권장 fallback이므로 호환 모델에서 제거하지 않습니다.
+Opus 5는 Opus 4.8과 가격이 같은 drop-in upgrade이며 adaptive thinking이 기본 활성화됩니다.
+직접 API를 연결할 때 `thinking: {"type": "disabled"}`와 `xhigh` 또는 `max`를 함께 보내면 HTTP 400이므로
+Autopus는 Claude Code argv에 thinking-disable flag를 추가하지 않습니다.
+Opus 4.8은 명시적으로 계속 선택할 수 있고 Opus 5 사이버보안 거부의 권장
+fallback이므로 호환 모델에서 제거하지 않습니다.
+
+Fable의 동적 alias인 `best`는 사용 권한에 따라 최신 Opus로 해석될 수
+있습니다. 따라서 모델 라우팅과 비용 계산에는 `claude-fable-5-1`을
+사용합니다. 기존 workflow와의 호환성을 위해 `claude-fable-5`도 허용하지만
+기본 프리셋은 Fable 5.1의 전체 모델 ID를 생성합니다.
+
+Quality Mode가 effort를 정할 때 Fable은 모드와 관계없이 `max`를 사용합니다.
+Ultra의 Opus는 `max`, Sonnet은 `high`를 사용하고, Balanced의 Opus는 `high`,
+Sonnet은 `medium`을 사용합니다. Haiku에서는 effort를 생략합니다. 명시적인
+`--effort`, `CLAUDE_CODE_EFFORT_LEVEL`, agent frontmatter 값은 기존 우선순위에
+따라 Quality Mode 기본값보다 먼저 적용됩니다.
+
+모델/API effort 값은 `low`, `medium`, `high`, `xhigh`, `max`입니다.
+`ultracode`는 여섯 번째 model effort가 아니라 실제 `xhigh`와 dynamic
+workflows를 결합한 Claude Code session-only 값입니다. main session은 Claude
+Code `2.1.203` 이상, agent/team 전달은 `2.1.210` 이상을 사용하세요.
 
 자세한 내용은 [Claude Code model 설정](https://code.claude.com/docs/en/model-config),
 [모델 개요](https://platform.claude.com/docs/en/about-claude/models/overview),
-[Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide)를
-확인하세요.
-
-### Claude Fable 5 명시적 선택
-
-Fable 5는 Autopus의 기본 모델이 아닙니다. 조직에 Fable 사용 권한이 있고
-Claude Code `2.1.170` 이상을 사용하는 경우에만 Claude provider에서 명시적으로
-선택하세요.
-
-```yaml
-orchestra:
-  providers:
-    claude:
-      binary: claude
-      args: ["--print", "--model", "fable", "--effort", "high"]
-```
-
-전체 모델 ID는 `claude-fable-5`이며 Claude Code alias는 `fable`과 `best`입니다.
-`best`는 조직에 Fable 권한이 있으면 Fable을, 없으면 최신 Opus를 선택하므로
-결정적 비용 계산에는 resolved full model ID를 사용해야 합니다. Fable은 ZDR
-조직에서 사용할 수 없고, 공식 가격은 입력 $10/MTok·출력 $50/MTok이며 native
-context는 1M tokens, 최대 output은 128k tokens입니다.
-
-모델/API effort는 `low`, `medium`, `high`, `xhigh`, `max` 다섯 값이고 Fable의
-기본값은 `high`입니다. `ultracode`는 여섯 번째 model effort가 아니라 실제
-`xhigh`와 dynamic workflows를 결합한 Claude Code session-only 값입니다.
-main session은 Claude Code `2.1.203` 이상, agent/team 전달은 `2.1.210` 이상을
-사용하세요. 자세한 내용은 [Claude Code model 설정](https://code.claude.com/docs/en/model-config),
+[Opus 5 migration guide](https://platform.claude.com/docs/en/about-claude/models/migration-guide),
 [CLI reference](https://code.claude.com/docs/en/cli-reference),
-[Fable 5 소개](https://platform.claude.com/docs/en/about-claude/models/introducing-claude-fable-5-and-claude-mythos-5),
-[effort reference](https://platform.claude.com/docs/en/build-with-claude/effort)를 확인하세요.
+[effort reference](https://platform.claude.com/docs/en/build-with-claude/effort)를
+확인하세요.
 
 ## 플랫폼별 설치 위치
 

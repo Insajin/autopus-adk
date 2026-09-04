@@ -17,7 +17,7 @@ func TestGenerateConfig_CatalogDowngradesEffortOnSameModel(t *testing.T) {
 
 	a := NewWithRoot(t.TempDir())
 	a.codexCatalogProbed = true
-	a.codexCatalogJSON = []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]}]}`)
+	a.codexCatalogJSON = []byte(`{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]}]}`)
 	var warnings bytes.Buffer
 	a.codexFallbackWriter = &warnings
 	cfg := config.DefaultFullConfig("catalog-project")
@@ -27,10 +27,10 @@ func TestGenerateConfig_CatalogDowngradesEffortOnSameModel(t *testing.T) {
 	files, err := a.prepareConfigFile(cfg)
 	require.NoError(t, err)
 	root := strings.SplitN(string(files[0].Content), "[agents]", 2)[0]
-	assert.Contains(t, root, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, root, `model = "gpt-6-astra"`)
 	assert.Contains(t, root, `model_reasoning_effort = "max"`)
-	assert.Contains(t, warnings.String(), "requested=gpt-5.6-sol/ultra")
-	assert.Contains(t, warnings.String(), "selected=gpt-5.6-sol/max")
+	assert.Contains(t, warnings.String(), "requested=gpt-6-astra/ultra")
+	assert.Contains(t, warnings.String(), "selected=gpt-6-astra/max")
 	assert.Contains(t, warnings.String(), "reason=effort_unavailable")
 	assert.Equal(t, 1, strings.Count(warnings.String(), "reason=effort_unavailable"))
 }
@@ -109,14 +109,14 @@ func TestCodexRenderContext_ResolvesAgentModelWithDeclaredEffort(t *testing.T) {
 
 	a := NewWithRoot(t.TempDir())
 	a.codexCatalogProbed = true
-	a.codexCatalogJSON = []byte(`{"models":[{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"high"}]}]}`)
+	a.codexCatalogJSON = []byte(`{"models":[{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"}]}]}`)
 	var warnings bytes.Buffer
 	a.codexFallbackWriter = &warnings
 	cfg := config.DefaultFullConfig("tuple-project")
 	data := codexRenderContext{HarnessConfig: cfg, adapter: a}
 
-	assert.Equal(t, config.CodexTerraModel, data.CodexAgentModel("reviewer", "sonnet", "high"))
-	assert.Equal(t, config.CodexEffortHigh, data.CodexAgentEffort("reviewer", "sonnet", "high"))
+	assert.Equal(t, config.CodexTerraModel, data.CodexAgentModel("tester", "sonnet", "medium"))
+	assert.Equal(t, config.CodexEffortMedium, data.CodexAgentEffort("tester", "sonnet", "medium"))
 	assert.Empty(t, warnings.String())
 }
 
@@ -140,8 +140,8 @@ func TestGenerateAgents_AppliesCatalogFallbackProfiles(t *testing.T) {
 		},
 		{
 			name:       "effort downgrade",
-			catalog:    `{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`,
-			wantModel:  config.CodexSolModel,
+			catalog:    `{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`,
+			wantModel:  config.CodexAstraModel,
 			wantEffort: config.CodexEffortXHigh,
 			wantReason: "effort_unavailable",
 		},

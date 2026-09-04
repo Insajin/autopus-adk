@@ -5,7 +5,15 @@ import (
 	"testing"
 )
 
-const missingManagedFingerprintFixture = "sha256:47a5f5efebd01b44f543a37adf34b22a3591c72fe46098069bc8a307cf490b04"
+const missingManagedFingerprintFixture = "sha256:6ce4ae8701413d8bd479df412f102783e1cd3d21e85e6ae91088fe1ee12aa75e"
+
+func TestOMPMissingManagedValueFingerprint_IsStable(t *testing.T) {
+	t.Parallel()
+
+	if got := OMPMissingManagedValueFingerprint(); got != missingManagedFingerprintFixture {
+		t.Fatalf("missing managed fingerprint = %q", got)
+	}
+}
 
 func TestRoleModelPolicy_ProjectManaged_RequiresExplicitCompleteClaims(t *testing.T) {
 	t.Parallel()

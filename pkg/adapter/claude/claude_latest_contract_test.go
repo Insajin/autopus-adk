@@ -82,7 +82,8 @@ func TestPrepareFiles_ClaudeAgentQualityProjectsModelAndEffortTogether(t *testin
 		wantEffort string
 	}{
 		{name: "balanced standard", mode: "balanced", agent: "tester", wantModel: "sonnet", wantEffort: "medium"},
-		{name: "ultra premium", mode: "ultra", agent: "executor", wantModel: "opus", wantEffort: "max"},
+		{name: "ultra executor", mode: "ultra", agent: "executor", wantModel: "opus", wantEffort: "max"},
+		{name: "ultra planner", mode: "ultra", agent: "planner", wantModel: "fable", wantEffort: "max"},
 	}
 
 	for _, test := range tests {
@@ -101,6 +102,30 @@ func TestPrepareFiles_ClaudeAgentQualityProjectsModelAndEffortTogether(t *testin
 			}
 			assert.Equal(t, test.wantModel, got.Model)
 			assert.Equal(t, test.wantEffort, got.Effort)
+		})
+	}
+}
+
+func TestClaudeAgentEffortUsesFourTierMatrix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		mode string
+		tier string
+		want string
+	}{
+		{name: "ultra fable", mode: "ultra", tier: "fable", want: "max"},
+		{name: "ultra opus", mode: "ultra", tier: "opus", want: "max"},
+		{name: "ultra sonnet", mode: "ultra", tier: "sonnet", want: "high"},
+		{name: "balanced fable", mode: "balanced", tier: "fable", want: "max"},
+		{name: "balanced opus", mode: "balanced", tier: "opus", want: "high"},
+		{name: "balanced sonnet", mode: "balanced", tier: "sonnet", want: "medium"},
+		{name: "haiku omits effort", mode: "balanced", tier: "haiku", want: ""},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, claudeAgentEffort(test.mode, test.tier))
 		})
 	}
 }

@@ -158,7 +158,7 @@ func TestGenerateConfig_UsesUltraQualityProfile(t *testing.T) {
 	content := string(files[0].Content)
 
 	rootSection := strings.SplitN(content, "[features]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model = "gpt-6-astra"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }
 

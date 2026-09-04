@@ -1,5 +1,7 @@
 package routing
 
+import "github.com/insajin/autopus-adk/pkg/config"
+
 // Complexity levels for message classification.
 type Complexity string
 
@@ -39,9 +41,17 @@ func DefaultConfig() RoutingConfig {
 			ComplexMinChars: 1000,
 		},
 		Models: map[string]ProviderModels{
-			"claude": {Simple: "claude-sonnet-5", Medium: "claude-sonnet-5", Complex: "claude-opus-5"},
-			"codex":  {Simple: "gpt-4o-mini", Medium: "gpt-4o", Complex: "o3"},
-			"gemini": {Simple: "gemini-2.0-flash", Medium: "gemini-2.5-pro", Complex: "gemini-2.5-pro"},
+			"claude": {
+				Simple:  config.ClaudeSonnetModel,
+				Medium:  config.ClaudeOpusModel,
+				Complex: config.ClaudeFableModel,
+			},
+			"codex": {
+				Simple:  config.CodexLunaModel,
+				Medium:  config.CodexSolModel,
+				Complex: config.CodexAstraModel,
+			},
+			"gemini": {Simple: "gemini-3.8-flash", Medium: "gemini-3.1-pro", Complex: "gemini-3.1-pro"},
 		},
 	}
 }

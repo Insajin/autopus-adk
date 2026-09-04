@@ -118,8 +118,8 @@ func TestCC21_TC1_AllAgentsHaveEffort(t *testing.T) {
 
 // --- TC2: ResolveEffort balanced mode (S3-1) ----------------------------------------
 
-// TestCC21_TC2_ResolveEffort_Balanced verifies that balanced quality + medium complexity
-// resolves to effort=medium.
+// TestCC21_TC2_ResolveEffort_Balanced verifies that the default Opus model in
+// Balanced mode resolves to effort=high even with medium task complexity.
 // Violation → S3-1.
 func TestCC21_TC2_ResolveEffort_Balanced(t *testing.T) {
 	result, err := cli.ResolveEffort(cli.EffortResolveInput{
@@ -127,8 +127,8 @@ func TestCC21_TC2_ResolveEffort_Balanced(t *testing.T) {
 		FlagComplexity: "medium",
 	})
 	require.NoError(t, err, "S3-1: ResolveEffort returned unexpected error")
-	assert.Equal(t, cli.EffortMedium, result.Effort,
-		"S3-1 violation: balanced+medium should resolve to medium, got %q", result.Effort)
+	assert.Equal(t, cli.EffortHigh, result.Effort,
+		"S3-1 violation: Balanced Opus should resolve to high, got %q", result.Effort)
 	assert.Equal(t, cli.EffortSourceQualityMode, result.Source,
 		"S3-1 violation: source should be quality_mode, got %q", result.Source)
 }

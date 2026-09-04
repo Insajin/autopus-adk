@@ -12,6 +12,8 @@ import (
 
 func TestNormalizeModelID(t *testing.T) {
 	cases := []struct{ in, want string }{
+		{"claude-fable-5-1", "fable-5-1"},
+		{"fable-5.1", "fable-5-1"},
 		{"opus-4.7", "opus-4-7"},
 		{"claude-opus-4.7", "opus-4-7"},
 		{"haiku-4.5", "haiku-4-5"},
@@ -189,8 +191,8 @@ func TestEffortDetectCmd_InvalidEnvWarnsAndFallsBack(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("command failed: %v", err)
 	}
-	if out := strings.TrimSpace(buf.String()); out != "effort=medium" {
-		t.Errorf("output: got %q, want effort=medium", out)
+	if out := strings.TrimSpace(buf.String()); out != "effort=high" {
+		t.Errorf("output: got %q, want effort=high", out)
 	}
 	if !strings.Contains(errBuf.String(), "outside SPEC-CC21-001 enum") {
 		t.Errorf("stderr should contain fallback warning, got: %q", errBuf.String())

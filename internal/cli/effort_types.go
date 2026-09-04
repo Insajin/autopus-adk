@@ -7,13 +7,13 @@ type EffortValue string
 const (
 	// EffortLow is the lowest effort tier.
 	EffortLow EffortValue = "low"
-	// EffortMedium is the default balanced-mode effort tier.
+	// EffortMedium is the Balanced Sonnet-tier default.
 	EffortMedium EffortValue = "medium"
-	// EffortHigh is used for high-complexity tasks and ultra mode on models without max support.
+	// EffortHigh is used by Balanced Opus and Ultra Sonnet tiers.
 	EffortHigh EffortValue = "high"
 	// EffortXHigh is a very high effort tier below max.
 	EffortXHigh EffortValue = "xhigh"
-	// EffortMax is the strongest Claude Code effort tier for max-capable Opus and Fable models.
+	// EffortMax is the strongest Claude Code tier for Fable and max-capable Opus models.
 	EffortMax EffortValue = "max"
 	// EffortStripped signals that effort must be omitted (Haiku 4.5).
 	EffortStripped EffortValue = ""

@@ -229,7 +229,8 @@ func tierRequestForProvider(quality config.QualityConf, provider string) execpla
 func topClaudeModelForRun(quality config.QualityConf) string {
 	agents := config.CanonicalAgentNames()
 	for _, model := range []string{
-		config.ClaudeOpusModel, config.ClaudeSonnetModel, config.ClaudeHaikuModel,
+		config.ClaudeFableModel, config.ClaudeOpusModel,
+		config.ClaudeSonnetModel, config.ClaudeHaikuModel,
 	} {
 		for _, agent := range agents {
 			if quality.ClaudeAgentModel(agent, "") == model {

@@ -35,23 +35,23 @@ func TestDefaultConfig(t *testing.T) {
 		t.Parallel()
 		m := cfg.Models["claude"]
 		assert.Equal(t, "claude-sonnet-5", m.Simple)
-		assert.Equal(t, "claude-sonnet-5", m.Medium)
-		assert.Equal(t, "claude-opus-5", m.Complex)
+		assert.Equal(t, "claude-opus-5", m.Medium)
+		assert.Equal(t, "claude-fable-5-1", m.Complex)
 	})
 
 	t.Run("codex models", func(t *testing.T) {
 		t.Parallel()
 		m := cfg.Models["codex"]
-		assert.Equal(t, "gpt-4o-mini", m.Simple)
-		assert.Equal(t, "gpt-4o", m.Medium)
-		assert.Equal(t, "o3", m.Complex)
+		assert.Equal(t, "gpt-5.6-luna", m.Simple)
+		assert.Equal(t, "gpt-5.6-sol", m.Medium)
+		assert.Equal(t, "gpt-6-astra", m.Complex)
 	})
 
 	t.Run("gemini models", func(t *testing.T) {
 		t.Parallel()
 		m := cfg.Models["gemini"]
-		assert.Equal(t, "gemini-2.0-flash", m.Simple)
-		assert.Equal(t, "gemini-2.5-pro", m.Medium)
-		assert.Equal(t, "gemini-2.5-pro", m.Complex)
+		assert.Equal(t, "gemini-3.8-flash", m.Simple)
+		assert.Equal(t, "gemini-3.1-pro", m.Medium)
+		assert.Equal(t, "gemini-3.1-pro", m.Complex)
 	})
 }

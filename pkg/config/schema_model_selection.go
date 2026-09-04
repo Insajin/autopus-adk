@@ -34,7 +34,7 @@ func (c *HarnessConfig) validateModelSelectionConfig() error {
 			)
 		}
 	}
-	validModelTiers := map[string]bool{"opus": true, "sonnet": true, "haiku": true}
+	validModelTiers := map[string]bool{"fable": true, "opus": true, "sonnet": true, "haiku": true}
 	for presetName, preset := range c.Quality.Presets {
 		for agentName, tier := range preset.Agents {
 			if !validModelTiers[tier] {

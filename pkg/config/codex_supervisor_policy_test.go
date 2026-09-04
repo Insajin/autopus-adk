@@ -25,7 +25,7 @@ func TestLegacyMissingSupervisorPolicyKeepsQualityManagedProfile(t *testing.T) {
 	cfg.Quality.SupervisorModelPolicy = ""
 	cfg.Quality.Default = "ultra"
 
-	assert.Equal(t, CodexSolModel, cfg.CodexSupervisorModel())
+	assert.Equal(t, CodexAstraModel, cfg.CodexSupervisorModel())
 	assert.Equal(t, CodexEffortUltra, cfg.CodexSupervisorEffort())
 }
 
@@ -46,7 +46,7 @@ func TestLoadLegacyYAMLMissingSupervisorPolicyKeepsQualityManagedProfile(t *test
 	require.NoError(t, err)
 	assert.Empty(t, loaded.Quality.SupervisorModelPolicy)
 	assert.Equal(t, SupervisorModelPolicyQuality, loaded.Quality.EffectiveSupervisorModelPolicy())
-	assert.Equal(t, CodexSolModel, loaded.CodexSupervisorModel())
+	assert.Equal(t, CodexAstraModel, loaded.CodexSupervisorModel())
 	assert.Equal(t, CodexEffortUltra, loaded.CodexSupervisorEffort())
 }
 

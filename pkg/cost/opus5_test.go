@@ -25,30 +25,34 @@ func TestDefaultPricingTable_Opus5UsesCanonicalPricing(t *testing.T) {
 	}
 }
 
-func TestQualityModeToModels_Opus5IsDefaultForUltraAndStrategicRoles(t *testing.T) {
+func TestQualityModeToModels_FableAndOpusFollowPresets(t *testing.T) {
 	t.Parallel()
 
+	wantUltra := map[string]string{
+		"planner":          "claude-fable-5-1",
+		"architect":        "claude-fable-5-1",
+		"executor":         "claude-opus-5",
+		"tester":           "claude-opus-5",
+		"reviewer":         "claude-fable-5-1",
+		"validator":        "claude-opus-5",
+		"test_scaffold":    "claude-opus-5",
+		"annotator":        "claude-opus-5",
+		"security_auditor": "claude-fable-5-1",
+	}
 	ultra := cost.QualityModeToModels("ultra")
-	for _, role := range []string{
-		"planner", "architect", "executor", "tester", "reviewer", "validator",
-		"test_scaffold", "annotator", "security_auditor",
-	} {
-		if got := ultra[role]; got != "claude-opus-5" {
-			t.Errorf("ultra/%s = %q, want claude-opus-5", role, got)
+	for role, want := range wantUltra {
+		if got := ultra[role]; got != want {
+			t.Errorf("ultra/%s = %q, want %q", role, got, want)
 		}
 	}
 
-	// balanced executor and security_auditor are opus now. Both were pinned to
-	// sonnet here while cost carried its own tier table; the balanced quality
-	// preset promoted them (executor on the PR #151 measurement), and cost now
-	// derives from that preset, so the promotion finally reaches cost.
 	wantBalanced := map[string]string{
-		"planner":          "claude-opus-5",
-		"architect":        "claude-opus-5",
+		"planner":          "claude-fable-5-1",
+		"architect":        "claude-fable-5-1",
 		"executor":         "claude-opus-5",
-		"security_auditor": "claude-opus-5",
+		"security_auditor": "claude-fable-5-1",
 		"tester":           "claude-sonnet-5",
-		"reviewer":         "claude-sonnet-5",
+		"reviewer":         "claude-opus-5",
 		"validator":        "claude-sonnet-5",
 		"test_scaffold":    "claude-sonnet-5",
 		"annotator":        "claude-sonnet-5",

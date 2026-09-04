@@ -61,14 +61,19 @@ func TestDefaultFullConfig_QualityPresets(t *testing.T) {
 		assert.True(t, exists, "balanced preset must contain agent %q defined in ultra preset", agent)
 	}
 
-	// Spot-check balanced preset: planner=opus, executor=opus (measured decisive
-	// role), validator=sonnet so the preset stays distinct from ultra.
-	assert.Equal(t, "opus", balanced.Agents["planner"])
-	assert.Equal(t, "opus", balanced.Agents["executor"])
-	assert.Equal(t, "sonnet", balanced.Agents["validator"])
+	assert.Equal(t, "추론 코어 7개는 Fable, 나머지는 Opus. 최고 품질.", ultra.Description)
+	assert.Equal(t, "기획·보안은 Fable, 구현·리뷰는 Opus, 기본 작업은 Sonnet. Haiku 미사용.", balanced.Description)
+	assert.Equal(t, map[string]string{
+		"architect": "fable", "planner": "fable", "security-auditor": "fable",
+		"debugger": "opus", "deep-worker": "opus", "executor": "opus",
+		"reviewer": "opus", "spec-writer": "opus",
+		"annotator": "sonnet", "devops": "sonnet", "explorer": "sonnet",
+		"frontend-specialist": "sonnet", "perf-engineer": "sonnet",
+		"tester": "sonnet", "ux-validator": "sonnet", "validator": "sonnet",
+	}, balanced.Agents)
 }
 
-func TestDefaultFullConfig_QualityUltraAllOpus(t *testing.T) {
+func TestDefaultFullConfig_QualityUltraUsesFableAndOpus(t *testing.T) {
 	t.Parallel()
 
 	cfg := DefaultFullConfig("test-project")
@@ -77,9 +82,15 @@ func TestDefaultFullConfig_QualityUltraAllOpus(t *testing.T) {
 	ultra, ok := cfg.Quality.Presets["ultra"]
 	require.True(t, ok, "ultra preset must exist")
 
-	// Every agent in the ultra preset must map to "opus".
-	for agent, model := range ultra.Agents {
-		assert.Equal(t, "opus", model, "ultra preset agent %q must be opus", agent)
+	counts := map[string]int{}
+	for _, tier := range ultra.Agents {
+		counts[tier]++
+	}
+	assert.Equal(t, map[string]int{"fable": 7, "opus": 9}, counts)
+	for _, agent := range []string{
+		"architect", "debugger", "deep-worker", "planner", "reviewer", "security-auditor", "spec-writer",
+	} {
+		assert.Equal(t, "fable", ultra.Agents[agent], agent)
 	}
 }
 
@@ -108,11 +119,14 @@ func TestDefaultCodexProviderEntryUsesBalancedProfile(t *testing.T) {
 
 	entry := DefaultCodexProviderEntry()
 	assert.Equal(t, ProviderModelPolicyQuality, entry.ModelPolicy)
-	assert.Equal(t, CodexSolModel, CodexFrontierModel)
+	assert.Equal(t, CodexAstraModel, CodexFrontierModel)
+	assert.Equal(t, CodexSolModel, CodexCodingModel)
 	assert.Equal(t, CodexTerraModel, CodexStandardModel)
 	assert.Equal(t, CodexLunaModel, CodexMiniModel)
+	assert.Equal(t, CodexLunaModel, CodexSparkModel)
+	assert.Equal(t, CodexLegacyModel, CodexFallbackModel)
 	assert.Equal(t,
-		[]string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="xhigh"`},
+		[]string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="xhigh"`},
 		entry.Args,
 	)
 }

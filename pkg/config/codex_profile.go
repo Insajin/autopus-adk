@@ -3,6 +3,7 @@ package config
 import "strings"
 
 const (
+	CodexAstraModel  = "gpt-6-astra"
 	CodexSolModel    = "gpt-5.6-sol"
 	CodexTerraModel  = "gpt-5.6-terra"
 	CodexLunaModel   = "gpt-5.6-luna"
@@ -58,9 +59,9 @@ type CodexCatalogReasoningLevel struct {
 // CodexSupervisorProfile returns the managed root Codex profile for this quality mode.
 func (q QualityConf) CodexSupervisorProfile() CodexProfile {
 	if q.codexQualityMode() == "ultra" {
-		return CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra}
+		return CodexProfile{Model: CodexAstraModel, Effort: CodexEffortUltra}
 	}
-	return CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}
+	return CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh}
 }
 
 func (q QualityConf) CodexSupervisorModel() string { return q.CodexSupervisorProfile().Model }
@@ -80,22 +81,18 @@ func (q QualityConf) CodexOrchestraEffort() string { return q.CodexOrchestraProf
 
 // CodexAgentProfile maps an agent's effective tier and declared effort to Codex.
 func (q QualityConf) CodexAgentProfile(agentName, fallbackTier, declaredEffort string) CodexProfile {
-	if q.codexQualityMode() == "ultra" {
-		effort := CodexEffortXHigh
-		switch agentName {
-		case "planner", "architect", "security-auditor":
-			effort = CodexEffortMax
-		}
-		return CodexProfile{Model: CodexSolModel, Effort: effort}
+	tier := q.codexAgentTier(agentName, fallbackTier)
+	if q.codexQualityMode() == "ultra" && tier != "fable" && tier != "opus" {
+		tier = "opus"
 	}
 
-	switch q.codexAgentTier(agentName, fallbackTier) {
+	switch tier {
+	case "fable":
+		return CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}
 	case "opus":
 		return CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}
-	case "haiku":
-		return CodexProfile{Model: CodexLunaModel, Effort: normalizeManagedCodexEffort(declaredEffort)}
 	default:
-		return CodexProfile{Model: CodexTerraModel, Effort: normalizeManagedCodexEffort(declaredEffort)}
+		return CodexProfile{Model: CodexModelForTier(tier), Effort: normalizeManagedCodexEffort(declaredEffort)}
 	}
 }
 
@@ -118,10 +115,24 @@ func (q QualityConf) codexAgentTier(agentName, fallbackTier string) string {
 	return q.AgentTier(QualityProviderCodex, agentName, fallbackTier)
 }
 
+// CodexModelForTier maps a relative tier onto its managed Codex model.
+func CodexModelForTier(tier string) string {
+	switch tier {
+	case "fable":
+		return CodexAstraModel
+	case "opus":
+		return CodexSolModel
+	case "haiku":
+		return CodexLunaModel
+	default:
+		return CodexTerraModel
+	}
+}
+
 func normalizeCodexTier(tier string) (string, bool) {
 	tier = strings.ToLower(strings.TrimSpace(tier))
 	switch tier {
-	case "opus", "sonnet", "haiku":
+	case "fable", "opus", "sonnet", "haiku":
 		return tier, true
 	default:
 		return "", false

@@ -60,11 +60,13 @@ func TestClaudeAgentModelFollowsBalancedPreset(t *testing.T) {
 }
 
 // TestClaudeAgentModelFollowsUltraPreset proves the preset — not the source
-// frontmatter — decides the tier: ultra lifts every agent to opus.
+// frontmatter — decides the tier: the reasoning core uses fable while other
+// ultra agents use opus.
 func TestClaudeAgentModelFollowsUltraPreset(t *testing.T) {
 	t.Parallel()
 	agentDir := generateClaudeAgentsForMode(t, "ultra")
 
+	assert.Contains(t, agentFrontmatterLines(t, agentDir, "planner.md"), "model: fable")
 	assert.Contains(t, agentFrontmatterLines(t, agentDir, "tester.md"), "model: opus")
 }
 
@@ -93,4 +95,5 @@ func TestClaudeAgentProfileUltraProjectsMaximumEffort(t *testing.T) {
 	t.Parallel()
 	agentDir := generateClaudeAgentsForMode(t, "ultra")
 	assert.Contains(t, agentFrontmatterLines(t, agentDir, "tester.md"), "effort: max")
+	assert.Contains(t, agentFrontmatterLines(t, agentDir, "planner.md"), "effort: max")
 }

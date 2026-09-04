@@ -38,7 +38,7 @@ func newEffortDetectCmd() *cobra.Command {
 Model/API effort values: low | medium | high | xhigh | max
 Opus 5 identifiers: claude-opus-5 | opus (the opus alias resolves to Opus 5 in Claude Code >= 2.1.219).
 Claude CLI session-only ultracode uses xhigh plus dynamic workflows (Claude Code >= 2.1.203; agent/team propagation >= 2.1.210).
-Fable opt-in identifiers: claude-fable-5 | fable | best (Claude Code >= 2.1.170; entitlement and ZDR restrictions apply).
+Fable 5.1 identifiers: claude-fable-5-1 | fable-5-1 | fable | best (Claude Code >= 2.1.170; legacy claude-fable-5 remains accepted).
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			errOut := cmd.ErrOrStderr()
@@ -74,7 +74,7 @@ Fable opt-in identifiers: claude-fable-5 | fable | best (Claude Code >= 2.1.170;
 
 	cmd.Flags().StringVar(&quality, "quality", "", "Quality mode preset (ultra|balanced)")
 	cmd.Flags().StringVar(&complexity, "complexity", "", "Task complexity hint (low|medium|high)")
-	cmd.Flags().StringVar(&model, "model", "", "Model identifier (opus-5|claude-opus-5|opus|opus-4.8|opus-4.7|sonnet-5|sonnet-4.6|haiku-4.5|claude-fable-5|fable|best)")
+	cmd.Flags().StringVar(&model, "model", "", "Model identifier (fable-5-1|claude-fable-5-1|fable|best|opus-5|claude-opus-5|opus|opus-4.8|opus-4.7|sonnet-5|sonnet-4.6|haiku-4.5|claude-fable-5)")
 	cmd.Flags().StringVar(&agent, "agent", "", "Agent name for frontmatter lookup (future use)")
 	cmd.Flags().StringVar(&format, "format", "plain", "Output format (plain|json)")
 	cmd.Flags().StringVar(&effortFlag, "effort", "", "Explicit model effort or Claude CLI session-only ultracode (overrides quality-mode mapping)")

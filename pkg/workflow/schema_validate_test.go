@@ -70,6 +70,7 @@ func TestParseSchema_RejectsInjectionModel(t *testing.T) {
 	for _, model := range []string{
 		"claude-opus-5\");evil((",
 		"claude-opus-4-8\");evil((",
+		"claude-fable-5-1\");evil((",
 		"claude-fable-5\");evil((",
 		"fable\nawait evil()",
 	} {
@@ -115,20 +116,22 @@ func TestParseSchema_RejectsUnsafeResultType(t *testing.T) {
 func TestIsSafeAgentModel(t *testing.T) {
 	t.Parallel()
 	cases := map[string]bool{
-		"":                          true,
-		"claude-opus-5":             true,
-		"claude-opus-4-8":           true,
-		"claude-sonnet-5":           true,
-		"claude-sonnet-4-6":         true,
-		"claude-haiku-4-5":          true,
-		"claude-fable-5":            true,
-		"fable":                     true,
-		"best":                      true,
-		"gpt-4":                     false,
-		"claude-opus-5\");evil((":   false,
-		"claude-opus-4-8\");evil((": false,
-		"claude-fable-5\");evil((":  false,
-		"fable\nawait evil()":       false,
+		"":                           true,
+		"claude-opus-5":              true,
+		"claude-opus-4-8":            true,
+		"claude-sonnet-5":            true,
+		"claude-sonnet-4-6":          true,
+		"claude-haiku-4-5":           true,
+		"claude-fable-5-1":           true,
+		"claude-fable-5":             true,
+		"fable":                      true,
+		"best":                       true,
+		"gpt-4":                      false,
+		"claude-opus-5\");evil((":    false,
+		"claude-opus-4-8\");evil((":  false,
+		"claude-fable-5-1\");evil((": false,
+		"claude-fable-5\");evil((":   false,
+		"fable\nawait evil()":        false,
 	}
 	for in, want := range cases {
 		if got := isSafeAgentModel(in); got != want {

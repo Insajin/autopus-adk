@@ -46,9 +46,8 @@ func TestEstimateCost_UltraExecutor(t *testing.T) {
 
 func TestEstimateCost_BalancedExecutor(t *testing.T) {
 	// balanced/executor → claude-opus-5: input=$5/M, output=$25/M.
-	// The balanced preset promoted the executor to the top tier, and cost now
-	// derives its models from that preset, so balanced and ultra price the
-	// executor identically.
+	// The executor stays on Opus in both presets. Cost derives from the shared
+	// config tier source, so balanced and ultra price this role identically.
 	// total=4000 → input=3000, output=1000
 	// cost = (3000/1_000_000 * 5) + (1000/1_000_000 * 25) = 0.015 + 0.025 = 0.04
 	e := cost.NewEstimator("balanced")
@@ -62,14 +61,14 @@ func TestEstimateCost_BalancedExecutor(t *testing.T) {
 }
 
 func TestEstimateCost_BalancedValidator(t *testing.T) {
-	// balanced/validator → claude-sonnet-5: input=$3/M, output=$15/M
+	// balanced/validator → claude-sonnet-5: input=$2/M, output=$10/M
 	// total=1_000_000 → input=750_000, output=250_000
-	// cost = (750_000/1_000_000 * 3.0) + (250_000/1_000_000 * 15.0) = 2.25 + 3.75 = 6.00
+	// cost = (750_000/1_000_000 * 2.0) + (250_000/1_000_000 * 10.0) = 1.50 + 2.50 = 4.00
 	e := cost.NewEstimator("balanced")
 	run := telemetry.AgentRun{AgentName: "validator", EstimatedTokens: 1_000_000}
 
 	got := roundTo6(e.EstimateCost(run))
-	want := roundTo6(6.00)
+	want := roundTo6(4.00)
 	if got != want {
 		t.Errorf("EstimateCost balanced/validator: want %f, got %f", want, got)
 	}
@@ -114,9 +113,9 @@ func TestEstimatePipelineCost_MultiplePhases(t *testing.T) {
 	// pipeline QualityMode="balanced"
 	// phase1: executor(4000 tokens) + validator(1000 tokens)
 	// phase2: planner(2000 tokens)
-	// balanced/executor (opus-5):  (3000/1M*5)+(1000/1M*25) = 0.000015+0.000025 = 0.00004
-	// balanced/validator (sonnet-5): (750/1M*3)+(250/1M*15) = 0.00000225+0.00000375 = 0.000006
-	// balanced/planner (opus-5):     (1500/1M*5)+(500/1M*25) = 0.0000075+0.0000125 = 0.00002
+	// balanced/executor (opus-5):    (3000/1M*5)+(1000/1M*25) = 0.015+0.025 = 0.04
+	// balanced/validator (sonnet-5): (750/1M*2)+(250/1M*10) = 0.0015+0.0025 = 0.004
+	// balanced/planner (fable-5-1):  (1500/1M*10)+(500/1M*50) = 0.015+0.025 = 0.04
 	e := cost.NewEstimator("ultra") // estimator mode doesn't matter; pipeline overrides it
 
 	pipeline := telemetry.PipelineRun{

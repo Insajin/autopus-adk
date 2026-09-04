@@ -142,5 +142,19 @@ func (process *OMPModelProbeProcess) run(
 	if process.profile != "" {
 		command.Env = append(command.Env, "PI_CODING_AGENT_DIR="+process.profile)
 	}
+	// omp 18.1.x `config get` ignores the `--config` argv overlay and only
+	// honours the PI_CONFIG_FILES environment overlay; the launch and rpc
+	// commands accept both. Forward the same file through the environment so
+	// every readback observes the overlay regardless of subcommand.
+	if overlay := ompModelProbeConfigOverlay(args); overlay != "" {
+		command.Env = append(command.Env, "PI_CONFIG_FILES="+overlay)
+	}
 	return processprobe.OutputLimited(command, process.maxOutput)
+}
+
+func ompModelProbeConfigOverlay(args []string) string {
+	if len(args) >= 2 && args[0] == "--config" {
+		return args[1]
+	}
+	return ""
 }

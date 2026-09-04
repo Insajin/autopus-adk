@@ -101,6 +101,7 @@ func TestLegacyTierRoute_V1_FailsClosedForUnknownTier(t *testing.T) {
 		capability string
 		role       string
 	}{
+		{"fable", CapabilityDeepReasoning, OMPRolePlan},
 		{"opus", CapabilityDeepReasoning, OMPRolePlan},
 		{"sonnet", CapabilityCodingToolUse, OMPRoleTask},
 		{"haiku", CapabilityDeterministicTransform, OMPRoleTiny},

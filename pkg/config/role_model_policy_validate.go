@@ -10,22 +10,40 @@ func (c *HarnessConfig) validateModelSelectionAndRolePolicy() error {
 	if err := c.validateModelSelectionConfig(); err != nil {
 		return err
 	}
-	return c.RoleModelPolicy.Validate()
+	return c.RoleModelPolicy.validateForQuality(c.Quality)
 }
 
 // Validate rejects partial or ambiguous opt-in role-model policies.
 func (c RoleModelPolicyConf) Validate() error {
-	if c.Version == "" && c.Profile == "" && len(c.Profiles) == 0 {
+	return c.validateForQuality(QualityConf{})
+}
+
+func (c RoleModelPolicyConf) validateForQuality(quality QualityConf) error {
+	if c.Version == "" && c.Profile == "" && c.Family == "" &&
+		c.ConfigMode == "" && len(c.Profiles) == 0 {
 		return nil
 	}
 	if c.EffectiveVersion() != RoleModelPolicyVersionV1 {
 		return fmt.Errorf("role_model_policy.policy_version_unknown: %q", c.Version)
 	}
+	if _, ok := effectiveBuiltinRoleModelFamily(c.Family); !ok {
+		return fmt.Errorf("role_model_policy.family_invalid: %q", c.Family)
+	}
+	if _, ok := effectiveBuiltinRoleModelConfigMode(c.ConfigMode); !ok {
+		return fmt.Errorf("role_model_policy.config_mode_invalid: %q", c.ConfigMode)
+	}
 	if c.Profile != "" {
-		// A built-in name needs no explicit definition: it is derived from the
-		// quality presets at lookup time.
-		if _, ok := c.Profiles[c.Profile]; !ok && !IsBuiltinRoleModelProfileName(c.Profile) {
-			return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
+		if _, ok := c.Profiles[c.Profile]; !ok {
+			if !IsBuiltinRoleModelProfileName(c.Profile) {
+				return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
+			}
+			profile, derived := BuiltinRoleModelProfile(c.Profile, quality, c.Family, c.ConfigMode)
+			if !derived {
+				return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
+			}
+			if err := validateRoleModelProfile(c.Profile, profile); err != nil {
+				return err
+			}
 		}
 	}
 	for name, profile := range c.Profiles {

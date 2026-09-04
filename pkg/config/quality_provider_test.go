@@ -148,7 +148,7 @@ func TestCodexProfilesUseCodexProviderMode(t *testing.T) {
 		QualityProviderCodex:  "ultra",
 	}
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortUltra},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortUltra},
 		balancedGlobalCodexUltra.CodexSupervisorProfile(),
 	)
 	assert.Equal(t,
@@ -156,11 +156,11 @@ func TestCodexProfilesUseCodexProviderMode(t *testing.T) {
 		balancedGlobalCodexUltra.CodexAgentProfile("executor", "sonnet", "medium"),
 	)
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax},
 		balancedGlobalCodexUltra.CodexOrchestraProfile(),
 	)
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortMax},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax},
 		balancedGlobalCodexUltra.CodexAgentProfile("planner", "opus", "medium"),
 	)
 
@@ -171,7 +171,7 @@ func TestCodexProfilesUseCodexProviderMode(t *testing.T) {
 		QualityProviderCodex:  "balanced",
 	}
 	assert.Equal(t,
-		CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh},
+		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh},
 		ultraGlobalCodexBalanced.CodexSupervisorProfile(),
 	)
 	// tester stays on the mid tier under balanced, so it still distinguishes the

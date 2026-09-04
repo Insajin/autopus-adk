@@ -28,13 +28,14 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 		{
 			name: "full support",
 			catalog: `{"models":[
-				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},
+				{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},
+				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"}]},
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
-			rendered:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
-			provider:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			rendered:         config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortUltra},
+			provider:         config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortMax},
 			providerReason:   config.CodexResolutionSupported,
-			supervisor:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortUltra},
+			supervisor:       config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortUltra},
 			supervisorReason: config.CodexResolutionSupported,
 			agent:            config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
 			agentReason:      config.CodexResolutionSupported,
@@ -42,13 +43,14 @@ func TestCodexCapabilityMatrixProjectsEveryConsumer(t *testing.T) {
 		{
 			name: "effort downgrade",
 			catalog: `{"models":[
-				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]},
+				{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"}]},
+				{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"}]},
 				{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}
 			]}`,
-			rendered:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
-			provider:         config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			rendered:         config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortMax},
+			provider:         config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortMax},
 			providerReason:   config.CodexResolutionSupported,
-			supervisor:       config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortMax},
+			supervisor:       config.CodexProfile{Model: config.CodexAstraModel, Effort: config.CodexEffortMax},
 			supervisorReason: config.CodexResolutionEffortUnavailable,
 			agent:            config.CodexProfile{Model: config.CodexSolModel, Effort: config.CodexEffortXHigh},
 			agentReason:      config.CodexResolutionSupported,

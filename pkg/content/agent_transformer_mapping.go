@@ -10,14 +10,16 @@ import (
 // modelMapping maps source model tiers to platform-specific model names.
 var modelMapping = map[string]map[string]string{
 	"codex": {
+		"fable":  config.CodexFrontierModel,
+		"opus":   config.CodexCodingModel,
 		"sonnet": config.CodexStandardModel,
-		"opus":   config.CodexFrontierModel,
 		"haiku":  config.CodexMiniModel,
 	},
 	"gemini": {
-		"sonnet": "gemini-2.5-pro",
-		"opus":   "gemini-2.5-pro",
-		"haiku":  "gemini-2.5-flash",
+		"fable":  "gemini-3.1-pro",
+		"opus":   "gemini-3.1-pro",
+		"sonnet": "gemini-3.1-pro",
+		"haiku":  "gemini-3.8-flash",
 	},
 }
 

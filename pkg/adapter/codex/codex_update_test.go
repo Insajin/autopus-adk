@@ -122,7 +122,7 @@ func TestUpdate_PreservesUserCodexModelSettings(t *testing.T) {
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	userConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.4"`, 1)
+	userConfig := strings.Replace(string(data), `model = "gpt-6-astra"`, `model = "gpt-5.4"`, 1)
 	userConfig = strings.Replace(userConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "ultra"`, 1)
 	require.Contains(t, userConfig, `model = "gpt-5.4"`)
 	require.Contains(t, userConfig, `model_reasoning_effort = "ultra"`)
@@ -184,7 +184,7 @@ func TestUpdate_UnrelatedConfigEditDoesNotFreezeManagedModel(t *testing.T) {
 	updated, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model = "gpt-6-astra"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 	assert.Contains(t, rootSection, `approval_policy = "on-request"`)
 	assert.NotContains(t, rootSection, codexUserModelMarker)
@@ -203,7 +203,7 @@ func TestUpdate_LegacyManagedManifestPreservesAmbiguousUserTuple(t *testing.T) {
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	legacyUserConfig := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.5"`, 1)
+	legacyUserConfig := strings.Replace(string(data), `model = "gpt-6-astra"`, `model = "gpt-5.5"`, 1)
 	legacyUserConfig = strings.Replace(legacyUserConfig, `model_reasoning_effort = "xhigh"`, `model_reasoning_effort = "medium"`, 1)
 	require.NoError(t, os.WriteFile(configPath, []byte(legacyUserConfig), 0o644))
 
@@ -271,7 +271,7 @@ func TestUpdate_RefreshesHistoricalManagedLegacyProfile(t *testing.T) {
 	configPath := filepath.Join(dir, ".codex", "config.toml")
 	data, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-	legacy := strings.Replace(string(data), `model = "gpt-5.6-sol"`, `model = "gpt-5.5"`, 1)
+	legacy := strings.Replace(string(data), `model = "gpt-6-astra"`, `model = "gpt-5.5"`, 1)
 	require.NoError(t, os.WriteFile(configPath, []byte(legacy), 0644))
 
 	manifest, err := adapter.LoadManifest(dir, adapterName)
@@ -287,6 +287,6 @@ func TestUpdate_RefreshesHistoricalManagedLegacyProfile(t *testing.T) {
 	updated, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model = "gpt-6-astra"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "ultra"`)
 }

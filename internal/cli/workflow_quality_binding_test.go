@@ -30,6 +30,14 @@ func TestResolveTeamQualityBinding_SerializesBarePhaseMap(t *testing.T) {
 		t.Fatalf("unmarshal bare phase map %q: %v", s, err)
 	}
 
+	planning, ok := phases["planning"]
+	if !ok {
+		t.Fatalf("missing planning entry in %q", s)
+	}
+	if planning["model"] != "claude-fable-5-1" || planning["effort"] != "max" {
+		t.Fatalf("planning binding = %v, want claude-fable-5-1 + max", planning)
+	}
+
 	impl, ok := phases["implementation"]
 	if !ok {
 		t.Fatalf("missing implementation entry in %q", s)
@@ -73,11 +81,13 @@ func TestResolveTeamQualityBinding_ReusesCanonicalResolvers(t *testing.T) {
 	}
 
 	balanced := resolveTeamQualityBinding("balanced", "")
+	bp := balanced.Phases["planning"]
+	if bp.Model != "claude-fable-5-1" || bp.Effort != "max" {
+		t.Fatalf("balanced planning = %+v, want claude-fable-5-1 + max", bp)
+	}
 	bi := balanced.Phases["implementation"]
-	// The executor carries the top tier in balanced mode, so the implementation
-	// phase resolves to opus-5 through cost.ModelForAgent (PR #151).
-	if bi.Model != "claude-opus-5" || bi.Effort != "medium" {
-		t.Fatalf("balanced implementation = %+v, want opus-5 + medium", bi)
+	if bi.Model != "claude-opus-5" || bi.Effort != "high" {
+		t.Fatalf("balanced implementation = %+v, want claude-opus-5 + high", bi)
 	}
 	br := balanced.Phases["review"]
 	if br.VerifyVotes != 1 || br.Synthesis {

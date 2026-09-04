@@ -85,7 +85,7 @@ func TestHarnessConfig_Validate_QualityDefaultExists(t *testing.T) {
 		Quality: QualityConf{
 			Default: "fast",
 			Presets: map[string]QualityPreset{
-				"fast": {Agents: map[string]string{"planner": "haiku"}},
+				"fast": {Agents: map[string]string{"planner": "fable"}},
 			},
 		},
 	}

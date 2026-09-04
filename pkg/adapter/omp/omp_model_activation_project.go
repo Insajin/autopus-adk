@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -38,7 +39,7 @@ type OMPProjectManagedResult struct {
 }
 
 func OMPMissingManagedValueFingerprint() string {
-	return OMPModelSHA256([]byte("autopus.omp.managed.missing.v1"))
+	return config.OMPMissingManagedValueFingerprint()
 }
 
 func FingerprintOMPManagedValue(value any) (string, error) {

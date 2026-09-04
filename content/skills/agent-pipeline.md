@@ -133,21 +133,21 @@ The terminal handoff must include a concise receipt of important choices, for ex
 
 ```
 Phase 0.7: Authenticity  → main session (subagent surface preflight and evidence counters)
-Phase 1:   Planning        → planner     (model: depends on quality mode, plan)
+Phase 1:   Planning        → planner     (fable, plan)
 Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip if --skip-scaffold
 Gate 1:    Approval        → skipped if --auto
 Phase 1.8: Doc Fetch       → main session (Context7 MCP) — skip if no external libs detected
-Phase 2:   Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
+Phase 2:   Implementation  → executor×N  (opus, acceptEdits, parallel with worktree isolation)
 Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
 Gate 2:    Validation      → validator   (sonnet, plan)  — retry up to 3x on FAIL
 Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX tags on modified files
 Phase 3:   Testing         → tester      (sonnet, acceptEdits)
 Gate 3:    Coverage        → verify 85%+ coverage
 Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) — optional, frontend only
-Phase 4:   Review          → reviewer + security-auditor (parallel) + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
+Phase 4:   Review          → reviewer (opus) + security-auditor (fable), parallel + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
 ```
 
-> The model assignments above are for Balanced mode. In Ultra mode, all agents run with the premium path.
+> The assignments above are for Balanced mode. Ultra assigns its seven-role reasoning core to `fable` and every remaining role to `opus`.
 
 ## Risk-Tiered Review Policy
 
@@ -179,13 +179,13 @@ legacy behavior and refreshes all configured platforms.
 
 ### Ultra Mode
 
-Use the premium model-and-effort projection for every installed agent definition.
+Use the Ultra role profile for every installed agent definition; complexity
+does not lower an assigned tier.
 
 Claude projects Ultra into agent frontmatter (`model:` plus `effort:`) before
-the session starts. Ordinary Agent calls inherit that pair. Codex uses a
-role-selective Ultra profile: a quality-managed depth-0 supervisor and orchestra
-use Sol/`ultra`; `planner`, `architect`, and `security-auditor` use Sol/`max`;
-every other managed agent uses Sol/`xhigh`. An `inherit` supervisor keeps the
+the session starts. Ordinary Agent calls inherit that pair. Codex maps the
+quality-managed depth-0 supervisor to Astra/`ultra`, the orchestra to Astra/`max`,
+Fable-tier workers to Astra/`max`, and Opus-tier workers to Sol/`xhigh`. An `inherit` supervisor keeps the
 user's Codex runtime default. User-owned root model or effort assignments remain
 preserved and take precedence. OpenCode keeps its configured default model and
 projects reasoning effort through its agent definition.
@@ -238,11 +238,12 @@ In Balanced mode, task complexity determines the generated agent profile:
 | LOW | standard `model:` plus mapped `effort:` |
 
 Current workspace policy:
-- Claude never uses `haiku`; LOW stays on `sonnet`
-- Codex maps Balanced Opus-tier work to Sol/`xhigh`, Sonnet-tier work to Terra with role effort, and Haiku-tier work to Luna with role effort; in Ultra, a quality-managed supervisor and orchestra use Sol/`ultra`, `planner`/`architect`/`security-auditor` use Sol/`max`, and every other managed agent uses Sol/`xhigh`
+- The shared hierarchy is `fable` > `opus` > `sonnet` > `haiku`. Claude maps those tiers to Fable 5.1, Opus 5, Sonnet 5, and Haiku 4.5; the shipped presets do not assign Haiku
+- Codex maps `fable` to Astra/`max`, `opus` to Sol/`xhigh`, `sonnet` to Terra with role effort, and `haiku` to Luna with role effort. Ultra uses Astra/`ultra` for a quality-managed supervisor and Astra/`max` for its orchestra; Balanced uses Astra/`xhigh` for both
+- Gemini maps `fable`/`opus`/`sonnet` to `gemini-3.1-pro` and `haiku` to `gemini-3.8-flash`
 - OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 
-In Ultra mode, complexity is IGNORED — all agents use the premium path.
+In Ultra mode, complexity is IGNORED, but the role-specific Fable/Opus assignment remains intact.
 
 Reference: `.claude/skills/adaptive-quality/SKILL.md`
 

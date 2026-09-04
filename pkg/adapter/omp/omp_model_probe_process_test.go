@@ -97,6 +97,28 @@ printf 'cwd=%s\n' "$PWD"
 	}
 }
 
+// omp 18.1.x `config get` reads overlays only from PI_CONFIG_FILES, so a
+// `--config` readback must forward the same file through the environment
+// while a plain metadata probe must not inherit the caller's overlay.
+func TestOMPModelProbeProcess_ForwardsConfigOverlayThroughEnvironment(t *testing.T) {
+	t.Setenv("PI_CONFIG_FILES", "/caller/overlay.yml")
+	executable := writeOMPModelProbeExecutable(t, `#!/bin/sh
+printf 'args=%s\n' "$*"
+printf 'overlay=%s\n' "${PI_CONFIG_FILES-unset}"
+`)
+	process, err := NewOMPModelProbeProcess(executable, 4096)
+	require.NoError(t, err)
+
+	output, err := process.Run(context.Background(),
+		"--config", "/tmp/routing.yml", "config", "get", "retry.fallbackChains", "--json")
+	require.NoError(t, err)
+	assert.Equal(t, "/tmp/routing.yml", ompModelProbeOutputValue(t, string(output), "overlay"))
+
+	output, err = process.Run(context.Background(), "models", "--json", "--no-extensions")
+	require.NoError(t, err)
+	assert.Equal(t, "unset", ompModelProbeOutputValue(t, string(output), "overlay"))
+}
+
 func TestNewOMPInstalledModelProbeProcess_RejectsUnsafeProfileLocator(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

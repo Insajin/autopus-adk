@@ -18,13 +18,17 @@ type ModelPricing struct {
 }
 
 // DefaultPricingTable returns the canonical pricing table for supported models.
-// Prices are in USD per 1M tokens. Opus 5 is the current default model;
-// Opus 4.8 and 4.7 pricing is retained because both remain selectable.
-// Opus 5 pricing verified against official docs (checked 2026-07-25):
-// $5 input / $25 output per MTok, identical to Opus 4.8 and 4.7.
-// Source: https://platform.claude.com/docs/en/about-claude/models/overview
+// Prices are in USD per 1M tokens. Fable 5.1 and Opus 5 are the current top
+// tiers; legacy full model IDs remain priced because they are still selectable.
+// OMP catalog pricing: Fable 5.1 is $10/$50 and Sonnet 5 is $2/$10 per MTok.
+// Checked 2026-09-05.
+// Retained Opus pricing source: https://platform.claude.com/docs/en/about-claude/models/overview
 func DefaultPricingTable() map[string]ModelPricing {
 	return map[string]ModelPricing{
+		config.ClaudeFableModel: {
+			InputPricePerMillion:  10.0,
+			OutputPricePerMillion: 50.0,
+		},
 		config.ClaudeOpusModel: {
 			InputPricePerMillion:  5.0,
 			OutputPricePerMillion: 25.0,
@@ -41,17 +45,15 @@ func DefaultPricingTable() map[string]ModelPricing {
 			InputPricePerMillion:  3.0,
 			OutputPricePerMillion: 15.0,
 		},
-		// Sonnet 5 standard pricing (intro pricing is $2/$10 through 2026-08-31);
-		// standard pricing is retained here as the durable value. Checked 2026-07-13.
 		config.ClaudeSonnetModel: {
-			InputPricePerMillion:  3.0,
-			OutputPricePerMillion: 15.0,
+			InputPricePerMillion:  2.0,
+			OutputPricePerMillion: 10.0,
 		},
 		config.ClaudeHaikuModel: {
 			InputPricePerMillion:  1.0,
 			OutputPricePerMillion: 5.0,
 		},
-		// @AX:NOTE [AUTO]: Fable pricing is keyed only by the resolved full model ID; dynamic aliases remain intentionally unpriced. @AX:SPEC SPEC-FABLE5-001
+		// @AX:NOTE [AUTO]: Fable pricing uses resolved full model IDs; dynamic aliases remain intentionally unpriced. @AX:SPEC SPEC-FABLE5-001
 		"claude-fable-5": {
 			InputPricePerMillion:  10.0,
 			OutputPricePerMillion: 50.0,

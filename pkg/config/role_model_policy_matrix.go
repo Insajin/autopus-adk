@@ -165,12 +165,13 @@ func ValidateOMPAgentRoleSet(agents []string) error {
 	return nil
 }
 
-// LegacyTierRoute maps only the v1 opus/sonnet/haiku compatibility vocabulary.
+// LegacyTierRoute maps the v1 fable/opus/sonnet/haiku compatibility vocabulary.
 func LegacyTierRoute(version, tier string) (LegacyRoleRoute, error) {
 	if version != RoleModelPolicyVersionV1 {
 		return LegacyRoleRoute{}, fmt.Errorf("policy_version_unknown: %q", version)
 	}
 	routes := map[string]LegacyRoleRoute{
+		"fable":  {Capability: CapabilityDeepReasoning, Role: OMPRolePlan, LegacySource: "fable"},
 		"opus":   {Capability: CapabilityDeepReasoning, Role: OMPRolePlan, LegacySource: "opus"},
 		"sonnet": {Capability: CapabilityCodingToolUse, Role: OMPRoleTask, LegacySource: "sonnet"},
 		"haiku":  {Capability: CapabilityDeterministicTransform, Role: OMPRoleTiny, LegacySource: "haiku"},

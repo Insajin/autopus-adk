@@ -20,11 +20,8 @@ func TestQualityPresetsCoverEveryCanonicalAgent(t *testing.T) {
 		require.True(t, ok, "%s preset must exist", mode)
 		assert.Len(t, preset.Agents, len(CanonicalAgentNames()), "%s preset size", mode)
 		for _, agent := range CanonicalAgentNames() {
-			tier, valid := normalizeCodexTier(preset.Agents[agent])
+			_, valid := normalizeCodexTier(preset.Agents[agent])
 			assert.True(t, valid, "%s preset must assign a tier to %q", mode, agent)
-			if mode == "ultra" {
-				assert.Equal(t, "opus", tier, "ultra runs every agent at the top tier")
-			}
 		}
 	}
 }
@@ -45,6 +42,7 @@ func TestAgentTierHonoursProviderOverrideAndFallback(t *testing.T) {
 
 	assert.Equal(t, "opus", quality.AgentTier(QualityProviderClaude, "tester", ""))
 	assert.Equal(t, "sonnet", quality.AgentTier(QualityProviderCodex, "tester", ""))
+	assert.Equal(t, "fable", quality.AgentTier(QualityProviderCodex, "unmapped", "fable"))
 	assert.Equal(t, "haiku", quality.AgentTier(QualityProviderCodex, "unmapped", "haiku"))
 	assert.Equal(t, "sonnet", quality.AgentTier(QualityProviderCodex, "unmapped", "nonsense"))
 }
@@ -65,17 +63,16 @@ func TestAgentTierFoldsWorkflowRoleSpelling(t *testing.T) {
 	)
 }
 
-// TestClaudeAgentModelProjectsResolvedTier verifies the Claude projection,
-// including the executor promotion that balanced mode now carries.
+// TestClaudeAgentModelProjectsResolvedTier verifies all four Claude tiers.
 func TestClaudeAgentModelProjectsResolvedTier(t *testing.T) {
 	t.Parallel()
 	quality := DefaultFullConfig("projection").Quality
 
-	assert.Equal(t, ClaudeOpusModel, quality.ClaudeAgentModel("planner", ""))
-	assert.Equal(t, ClaudeOpusModel, quality.ClaudeAgentModel("executor", ""),
-		"balanced promotes the executor to the top tier")
+	assert.Equal(t, ClaudeFableModel, quality.ClaudeAgentModel("planner", ""))
+	assert.Equal(t, ClaudeOpusModel, quality.ClaudeAgentModel("executor", ""))
 	assert.Equal(t, ClaudeSonnetModel, quality.ClaudeAgentModel("tester", ""))
 
+	assert.Equal(t, ClaudeFableModel, ClaudeModelForTier("fable"))
 	assert.Equal(t, ClaudeOpusModel, ClaudeModelForTier("opus"))
 	assert.Equal(t, ClaudeSonnetModel, ClaudeModelForTier("sonnet"))
 	assert.Equal(t, ClaudeHaikuModel, ClaudeModelForTier("haiku"))
@@ -88,6 +85,7 @@ func TestClaudeAgentModelProjectsResolvedTier(t *testing.T) {
 func TestClaudeModelSlugsArePinned(t *testing.T) {
 	t.Parallel()
 
+	assert.Equal(t, "claude-fable-5-1", ClaudeModelForTier("fable"))
 	assert.Equal(t, "claude-opus-5", ClaudeModelForTier("opus"))
 	assert.Equal(t, "claude-sonnet-5", ClaudeModelForTier("sonnet"))
 	assert.Equal(t, "claude-haiku-4-5", ClaudeModelForTier("haiku"))

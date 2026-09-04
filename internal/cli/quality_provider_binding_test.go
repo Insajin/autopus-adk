@@ -22,10 +22,10 @@ func TestClaudeProviderQualityFeedsRouteTeamBinding(t *testing.T) {
 		quality.EffectiveMode(config.QualityProviderClaude),
 		"",
 	)
-	assert.Equal(t, "claude-opus-5", persisted.Phases["planning"].Model)
-	assert.Equal(t, "medium", persisted.Phases["planning"].Effort)
+	assert.Equal(t, "claude-fable-5-1", persisted.Phases["planning"].Model)
+	assert.Equal(t, "max", persisted.Phases["planning"].Effort)
 	assert.Equal(t, "claude-opus-5", persisted.Phases["implementation"].Model)
-	assert.Equal(t, "medium", persisted.Phases["implementation"].Effort)
+	assert.Equal(t, "high", persisted.Phases["implementation"].Effort)
 
 	explicitGlobal := quality.WithGlobalOverride("ultra")
 	overrideBinding := resolveTeamQualityBinding(
@@ -33,8 +33,8 @@ func TestClaudeProviderQualityFeedsRouteTeamBinding(t *testing.T) {
 		"",
 	)
 	assert.Len(t, overrideBinding.Phases, 6)
-	for phase, binding := range overrideBinding.Phases {
-		assert.Equal(t, "claude-opus-5", binding.Model, phase)
-		assert.Equal(t, "max", binding.Effort, phase)
-	}
+	assert.Equal(t, "claude-fable-5-1", overrideBinding.Phases["planning"].Model)
+	assert.Equal(t, "max", overrideBinding.Phases["planning"].Effort)
+	assert.Equal(t, "claude-opus-5", overrideBinding.Phases["implementation"].Model)
+	assert.Equal(t, "max", overrideBinding.Phases["implementation"].Effort)
 }

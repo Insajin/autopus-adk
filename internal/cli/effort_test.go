@@ -56,23 +56,51 @@ func TestEffortResolve_TC3_UltraHaiku(t *testing.T) {
 	}
 }
 
-// TC4: --quality=balanced --complexity=medium → medium
-func TestEffortResolve_TC4_BalancedMedium(t *testing.T) {
+// TC4: --quality=balanced --model=opus-4.6 → high
+func TestEffortResolve_TC4_BalancedOpus(t *testing.T) {
 	result, err := ResolveEffort(EffortResolveInput{
 		FlagQuality: "balanced", FlagComplexity: "medium", Model: "opus-4.6",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Effort != EffortMedium {
-		t.Errorf("effort: got %q, want %q", result.Effort, EffortMedium)
+	if result.Effort != EffortHigh {
+		t.Errorf("effort: got %q, want %q", result.Effort, EffortHigh)
+	}
+	if !strings.Contains(result.Reason, "opus tier") {
+		t.Errorf("reason should contain opus tier, got: %q", result.Reason)
 	}
 }
 
-// TC5: --quality=balanced --complexity=high → high, reason=high_complexity_task
-func TestEffortResolve_TC5_BalancedHighComplexity(t *testing.T) {
+func TestEffortResolve_BalancedSonnetAndHaikuFollowModelTier(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		model string
+		want  EffortValue
+	}{
+		{"claude-sonnet-5", EffortMedium},
+		{"claude-haiku-4-5", EffortStripped},
+	}
+	for _, tc := range cases {
+		result, err := ResolveEffort(EffortResolveInput{
+			FlagQuality:    "balanced",
+			FlagComplexity: "high",
+			Model:          tc.model,
+		})
+		if err != nil {
+			t.Fatalf("ResolveEffort(%s): %v", tc.model, err)
+		}
+		if result.Effort != tc.want {
+			t.Errorf("ResolveEffort(%s) = %q, want %q", tc.model, result.Effort, tc.want)
+		}
+	}
+}
+
+// TC5: high complexity remains the fallback for an unknown model family.
+func TestEffortResolve_TC5_BalancedHighComplexityFallback(t *testing.T) {
 	result, err := ResolveEffort(EffortResolveInput{
-		FlagQuality: "balanced", FlagComplexity: "high", Model: "opus-4.6",
+		FlagQuality: "balanced", FlagComplexity: "high", Model: "unknown-model",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -131,8 +159,8 @@ func TestEffortResolve_TC8_InvalidEnvFallsBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Effort != EffortMedium {
-		t.Errorf("effort: got %q, want %q", result.Effort, EffortMedium)
+	if result.Effort != EffortHigh {
+		t.Errorf("effort: got %q, want %q", result.Effort, EffortHigh)
 	}
 	if result.Source != EffortSourceQualityMode {
 		t.Errorf("source: got %q, want %q", result.Source, EffortSourceQualityMode)
@@ -157,7 +185,7 @@ func TestEffortResolve_TC9_FrontmatterOverridesQuality(t *testing.T) {
 	}
 }
 
-// TC10: empty env string is unset → falls through to quality_mode → medium
+// TC10: empty env string falls through to the Balanced Opus mapping.
 func TestEffortResolve_TC10_EmptyEnvFallthrough(t *testing.T) {
 	result, err := ResolveEffort(EffortResolveInput{
 		EnvValue: "", FlagQuality: "balanced", Model: "opus-4.6",
@@ -165,8 +193,8 @@ func TestEffortResolve_TC10_EmptyEnvFallthrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Effort != EffortMedium {
-		t.Errorf("effort: got %q, want %q", result.Effort, EffortMedium)
+	if result.Effort != EffortHigh {
+		t.Errorf("effort: got %q, want %q", result.Effort, EffortHigh)
 	}
 }
 

@@ -29,16 +29,16 @@ func TestRoute(t *testing.T) {
 			want:     "claude-sonnet-5",
 		},
 		{
-			name:     "claude complex message returns opus",
+			name:     "claude complex message returns fable",
 			provider: "claude",
 			message:  strings.Repeat("x", 1200) + " 리팩토링 아키텍처",
-			want:     "claude-opus-5",
+			want:     "claude-fable-5-1",
 		},
 		{
-			name:     "claude medium message returns sonnet",
+			name:     "claude medium message returns opus",
 			provider: "claude",
 			message:  strings.Repeat("a", 500) + " 수정 변경",
-			want:     "claude-sonnet-5",
+			want:     "claude-opus-5",
 		},
 		{
 			name:     "unknown provider returns empty",

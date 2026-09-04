@@ -41,11 +41,12 @@ type OMPAgentModelSelection struct {
 }
 
 // TransformAgentForOMP produces an OMP markdown template without selecting a
-// child model. Legacy Claude sonnet/opus labels are not OMP selectors, so their
+// child model. Legacy Claude tier labels are not OMP selectors, so their
 // omission intentionally inherits the parent session model.
 func TransformAgentForOMP(src AgentSource) string {
 	model := src.Meta.Model
-	if model == "sonnet" || model == "opus" {
+	switch model {
+	case "fable", "opus", "sonnet", "haiku":
 		model = ""
 	}
 	return renderAgentForOMP(src, model, "")

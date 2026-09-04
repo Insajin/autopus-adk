@@ -76,13 +76,15 @@ func TestWorkflowRender_TeamBaselinePhases(t *testing.T) {
 	lines := renderLines(t, "--route", "team", "--dry-run")
 
 	planning := findLine(lines, "phase planning:")
-	if !strings.Contains(planning, "model=claude-opus-5") || !strings.Contains(planning, "effort=medium") {
-		t.Fatalf("planning baseline = %q, want opus-5 + medium", planning)
+	if !strings.Contains(planning, "model=claude-fable-5-1") || !strings.Contains(planning, "effort=max") {
+		t.Fatalf("planning baseline = %q, want claude-fable-5-1 + max", planning)
 	}
 
 	impl := findLine(lines, "phase implementation:")
-	if !strings.Contains(impl, "fan_out_cap=5") {
-		t.Fatalf("implementation baseline = %q, want fan_out_cap=5", impl)
+	if !strings.Contains(impl, "model=claude-opus-5") ||
+		!strings.Contains(impl, "effort=high") ||
+		!strings.Contains(impl, "fan_out_cap=5") {
+		t.Fatalf("implementation baseline = %q, want claude-opus-5 + high + fan_out_cap=5", impl)
 	}
 
 	review := findLine(lines, "phase review:")
@@ -96,6 +98,10 @@ func TestWorkflowRender_TeamQualityOverlay(t *testing.T) {
 	t.Parallel()
 
 	ultra := renderLines(t, "--route", "team", "--quality", "ultra")
+	planningU := findLine(ultra, "phase planning:")
+	if !strings.Contains(planningU, "model=claude-fable-5-1") || !strings.Contains(planningU, "effort=max") {
+		t.Fatalf("ultra planning = %q, want claude-fable-5-1 + max", planningU)
+	}
 	implU := findLine(ultra, "phase implementation:")
 	if !strings.Contains(implU, "model=claude-opus-5") || !strings.Contains(implU, "effort=max") {
 		t.Fatalf("ultra implementation = %q, want opus-5 + max", implU)
@@ -106,9 +112,13 @@ func TestWorkflowRender_TeamQualityOverlay(t *testing.T) {
 	}
 
 	balanced := renderLines(t, "--route", "team", "--quality", "balanced")
+	planningB := findLine(balanced, "phase planning:")
+	if !strings.Contains(planningB, "model=claude-fable-5-1") || !strings.Contains(planningB, "effort=max") {
+		t.Fatalf("balanced planning = %q, want claude-fable-5-1 + max", planningB)
+	}
 	implB := findLine(balanced, "phase implementation:")
-	if !strings.Contains(implB, "model=claude-opus-5") || !strings.Contains(implB, "effort=medium") {
-		t.Fatalf("balanced implementation = %q, want opus-5 + medium", implB)
+	if !strings.Contains(implB, "model=claude-opus-5") || !strings.Contains(implB, "effort=high") {
+		t.Fatalf("balanced implementation = %q, want opus-5 + high", implB)
 	}
 	reviewB := findLine(balanced, "phase review:")
 	if !strings.Contains(reviewB, "verify_votes=1") || !strings.Contains(reviewB, "synthesis=false") {

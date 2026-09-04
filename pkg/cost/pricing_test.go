@@ -9,7 +9,7 @@ import (
 func TestDefaultPricingTable_ContainsAllModels(t *testing.T) {
 	table := cost.DefaultPricingTable()
 
-	required := []string{"claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5", "claude-fable-5"}
+	required := []string{"claude-fable-5-1", "claude-fable-5", "claude-opus-5", "claude-opus-4-8", "claude-opus-4-7", "claude-sonnet-5", "claude-sonnet-4-6", "claude-haiku-4-5"}
 	for _, model := range required {
 		if _, ok := table[model]; !ok {
 			t.Errorf("pricing table missing model: %s", model)
@@ -25,13 +25,14 @@ func TestDefaultPricingTable_Prices(t *testing.T) {
 		input  float64
 		output float64
 	}{
+		{"claude-fable-5-1", 10.0, 50.0},
+		{"claude-fable-5", 10.0, 50.0},
 		{"claude-opus-5", 5.0, 25.0},
 		{"claude-opus-4-8", 5.0, 25.0},
 		{"claude-opus-4-7", 5.0, 25.0},
-		{"claude-sonnet-5", 3.0, 15.0},
+		{"claude-sonnet-5", 2.0, 10.0},
 		{"claude-sonnet-4-6", 3.0, 15.0},
 		{"claude-haiku-4-5", 1.0, 5.0},
-		{"claude-fable-5", 10.0, 50.0},
 	}
 
 	for _, tc := range cases {
@@ -59,14 +60,23 @@ func TestDefaultPricingTable_FableAliasesRemainUnpriced(t *testing.T) {
 	}
 }
 
-func TestQualityModeToModels_FableIsNotDefault(t *testing.T) {
+func TestQualityModeToModels_FableRoutesStrategicRoles(t *testing.T) {
 	t.Parallel()
 
-	for _, mode := range []string{"ultra", "balanced"} {
-		for agent, model := range cost.QualityModeToModels(mode) {
-			if model == "claude-fable-5" || model == "fable" || model == "best" {
-				t.Errorf("%s/%s unexpectedly defaults to Fable model %q", mode, agent, model)
-			}
+	cases := []struct {
+		mode  string
+		agent string
+		want  string
+	}{
+		{"ultra", "planner", "claude-fable-5-1"},
+		{"ultra", "executor", "claude-opus-5"},
+		{"balanced", "planner", "claude-fable-5-1"},
+		{"balanced", "executor", "claude-opus-5"},
+		{"balanced", "tester", "claude-sonnet-5"},
+	}
+	for _, tc := range cases {
+		if got := cost.ModelForAgent(tc.mode, tc.agent); got != tc.want {
+			t.Errorf("%s/%s = %q, want %q", tc.mode, tc.agent, got, tc.want)
 		}
 	}
 }
@@ -77,10 +87,17 @@ func TestQualityModeToModels_Ultra(t *testing.T) {
 		t.Fatal("ultra mode returned nil")
 	}
 
-	expected := []string{"planner", "architect", "executor", "tester", "reviewer", "validator"}
-	for _, agent := range expected {
-		if model, ok := agents[agent]; !ok || model != "claude-opus-5" {
-			t.Errorf("ultra/%s: want claude-opus-5, got %q", agent, model)
+	cases := map[string]string{
+		"planner":   "claude-fable-5-1",
+		"architect": "claude-fable-5-1",
+		"executor":  "claude-opus-5",
+		"tester":    "claude-opus-5",
+		"reviewer":  "claude-fable-5-1",
+		"validator": "claude-opus-5",
+	}
+	for agent, want := range cases {
+		if got := agents[agent]; got != want {
+			t.Errorf("ultra/%s: want %s, got %q", agent, want, got)
 		}
 	}
 }
@@ -95,13 +112,11 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 		agent string
 		model string
 	}{
-		{"planner", "claude-opus-5"},
-		{"architect", "claude-opus-5"},
-		// executor and security-auditor sit at opus in the balanced preset,
-		// which is now the only tier source for cost.
+		{"planner", "claude-fable-5-1"},
+		{"architect", "claude-fable-5-1"},
 		{"executor", "claude-opus-5"},
 		{"tester", "claude-sonnet-5"},
-		{"reviewer", "claude-sonnet-5"},
+		{"reviewer", "claude-opus-5"},
 		{"validator", "claude-sonnet-5"},
 	}
 
@@ -124,10 +139,12 @@ func TestModelForAgent_Known(t *testing.T) {
 		agent string
 		want  string
 	}{
+		{"ultra", "planner", "claude-fable-5-1"},
 		{"ultra", "executor", "claude-opus-5"},
+		{"balanced", "planner", "claude-fable-5-1"},
 		{"balanced", "executor", "claude-opus-5"},
+		{"balanced", "tester", "claude-sonnet-5"},
 		{"balanced", "validator", "claude-sonnet-5"},
-		{"balanced", "planner", "claude-opus-5"},
 	}
 
 	for _, tc := range cases {
@@ -139,9 +156,8 @@ func TestModelForAgent_Known(t *testing.T) {
 }
 
 // TestModelForAgent_TeamPhaseRoles covers the workflow phase roles added in
-// SPEC-HARNESS-WORKFLOW-TEAM-001 T8. The S3 tier shape still holds (ultra is
-// uniformly opus); the balanced values now follow the config quality preset,
-// which promoted executor and security-auditor to opus.
+// SPEC-HARNESS-WORKFLOW-TEAM-001 T8. Ultra and Balanced both preserve the
+// four-tier config preset instead of flattening every role onto one model.
 func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 	t.Parallel()
 
@@ -151,16 +167,18 @@ func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 		want  string
 	}{
 		// Core roles — regression guard.
+		{"ultra", "planner", "claude-fable-5-1"},
 		{"ultra", "executor", "claude-opus-5"},
+		{"balanced", "planner", "claude-fable-5-1"},
 		{"balanced", "executor", "claude-opus-5"},
-		{"balanced", "planner", "claude-opus-5"},
-		// New team-phase roles — ultra mode.
+		{"balanced", "tester", "claude-sonnet-5"},
+		// Team-phase roles — Ultra mode.
 		{"ultra", "annotator", "claude-opus-5"},
-		{"ultra", "security_auditor", "claude-opus-5"},
+		{"ultra", "security_auditor", "claude-fable-5-1"},
 		{"ultra", "test_scaffold", "claude-opus-5"},
-		// New team-phase roles — balanced mode.
+		// Team-phase roles — Balanced mode.
 		{"balanced", "annotator", "claude-sonnet-5"},
-		{"balanced", "security_auditor", "claude-opus-5"},
+		{"balanced", "security_auditor", "claude-fable-5-1"},
 		{"balanced", "test_scaffold", "claude-sonnet-5"},
 	}
 

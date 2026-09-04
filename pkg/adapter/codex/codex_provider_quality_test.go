@@ -14,8 +14,7 @@ import (
 func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 	t.Parallel()
 
-	// tester is the mid-tier witness: under balanced it stays on the mid model,
-	// under ultra it rises, so each row still proves which preset was applied.
+	// tester is Sonnet in balanced and Opus in ultra while planner remains Fable.
 	tests := []struct {
 		name              string
 		global            string
@@ -30,7 +29,7 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 			global:            "ultra",
 			codex:             "balanced",
 			wantRootEffort:    config.CodexEffortXHigh,
-			wantPlannerEffort: config.CodexEffortXHigh,
+			wantPlannerEffort: config.CodexEffortMax,
 			wantMidModel:      config.CodexTerraModel,
 			wantMidEffort:     config.CodexEffortMedium,
 		},
@@ -63,7 +62,7 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 			configFiles, err := adapter.prepareConfigFile(cfg)
 			require.NoError(t, err)
 			root := strings.SplitN(string(configFiles[0].Content), "[agents]", 2)[0]
-			assert.Contains(t, root, `model = "`+config.CodexSolModel+`"`)
+			assert.Contains(t, root, `model = "`+config.CodexAstraModel+`"`)
 			assert.Contains(t, root, `model_reasoning_effort = "`+tt.wantRootEffort+`"`)
 
 			agentFiles, err := adapter.generateAgents(cfg)
@@ -74,7 +73,7 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 			}
 			planner := byPath[filepath.Join(".codex", "agents", "planner.toml")]
 			tester := byPath[filepath.Join(".codex", "agents", "tester.toml")]
-			assert.Contains(t, planner, `model = "`+config.CodexSolModel+`"`)
+			assert.Contains(t, planner, `model = "`+config.CodexAstraModel+`"`)
 			assert.Contains(t, planner, `model_reasoning_effort = "`+tt.wantPlannerEffort+`"`)
 			assert.Contains(t, tester, `model = "`+tt.wantMidModel+`"`)
 			assert.Contains(t, tester, `model_reasoning_effort = "`+tt.wantMidEffort+`"`)

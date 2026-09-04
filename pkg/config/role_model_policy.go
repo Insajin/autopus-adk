@@ -1,5 +1,10 @@
 package config
 
+import (
+	"crypto/sha256"
+	"encoding/hex"
+)
+
 const (
 	RoleModelPolicyVersionV1 = "v1"
 
@@ -11,10 +16,13 @@ const (
 )
 
 // RoleModelPolicyConf is an opt-in, provider-neutral OMP role routing policy.
+// Family and ConfigMode apply only when a selected built-in profile is derived.
 type RoleModelPolicyConf struct {
-	Version  string                          `yaml:"version,omitempty"`
-	Profile  string                          `yaml:"profile,omitempty"`
-	Profiles map[string]RoleModelProfileConf `yaml:"profiles,omitempty"`
+	Version    string                          `yaml:"version,omitempty"`
+	Profile    string                          `yaml:"profile,omitempty"`
+	Family     string                          `yaml:"family,omitempty"`
+	ConfigMode string                          `yaml:"config_mode,omitempty"`
+	Profiles   map[string]RoleModelProfileConf `yaml:"profiles,omitempty"`
 }
 
 // RoleModelProfileConf owns capability routes and optional OMP projection policy.
@@ -90,6 +98,12 @@ func (c RoleModelProfileConf) EffectiveCatalogTrust() string {
 	return c.CatalogTrust
 }
 
+// OMPMissingManagedValueFingerprint identifies a managed key that was absent.
+func OMPMissingManagedValueFingerprint() string {
+	sum := sha256.Sum256([]byte("autopus.omp.managed.missing.v1"))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
 // SelectedRoleModelProfile returns the explicitly selected profile.
 func (c RoleModelPolicyConf) SelectedRoleModelProfile() (string, RoleModelProfileConf, bool) {
 	if c.Profile == "" {
@@ -107,6 +121,6 @@ func (c RoleModelPolicyConf) SelectedRoleModelProfileForQuality(quality QualityC
 	if ok || name == "" {
 		return name, profile, ok
 	}
-	profile, ok = BuiltinRoleModelProfile(name, quality)
+	profile, ok = BuiltinRoleModelProfile(name, quality, c.Family, c.ConfigMode)
 	return name, profile, ok
 }

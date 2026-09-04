@@ -40,7 +40,7 @@ func TestTransformAgentForOMPWithModel_AcceptsNativeThinkingLevels(t *testing.T)
 func TestTransformAgentForOMP_WithoutOptIn_OmitsLegacyModelsToInheritParent(t *testing.T) {
 	t.Parallel()
 
-	for _, legacyModel := range []string{"sonnet", "opus"} {
+	for _, legacyModel := range []string{"fable", "opus", "sonnet", "haiku"} {
 		src := content.AgentSource{
 			Meta: content.AgentSourceMeta{
 				Name: "legacy-agent", Description: "parent model inheritance fixture",

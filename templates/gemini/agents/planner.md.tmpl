@@ -128,25 +128,26 @@ Assign HIGH if ANY two factors are at the HIGH threshold. Assign LOW only if ALL
 
 ## Adaptive Quality
 
-Subextension of the global Quality Mode (`ultra` / `balanced`). Controls which model is used per task.
+Subextension of the global Quality Mode (`ultra` / `balanced`). Uses the shared four-tier order `fable` > `opus` > `sonnet` > `haiku` for task assignments.
 
 ### Ultra Mode
 
-ALL tasks receive `model: "opus"` regardless of complexity. Complexity field is IGNORED for model assignment.
+Complexity does not lower an Ultra assignment. The reasoning core (`planner`, `architect`, `spec-writer`, `security-auditor`, `reviewer`, `debugger`, and `deep-worker`) uses `model: "fable"`; every remaining agent uses `model: "opus"`.
 
 ### Balanced Mode
 
-Model is selected per task based on complexity:
+Model tier follows role and task complexity:
 
 | Complexity | Model Assignment |
 |-----------|-----------------|
-| HIGH | `model: "opus"` |
-| MEDIUM | *(omit — sonnet default)* |
-| LOW | *(omit — sonnet default)* |
+| HIGH | `model: "fable"` for `planner`, `architect`, and `security-auditor` work |
+| MEDIUM | `model: "opus"` for implementation, review, and deep work |
+| LOW | `model: "sonnet"` for routine and default work |
 
 Platform note:
-- Claude never uses `haiku` in this workspace; LOW stays on `sonnet`
-- Codex maps Balanced Opus-tier tasks to Sol/`xhigh`, Sonnet-tier tasks to Terra with role effort, and Haiku-tier tasks to Luna with role effort; in Ultra, a quality-managed supervisor and orchestra use Sol/`ultra`, `planner`/`architect`/`security-auditor` use Sol/`max`, and every other managed agent uses Sol/`xhigh`
+- Claude maps the four tiers to Claude Fable 5.1, Opus 5, Sonnet 5, and Haiku 4.5; the default Ultra and Balanced presets do not assign Haiku
+- Codex maps `fable` to Astra/`max`, `opus` to Sol/`xhigh`, `sonnet` to Terra with role effort, and `haiku` to Luna with role effort; quality-managed supervisors and orchestras use Astra
+- Gemini maps `fable`, `opus`, and `sonnet` to `gemini-3.1-pro`, and `haiku` to `gemini-3.8-flash`
 - OpenCode uses its configured default runtime model; LOW/MEDIUM/HIGH act as reasoning-profile hints until explicit model overrides are surfaced
 
 ### Override
@@ -157,10 +158,10 @@ Override via `autopus.yaml`:
 quality:
   presets:
     balanced:
-      adaptive: true   # enable adaptive quality in balanced mode
+      adaptive: true   # enable complexity-aware tier selection in balanced mode
 ```
 
-When `adaptive: false`, balanced mode uses sonnet for all tasks regardless of complexity.
+When `adaptive: false`, balanced mode follows its fixed role preset instead of changing tiers from per-task complexity.
 
 ### Cost Estimation
 

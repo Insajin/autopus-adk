@@ -22,6 +22,8 @@ func TestInspectLegacySupervisorModelMigratesKnownManagedProfiles(t *testing.T) 
 		{model: config.CodexLegacyModel, effort: config.CodexEffortXHigh},
 		{model: config.CodexSolModel, effort: config.CodexEffortXHigh},
 		{model: config.CodexSolModel, effort: config.CodexEffortUltra},
+		{model: config.CodexAstraModel, effort: config.CodexEffortXHigh},
+		{model: config.CodexAstraModel, effort: config.CodexEffortUltra},
 	}
 	for _, profile := range profiles {
 		profile := profile

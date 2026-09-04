@@ -5,6 +5,7 @@ import "strings"
 // Canonical Claude slugs for the relative quality tiers. Every Claude-facing
 // projection resolves through these so a tier promotion lands in one place.
 const (
+	ClaudeFableModel  = "claude-fable-5-1"
 	ClaudeOpusModel   = "claude-opus-5"
 	ClaudeSonnetModel = "claude-sonnet-5"
 	ClaudeHaikuModel  = "claude-haiku-4-5"
@@ -46,9 +47,9 @@ func NormalizeAgentName(raw string) string {
 	return name
 }
 
-// AgentTier resolves the relative tier (opus, sonnet, or haiku) for one agent
-// under a provider's effective quality view. This is the single tier decision;
-// provider adapters project it onto their own model vocabulary.
+// AgentTier resolves the relative tier (fable, opus, sonnet, or haiku) for one
+// agent under a provider's effective quality view. This is the single tier
+// decision; provider adapters project it onto their own model vocabulary.
 func (q QualityConf) AgentTier(provider, agentName, fallbackTier string) string {
 	name := NormalizeAgentName(agentName)
 	preset, ok := q.Presets[q.ForProvider(provider).Default]
@@ -75,6 +76,8 @@ func (q QualityConf) ClaudeAgentModel(agentName, fallbackTier string) string {
 // resolves to the mid tier, matching AgentTier's own fallback.
 func ClaudeModelForTier(tier string) string {
 	switch tier {
+	case "fable":
+		return ClaudeFableModel
 	case "opus":
 		return ClaudeOpusModel
 	case "haiku":

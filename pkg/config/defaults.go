@@ -1,10 +1,10 @@
 package config
 
 const (
-	CodexFrontierModel           = CodexSolModel
+	CodexFrontierModel           = CodexAstraModel
+	CodexCodingModel             = CodexSolModel
 	CodexStandardModel           = CodexTerraModel
 	CodexMiniModel               = CodexLunaModel
-	CodexCodingModel             = CodexSolModel
 	CodexSparkModel              = CodexLunaModel
 	CodexFallbackModel           = CodexLegacyModel
 	CodexOrchestraTimeoutSeconds = 420
@@ -41,7 +41,7 @@ func CodexProviderEntryForQuality(quality QualityConf) ProviderEntry {
 }
 
 // DefaultFullConfig returns the default config for Full mode.
-// @AX:NOTE: [AUTO] magic constants — model names (opus, sonnet, haiku, Codex GPT-5.x), timeouts, and tier mappings are hardcoded below
+// @AX:NOTE: [AUTO] magic constants — model names (fable, opus, sonnet, haiku, Codex GPT), timeouts, and tier mappings are hardcoded below
 func DefaultFullConfig(projectName string) *HarnessConfig {
 	return &HarnessConfig{
 		Mode:        ModeFull,
@@ -125,32 +125,25 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			SupervisorModelPolicy: SupervisorModelPolicyInherit,
 			Presets: map[string]QualityPreset{
 				"ultra": {
-					Description: "모든 에이전트를 Opus로 실행. 최고 품질.",
+					Description: "추론 코어 7개는 Fable, 나머지는 Opus. 최고 품질.",
 					Agents: map[string]string{
-						"annotator": "opus", "architect": "opus", "debugger": "opus",
-						"deep-worker": "opus", "devops": "opus", "executor": "opus",
+						"architect": "fable", "debugger": "fable", "deep-worker": "fable",
+						"planner": "fable", "reviewer": "fable", "security-auditor": "fable",
+						"spec-writer": "fable",
+						"annotator":   "opus", "devops": "opus", "executor": "opus",
 						"explorer": "opus", "frontend-specialist": "opus",
-						"perf-engineer": "opus", "planner": "opus", "reviewer": "opus",
-						"security-auditor": "opus", "spec-writer": "opus",
-						"tester": "opus", "ux-validator": "opus", "validator": "opus",
+						"perf-engineer": "opus", "tester": "opus",
+						"ux-validator": "opus", "validator": "opus",
 					},
 				},
 				"balanced": {
-					// The executor carries the top tier on measured grounds: on the
-					// one Go-semantics family with headroom the frontier tier scored
-					// 42/45 against 36/45 for the mid tier, and no multi-agent
-					// arrangement closed that gap (best apparatus 40/45 at five
-					// provider calls). Those questions are executor-shaped — predict
-					// exactly what the code does — and the executor's artifact is
-					// what every later role reviews. Planning roles keep their tier:
-					// open judgment was never graded either way.
-					Description: "실행과 핵심 분석은 Opus, 나머지 작업은 Sonnet. Haiku 미사용.",
+					Description: "기획·보안은 Fable, 구현·리뷰는 Opus, 기본 작업은 Sonnet. Haiku 미사용.",
 					Agents: map[string]string{
-						"architect": "opus", "deep-worker": "opus", "executor": "opus",
-						"planner": "opus", "security-auditor": "opus", "spec-writer": "opus",
-						"annotator": "sonnet", "debugger": "sonnet", "devops": "sonnet",
-						"explorer": "sonnet", "frontend-specialist": "sonnet",
-						"perf-engineer": "sonnet", "reviewer": "sonnet",
+						"architect": "fable", "planner": "fable", "security-auditor": "fable",
+						"debugger": "opus", "deep-worker": "opus", "executor": "opus",
+						"reviewer": "opus", "spec-writer": "opus",
+						"annotator": "sonnet", "devops": "sonnet", "explorer": "sonnet",
+						"frontend-specialist": "sonnet", "perf-engineer": "sonnet",
 						"tester": "sonnet", "ux-validator": "sonnet", "validator": "sonnet",
 					},
 				},

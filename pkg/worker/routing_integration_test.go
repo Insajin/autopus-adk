@@ -96,8 +96,8 @@ func TestRoutingIntegration_ComplexPrompt(t *testing.T) {
 	}
 
 	mock.BuildCommand(context.Background(), taskCfg)
-	assert.Equal(t, "claude-opus-5", mock.capturedModel,
-		"complex prompt should route to complex model (claude-opus-5)")
+	assert.Equal(t, "claude-fable-5-1", mock.capturedModel,
+		"complex prompt should route to complex model (claude-fable-5-1)")
 }
 
 // TestRoutingIntegration_Disabled verifies S7 passthrough:
@@ -188,10 +188,10 @@ func TestRoutingIntegration_CodexProvider(t *testing.T) {
 
 	router := routing.NewRouter(enabledRoutingConfig())
 
-	// Short prompt -> simple -> gpt-4o-mini for codex.
+	// Short prompt -> simple -> gpt-5.6-luna for codex.
 	model := router.Route("codex", "fix bug")
-	assert.Equal(t, "gpt-4o-mini", model,
-		"codex simple prompt should route to gpt-4o-mini")
+	assert.Equal(t, "gpt-5.6-luna", model,
+		"codex simple prompt should route to gpt-5.6-luna")
 }
 
 // TestRoutingIntegration_GeminiProvider verifies Gemini provider gets correct model.
@@ -200,10 +200,10 @@ func TestRoutingIntegration_GeminiProvider(t *testing.T) {
 
 	router := routing.NewRouter(enabledRoutingConfig())
 
-	// Short prompt -> simple -> gemini-2.0-flash.
+	// Short prompt -> simple -> gemini-3.8-flash.
 	model := router.Route("gemini", "hello")
-	assert.Equal(t, "gemini-2.0-flash", model,
-		"gemini simple prompt should route to gemini-2.0-flash")
+	assert.Equal(t, "gemini-3.8-flash", model,
+		"gemini simple prompt should route to gemini-3.8-flash")
 }
 
 // TestRoutingIntegration_UnknownProvider verifies unknown providers return empty model.

@@ -77,10 +77,9 @@ func (e *Estimator) EstimatePipelineCost(run telemetry.PipelineRun) float64 {
 // Used by the comparison UI (R7) to show cost trade-offs before pipeline
 // execution.
 //
-// A single synthetic "executor" run used to stand in for the whole pipeline,
-// but the balanced preset now runs the executor at the top tier, so that proxy
-// reports an identical cost for both modes. Spreading the same budget over the
-// roster keeps the token total intact and lets the agents whose tiers actually
+// A single synthetic executor run would report the same cost for both modes
+// because the executor stays on Opus in each preset. Spreading the same budget
+// over the roster keeps the token total intact and lets the roles whose tiers
 // differ carry the comparison.
 func (e *Estimator) EstimateQualityComparison(totalTokens int) (ultraCost, balancedCost float64) {
 	agents := config.CanonicalAgentNames()

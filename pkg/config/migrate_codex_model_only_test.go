@@ -31,8 +31,8 @@ func TestMigrateOrchestraConfig_V05066AutoPinnedModelOnlyCodex_RepairsToQuality(
 
 			got := cfg.Orchestra.Providers["codex"]
 			assert.Equal(t, ProviderModelPolicyQuality, got.ModelPolicy)
-			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.Args)
-			assert.Equal(t, []string{"-m", CodexSolModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.PaneArgs)
+			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.Args)
+			assert.Equal(t, []string{"-m", CodexAstraModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, got.PaneArgs)
 			assert.Equal(t, canonicalLegacyCodexSubprocess(), got.Subprocess)
 		})
 	}

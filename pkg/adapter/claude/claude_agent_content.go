@@ -106,17 +106,20 @@ func applyClaudeAgentProfile(cfg *config.HarnessConfig, filename, content string
 }
 
 func claudeAgentEffort(mode, tier string) string {
-	if tier == "haiku" {
+	switch tier {
+	case "haiku":
 		return ""
-	}
-	if mode == "ultra" {
-		if tier == "opus" {
+	case "fable":
+		return "max"
+	case "opus":
+		if mode == "ultra" {
 			return "max"
 		}
 		return "high"
+	default:
+		if mode == "ultra" {
+			return "high"
+		}
+		return "medium"
 	}
-	if tier == "opus" {
-		return "high"
-	}
-	return "medium"
 }

@@ -176,12 +176,12 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// report, the typed GUI capture contract, the `report` route in its command
 	// description, and the scenario authoring contract (`auto qa scenario`, the
 	// closed read-only step vocabulary, and the screen_ref link that makes
-	// gui.screen_matrix enforceable). It last moved when generated surfaces
-	// stopped referencing ADK source paths that no install manifest writes:
-	// branding formats were inlined into the branding rule, rule references
-	// were repointed at installed per-platform paths, and the language policy
-	// stopped claiming mechanical enforcement.
-	const priorPreparedFilesFingerprint = "fd2d2f55025ff39306547a8b9c19b51a8650832584511e671701a84bc2014d52"
+	// gui.screen_matrix enforceable). It last moved when the quality tiers
+	// became four-way (fable > opus > sonnet > haiku): the planner and
+	// validator agent bodies and the adaptive-quality, agent-pipeline,
+	// using-autopus, subagent-dev, and writing-skills skill bodies now describe
+	// the Fable/Astra/Gemini 3.x projection.
+	const priorPreparedFilesFingerprint = "06cc58dbd3527d19f24f8e0882c67672ff7eeba01815d00de37d7d677b77caa5"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

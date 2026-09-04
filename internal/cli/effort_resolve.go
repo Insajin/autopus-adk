@@ -136,7 +136,8 @@ func resolveQualityMode(quality, complexity, model string) (EffortResult, error)
 }
 
 // resolveUltraMode applies Ultra-quality effort mapping per spec R2.
-// Haiku 4.5 → strip; max-capable Opus and Fable models → max; others → high.
+// Haiku 4.5 → strip; current and max-capable legacy Opus/Fable models → max;
+// other models → high.
 func resolveUltraMode(model string) (EffortResult, error) {
 	normalized := normalizeModelID(model)
 
@@ -149,8 +150,8 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Model:  model,
 			Reason: "effort_stripped_model=haiku-4-5",
 		}, nil
-	case "opus-5", "opus", "opus-4-8", "opus-4-7", "fable-5", "fable", "best":
-		// Top-tier Opus and Fable models support the strongest effort tier.
+	case "opus-5", "opus", "opus-4-8", "opus-4-7",
+		"fable-5-1", "fable-5", "fable", "best":
 		return EffortResult{
 			Effort: EffortMax,
 			Source: EffortSourceQualityMode,
@@ -158,7 +159,7 @@ func resolveUltraMode(model string) (EffortResult, error) {
 			Reason: "ultra mode with max-capable model",
 		}, nil
 	default:
-		// Opus 4.6, Sonnet 5, Sonnet 4.6, or anything else in ultra mode → high.
+		// Opus 4.6, Sonnet models, and unknown models use the safe high fallback.
 		return EffortResult{
 			Effort: EffortHigh,
 			Source: EffortSourceQualityMode,
@@ -168,8 +169,39 @@ func resolveUltraMode(model string) (EffortResult, error) {
 	}
 }
 
-// resolveBalancedMode applies Balanced-quality effort mapping per spec R3.
+// resolveBalancedMode applies model-tier effort mapping in Balanced mode.
 func resolveBalancedMode(complexity, model string) (EffortResult, error) {
+	normalized := normalizeModelID(model)
+	switch normalized {
+	case "haiku-4-5":
+		return EffortResult{
+			Effort: EffortStripped,
+			Source: EffortSourceQualityMode,
+			Model:  model,
+			Reason: "effort_stripped_model=haiku-4-5",
+		}, nil
+	case "fable-5-1", "fable-5", "fable", "best":
+		return EffortResult{
+			Effort: EffortMax,
+			Source: EffortSourceQualityMode,
+			Model:  model,
+			Reason: "balanced mode with fable tier",
+		}, nil
+	case "opus-5", "opus", "opus-4-8", "opus-4-7", "opus-4-6":
+		return EffortResult{
+			Effort: EffortHigh,
+			Source: EffortSourceQualityMode,
+			Model:  model,
+			Reason: "balanced mode with opus tier",
+		}, nil
+	case "sonnet-5", "sonnet", "sonnet-4-6":
+		return EffortResult{
+			Effort: EffortMedium,
+			Source: EffortSourceQualityMode,
+			Model:  model,
+			Reason: "balanced mode with sonnet tier",
+		}, nil
+	}
 	if strings.ToLower(complexity) == "high" {
 		return EffortResult{
 			Effort: EffortHigh,

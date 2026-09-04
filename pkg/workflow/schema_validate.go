@@ -10,6 +10,7 @@ package workflow
 // interpolated into generated workflow JS. Extend deliberately; never widen to
 // free-form input.
 var safeAgentModels = map[string]bool{
+	"claude-fable-5-1":  true,
 	"claude-opus-5":     true,
 	"claude-opus-4-8":   true,
 	"claude-opus-4-7":   true,
