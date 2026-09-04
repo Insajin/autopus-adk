@@ -46,8 +46,38 @@ func TestUpdate_UserMarkerPreservesOnlyNamedCodexSetting(t *testing.T) {
 	updated, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	root := strings.SplitN(string(updated), "[agents]", 2)[0]
-	assert.Contains(t, root, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, root, `model = "gpt-6-astra"`)
 	assert.Contains(t, root, `model_reasoning_effort = "ultra"`)
 	assert.Contains(t, root, `model_reasoning_summary = "detailed"`)
 	assert.NotContains(t, root, codexUserModelMarker+": model,")
+}
+
+// Every update merges the existing file's comments forward and then re-marks
+// the user-owned keys; before the fix each run appended one more marker line.
+func TestUpdate_UserMarkerIsWrittenOnceAcrossRepeatedUpdates(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	a := NewWithRoot(dir)
+	useFullCodexCatalogForTest(a)
+	cfg := config.DefaultFullConfig("test-project")
+	cfg.Quality.SupervisorModelPolicy = "quality"
+
+	_, err := a.Generate(context.Background(), cfg)
+	require.NoError(t, err)
+	configPath := filepath.Join(dir, ".codex", "config.toml")
+	data, err := os.ReadFile(configPath)
+	require.NoError(t, err)
+	custom := strings.Replace(string(data), `model_verbosity = "medium"`, `model_verbosity = "high"`, 1)
+	require.NotEqual(t, string(data), custom)
+	require.NoError(t, os.WriteFile(configPath, []byte(custom), 0o644))
+
+	for round := 1; round <= 3; round++ {
+		_, err = a.Update(context.Background(), cfg)
+		require.NoError(t, err, "update round %d", round)
+		updated, err := os.ReadFile(configPath)
+		require.NoError(t, err)
+		root := strings.SplitN(string(updated), "[agents]", 2)[0]
+		assert.Equal(t, 1, strings.Count(root, codexUserModelMarker), "round %d marker count", round)
+		assert.Contains(t, root, `model_verbosity = "high"`)
+	}
 }

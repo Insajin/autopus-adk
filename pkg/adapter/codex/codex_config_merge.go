@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 const (
@@ -93,10 +94,12 @@ func isKnownManagedCodexSupervisorTuple(model string, hasModel bool, effort stri
 		return false
 	}
 	switch modelValue {
-	case "gpt-5.5":
-		return effortValue == "xhigh"
-	case "gpt-5.6-sol":
-		return effortValue == "xhigh" || effortValue == "ultra"
+	case config.CodexLegacyModel:
+		return effortValue == config.CodexEffortXHigh
+	case config.CodexSolModel:
+		return effortValue == config.CodexEffortXHigh || effortValue == config.CodexEffortUltra
+	case config.CodexAstraModel:
+		return effortValue == config.CodexEffortXHigh || effortValue == config.CodexEffortUltra
 	default:
 		return false
 	}
@@ -157,11 +160,16 @@ func preserveUserCodexModelSettings(rendered string, preservation codexModelPres
 	return strings.Join(lines, "\n")
 }
 
+// insertCodexUserModelMarker places exactly one marker before the first
+// user-owned assignment. mergeCodexConfig carries every comment line of the
+// existing file forward, so the marker written by the previous update is
+// dropped first; otherwise each update would append another copy.
 func insertCodexUserModelMarker(lines []string, overrides map[string]string) []string {
 	marker := formatCodexUserModelMarker(overrides)
 	if marker == "" {
 		return lines
 	}
+	lines = dropStandaloneCodexUserModelMarkers(lines)
 	section := ""
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -179,6 +187,28 @@ func insertCodexUserModelMarker(lines []string, overrides map[string]string) []s
 		}
 	}
 	return lines
+}
+
+// dropStandaloneCodexUserModelMarkers removes marker comments that are real
+// TOML comments. A marker inside a multiline string is user data and stays.
+func dropStandaloneCodexUserModelMarkers(lines []string) []string {
+	var scan codexTOMLScanState
+	kept := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if scan.skipSyntaxLine(line) {
+			kept = append(kept, line)
+			continue
+		}
+		trimmed := strings.TrimSpace(line)
+		if trimmed == codexUserModelMarker || strings.HasPrefix(trimmed, codexUserModelMarker+":") {
+			continue
+		}
+		if _, value, ok := parseCodexConfigAssignment(trimmed); ok {
+			scan.observeValue(value)
+		}
+		kept = append(kept, line)
+	}
+	return kept
 }
 
 func formatCodexUserModelMarker(overrides map[string]string) string {
