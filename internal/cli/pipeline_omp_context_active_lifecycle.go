@@ -9,7 +9,36 @@ import (
 	"strings"
 )
 
-const pipelineOMPActiveCompactionNoopMessage = "Nothing to compact (session too small)"
+// A refused compaction is not a protocol violation. OMP declines in two shapes
+// and both mean the history is already minimal:
+//
+//   - "Nothing to compact (session too small)" — 17.2.7 and 18.1.x
+//   - "snapcompact would not reduce context locally." — 18.1.x only, measured
+//     absent from 17.2.7 and present six times in 18.1.2 and 18.1.5
+//
+// The second one cost the first v0.50.114 attempt its cohort: the harness knew
+// only the first message, so a legitimate no-op was rejected as an invalid
+// response at call 6 of 42.
+//
+// 18.1.x also evaluates the reduction *after* firing the pre-compaction hook,
+// so a refusal can arrive with the pre-ACK already acknowledged. The no-op
+// proof does not depend on that ordering — it re-reads the transcript and the
+// idle state and requires both unchanged — so the pre-ACK is tolerated while
+// the post-ACK must still be absent.
+var pipelineOMPActiveCompactionNoopMessages = []string{
+	"Nothing to compact (session too small)",
+	"Nothing to compact (no messages yet)",
+	"snapcompact would not reduce context locally.",
+}
+
+func pipelineOMPActiveCompactionRefused(message string) bool {
+	for _, known := range pipelineOMPActiveCompactionNoopMessages {
+		if message == known {
+			return true
+		}
+	}
+	return false
+}
 
 func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	ctx context.Context,
@@ -66,8 +95,8 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			}
 		case "response":
 			if frame.ID == id && frame.Command == "compact" && !frame.Success && !started &&
-				!preACKed && !postACKed && !responded &&
-				frame.Error == pipelineOMPActiveCompactionNoopMessage {
+				!postACKed && !responded &&
+				pipelineOMPActiveCompactionRefused(frame.Error) {
 				postProof, _, proofErr := protocol.validatePipelineOMPActiveTranscript(ctx, false)
 				state, stateErr := protocol.readIdleState(ctx, "managed-compaction-noop")
 				if proofErr != nil || postProof != preProof || stateErr != nil ||

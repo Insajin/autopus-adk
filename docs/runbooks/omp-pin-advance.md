@@ -155,6 +155,59 @@ Adapting the harness to 18.1.5's compaction response is a separate task. It
 changes the evidence oracle, so it needs its own cohort run and its own
 `min_reduction_basis_points` measurement.
 
+## Diagnosed 2026-09-03: the refusal, and the gate behind it
+
+The fixed instrument answered in one standalone cohort run, six provider calls:
+
+```
+managed active OMP manual compaction response is invalid:
+  id_match=true command="compact" success=false already_responded=false
+  pre_acked=true post_acked=false summary_valid=false
+  error="snapcompact would not reduce context locally."
+```
+
+`strings` over the staged binaries settles where it came from:
+
+| Message | 17.2.7 | 18.1.2 | 18.1.5 |
+|---|---|---|---|
+| `snapcompact would not reduce context locally.` | absent | 6 | 6 |
+
+So 18.1.x added a refusal class. It is not a protocol violation — it means the
+history is already minimal — and the harness knew only
+`Nothing to compact (session too small)`. 18.1.x also decides this *after*
+firing the pre-compaction hook, so the refusal lands with the pre-ACK already
+acknowledged, which the no-op branch also rejected.
+
+Both are fixed in `pipeline_omp_context_active_lifecycle.go`: all three measured
+refusals are recognized, and the pre-ACK is tolerated while the post-ACK must
+still be absent. The no-op proof is unchanged — it re-reads the transcript and
+idle state and requires both untouched.
+
+Measured result: the standalone cohort against 18.1.5 now completes **42/42**
+instead of stopping at 6.
+
+### But 18.1.x still cannot ship, and the reason is the oracle
+
+The run now fails one step later, at `OMP context promotion cohort gates
+failed`. That gate requires, among other things, `compactionCount >= 2` and
+`MedianReductionBasisPoints >= MinReductionBasisPoints`. If 18.1.x declines
+every compaction as unprofitable, there are zero compactions and no reduction to
+attest, so the promotion evidence has nothing to say.
+
+That is a real product boundary, not a bug to adapt away. Advancing to 18.1.x
+needs one of:
+
+1. a cohort workload that gives 18.1.x history worth compacting, or
+2. an oracle that accepts "declined because it would not help" as a distinct,
+   attestable outcome rather than requiring reduction.
+
+The second changes what the promotion evidence claims, so it is a policy
+decision with its own SPEC, not a pin move.
+
+The adaptation above is kept regardless: a legitimate refusal should never read
+as a protocol violation, 17.2.7 never emits the new message so its behaviour is
+unchanged, and the failure now lands on the honest gate.
+
 ## Why not drop the pin and measure at release time
 
 Because then nothing in the repository states which executable the evidence will

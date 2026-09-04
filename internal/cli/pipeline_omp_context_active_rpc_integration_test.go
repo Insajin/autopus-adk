@@ -86,7 +86,7 @@ func TestPipelineOMPActiveRPC_AcceptsProvenEmptyNoopCompaction(t *testing.T) {
 	require.NoError(t, err)
 	protocol, _ := pipelineOMPProtocolFixture([]pipelineOMPRPCFrame{
 		{ID: "pipeline-1", Type: "response", Command: "get_messages_page", Success: true, Data: page},
-		{ID: "pipeline-active-compact-2", Type: "response", Command: "compact", Error: pipelineOMPActiveCompactionNoopMessage},
+		{ID: "pipeline-active-compact-2", Type: "response", Command: "compact", Error: pipelineOMPActiveCompactionNoopMessages[0]},
 		{ID: "pipeline-3", Type: "response", Command: "get_messages_page", Success: true, Data: page},
 		{ID: "pipeline-4", Type: "response", Command: "get_state", Success: true, Data: idle},
 	})
