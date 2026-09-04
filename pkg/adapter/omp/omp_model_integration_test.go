@@ -140,10 +140,10 @@ func TestOMPModelIntegration_S2_ConnectsPolicyCatalogProjectionAgentsAndReceipt(
 			t.Fatalf("missing integrated mapping %q", path)
 		}
 	}
-	if !strings.Contains(string(byPath[".omp/agents/planner.md"].Content), "model: '@plan'\nthinking: xhigh") {
+	if !strings.Contains(string(byPath[".omp/agents/planner.md"].Content), "model: '@autopus_planner'\nthinking: xhigh") {
 		t.Fatalf("planner projection missing:\n%s", byPath[".omp/agents/planner.md"].Content)
 	}
-	if !strings.Contains(string(byPath[DefaultOMPModelOverlayPath].Content), "plan: anthropic/alpha-reasoner:xhigh") {
+	if !strings.Contains(string(byPath[DefaultOMPModelOverlayPath].Content), "autopus_planner: anthropic/alpha-reasoner:xhigh") {
 		t.Fatalf("overlay projection missing:\n%s", byPath[DefaultOMPModelOverlayPath].Content)
 	}
 	if !strings.Contains(string(byPath[DefaultOMPModelOverlayPath].Content), "modelFallback: true") {
@@ -194,7 +194,8 @@ func TestOMPModelIntegration_OptionalAndRuntimeDefaultRoutesInherit(t *testing.T
 			}
 			byPath := integrationMappingsByPath(files)
 			overlay := string(byPath[DefaultOMPModelOverlayPath].Content)
-			if strings.Contains(overlay, "advisor:") || strings.Contains(overlay, "missing/reviewer") {
+			if strings.Contains(overlay, "autopus_reviewer:") || strings.Contains(overlay, "autopus_security_auditor:") ||
+				strings.Contains(overlay, "missing/reviewer") {
 				t.Fatalf("optional route leaked into overlay:\n%s", overlay)
 			}
 			for _, agent := range []string{"reviewer", "security-auditor"} {
@@ -210,20 +211,33 @@ func TestOMPModelIntegration_OptionalAndRuntimeDefaultRoutesInherit(t *testing.T
 	}
 }
 
-func TestBridgeOMPIntegrationRoutes_FamilyDiversityRolesAreExact(t *testing.T) {
+func TestBridgeOMPIntegrationRoutes_S4_FamilyDiversityRolesAreExact(t *testing.T) {
 	t.Parallel()
 
 	profile := integrationHarnessConfig("overlay").RoleModelPolicy.Profiles["p1"]
-	profile.FamilyDiversity.Roles = []string{config.OMPRolePlan}
+	profile.FamilyDiversity.Roles = []string{config.OMPAgentRoleName("reviewer")}
 	routes, err := bridgeOMPIntegrationRoutes(profile)
 	if err != nil {
 		t.Fatalf("bridge routes: %v", err)
 	}
-	if !routes[config.CapabilityDeepReasoning].PreferDistinctExecutorFamily {
-		t.Fatal("configured plan role did not request family diversity")
+	if len(routes) != len(config.CanonicalAgentNames()) {
+		t.Fatalf("route count = %d, want one per canonical agent", len(routes))
 	}
-	if routes[config.CapabilityIndependentDissent].PreferDistinctExecutorFamily {
-		t.Fatal("unconfigured advisor role requested family diversity")
+	for _, agent := range config.CanonicalAgentNames() {
+		route, ok := routes[agent]
+		if !ok {
+			t.Fatalf("route missing for agent %q", agent)
+		}
+		capability, _ := config.OMPAgentCapability(agent)
+		if route.Agent != agent || route.Role != config.OMPAgentRoleName(agent) || route.Capability != capability {
+			t.Fatalf("route %q carries wrong identity: %+v", agent, route)
+		}
+	}
+	if !routes["reviewer"].PreferDistinctExecutorFamily {
+		t.Fatal("configured reviewer role did not request family diversity")
+	}
+	if routes["security-auditor"].PreferDistinctExecutorFamily {
+		t.Fatal("unconfigured security-auditor role requested family diversity")
 	}
 }
 

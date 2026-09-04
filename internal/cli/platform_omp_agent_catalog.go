@@ -57,7 +57,7 @@ func buildOMPAgentCatalog(
 	summary := ompAgentCatalogSummary{Expected: len(names)}
 	for _, name := range names {
 		role := mapping[name]
-		capability, _ := config.OMPNativeRoleCapability(role)
+		capability, _ := config.OMPAgentCapability(name)
 		definitionPath := path.Join(".omp", "agents", name+".md")
 		installStatus := inspectOMPAgentDefinition(root, definitionPath)
 		definitionVerified := verified[definitionPath]

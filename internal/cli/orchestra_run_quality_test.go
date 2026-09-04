@@ -56,6 +56,6 @@ func TestRunSubprocessPipeline_AppliesRuntimeCodexQualityAndEffort(t *testing.T)
 	})
 	require.NoError(t, err)
 	require.Len(t, captured.Providers, 1)
-	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)
-	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexAstraModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexAstraModel, config.CodexEffortMax)
 }

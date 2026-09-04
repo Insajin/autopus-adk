@@ -89,6 +89,9 @@ func normalizeOMPOperatorAttestedCatalog(
 	return canonicalOMPModelCatalog(models)
 }
 
+// ompOperatorAttestedDeclarations collects every candidate a closed profile
+// declares, from capability routes and agent overrides alike, so attested
+// metadata covers each selector the routing resolver may pick.
 func ompOperatorAttestedDeclarations(
 	profile config.RoleModelProfileConf,
 ) (map[string]ompOperatorAttestedDeclaration, bool) {
@@ -99,36 +102,54 @@ func ompOperatorAttestedDeclarations(
 	declarations := make(map[string]ompOperatorAttestedDeclaration)
 	for _, capability := range capabilities {
 		route, ok := profile.Capabilities[capability]
-		if !ok || !route.Required || route.DegradedAction != "" || len(route.Candidates) == 0 {
+		if !ok || !route.Required || route.DegradedAction != "" || len(route.Candidates) == 0 ||
+			!declareOMPOperatorAttestedCandidates(declarations, capability, route.Candidates) {
 			return nil, false
 		}
-		seen := make(map[string]struct{}, len(route.Candidates))
-		for _, candidate := range route.Candidates {
-			if _, _, valid := parseOMPRoutingSelector(candidate.Selector); !valid ||
-				candidate.Family == "" || !safeOMPModelToken(candidate.Family) ||
-				!config.IsOMPNativeThinkingLevel(candidate.Thinking) {
-				return nil, false
-			}
-			key := candidate.Selector + "\x00" + candidate.Thinking
-			if _, duplicate := seen[key]; duplicate {
-				return nil, false
-			}
-			seen[key] = struct{}{}
-			declaration := declarations[candidate.Selector]
-			if declaration.family != "" && declaration.family != candidate.Family {
-				return nil, false
-			}
-			if declaration.capabilities == nil {
-				declaration = ompOperatorAttestedDeclaration{
-					family: candidate.Family, capabilities: make(map[string]struct{}), thinking: make(map[string]struct{}),
-				}
-			}
-			declaration.capabilities[capability] = struct{}{}
-			declaration.thinking[candidate.Thinking] = struct{}{}
-			declarations[candidate.Selector] = declaration
+	}
+	for agent, override := range profile.Agents {
+		if len(override.Candidates) == 0 {
+			continue
+		}
+		capability, err := config.OMPAgentCapability(agent)
+		if err != nil || !declareOMPOperatorAttestedCandidates(declarations, capability, override.Candidates) {
+			return nil, false
 		}
 	}
 	return declarations, true
+}
+
+func declareOMPOperatorAttestedCandidates(
+	declarations map[string]ompOperatorAttestedDeclaration,
+	capability string,
+	candidates []config.RoleModelCandidateConf,
+) bool {
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if _, _, valid := parseOMPRoutingSelector(candidate.Selector); !valid ||
+			candidate.Family == "" || !safeOMPModelToken(candidate.Family) ||
+			!config.IsOMPNativeThinkingLevel(candidate.Thinking) {
+			return false
+		}
+		key := candidate.Selector + "\x00" + candidate.Thinking
+		if _, duplicate := seen[key]; duplicate {
+			return false
+		}
+		seen[key] = struct{}{}
+		declaration := declarations[candidate.Selector]
+		if declaration.family != "" && declaration.family != candidate.Family {
+			return false
+		}
+		if declaration.capabilities == nil {
+			declaration = ompOperatorAttestedDeclaration{
+				family: candidate.Family, capabilities: make(map[string]struct{}), thinking: make(map[string]struct{}),
+			}
+		}
+		declaration.capabilities[capability] = struct{}{}
+		declaration.thinking[candidate.Thinking] = struct{}{}
+		declarations[candidate.Selector] = declaration
+	}
+	return true
 }
 
 func sortedOMPDeclarationValues(values map[string]struct{}) []string {

@@ -24,8 +24,8 @@ func TestProjectOMPModelRoutingDoctorChecks_ProjectsSafeAvailabilityRows(t *test
 	report := omp.OMPModelDoctorReport{
 		Enabled: true, Profile: "balanced", Status: "degraded", Reason: "role_degraded", ReceiptStatus: "valid",
 		Roles: []omp.OMPModelDoctorRoleRow{
-			{Agent: "executor", Role: "task", Capability: "coding_tool_use", Status: "supported", Reason: "selected", FamilyDiversity: "not_applicable", EvidenceClass: "availability"},
-			{Agent: "reviewer", Role: "advisor", Capability: "independent_dissent", Status: "degraded", Reason: "explicit_degraded", FamilyDiversity: "degraded", FamilyReason: "same_family_only", EvidenceClass: "availability"},
+			{Agent: "executor", Role: "autopus_executor", Capability: "coding_tool_use", Status: "supported", Reason: "selected", FamilyDiversity: "not_applicable", EvidenceClass: "availability"},
+			{Agent: "reviewer", Role: "autopus_reviewer", Capability: "independent_dissent", Status: "degraded", Reason: "explicit_degraded", FamilyDiversity: "degraded", FamilyReason: "same_family_only", EvidenceClass: "availability"},
 		},
 	}
 	checks := projectOMPModelRoutingDoctorChecks(report)
@@ -38,6 +38,7 @@ func TestProjectOMPModelRoutingDoctorChecks_ProjectsSafeAvailabilityRows(t *test
 	encoded, err := json.Marshal(checks)
 	require.NoError(t, err)
 	text := string(encoded)
+	assert.Contains(t, text, "agent=executor role=autopus_executor capability=coding_tool_use")
 	assert.Contains(t, text, "evidence=availability quorum=false")
 	assert.Contains(t, text, "family_diversity=degraded family_reason=same_family_only")
 	for _, forbidden := range []string{"p/code", "q/review", "/Users/", "api_key", "Bearer "} {

@@ -120,6 +120,9 @@ func buildOMPModelDoctorInput(
 	return input
 }
 
+// compileOMPModelDoctorRouting mirrors the generation bridge for doctor rows:
+// one agent-keyed route per canonical agent, skipping agents whose capability
+// route the profile does not declare so partial profiles still report.
 func compileOMPModelDoctorRouting(
 	profile config.RoleModelProfileConf,
 	catalog omp.OMPModelCatalog,
@@ -131,17 +134,17 @@ func compileOMPModelDoctorRouting(
 			diverseRoles[role] = struct{}{}
 		}
 	}
-	for agent, defaultRole := range config.OMPAgentRoleMapping() {
-		role := defaultRole
-		capability, err := config.OMPNativeRoleCapability(role)
+	for _, agent := range config.CanonicalAgentNames() {
+		role, err := config.OMPAgentRole(agent)
 		if err != nil {
 			continue
 		}
-		if override, ok := profile.Agents[agent]; ok {
-			role, capability = override.Role, override.Capability
+		capability, err := config.OMPAgentCapability(agent)
+		if err != nil {
+			continue
 		}
-		route, ok := profile.Capabilities[capability]
-		if !ok {
+		route, err := profile.AgentRoute(agent)
+		if err != nil {
 			continue
 		}
 		_, preferDistinctFamily := diverseRoles[role]

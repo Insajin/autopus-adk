@@ -8,9 +8,15 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/insajin/autopus-adk/pkg/config"
 )
+
+// ompModelRoleRPCWorkers bounds how many role-resolution OMP processes run at
+// once. Every role is an independent process, and a serial sweep over the 16
+// agent roles no longer fits the doctor's shared probe deadline.
+const ompModelRoleRPCWorkers = 4
 
 var ompModelRoleRPCRequest = []byte(`{"id":"autopus-model-state","type":"get_state"}` + "\n")
 
@@ -41,26 +47,66 @@ func readOMPModelRolesViaRPC(
 		roles = append(roles, role)
 	}
 	sort.Strings(roles)
-	resolved := make(map[string]string, len(roles))
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		mu       sync.Mutex
+		wg       sync.WaitGroup
+		firstErr error
+		resolved = make(map[string]string, len(roles))
+		slots    = make(chan struct{}, ompModelRoleRPCWorkers)
+	)
 	for _, role := range roles {
-		args := []string{
-			"--config", configPath, "--model", "@" + role, "--mode", "rpc",
-			"--no-tools", "--no-skills", "--no-extensions",
+		if ctx.Err() != nil {
+			break
 		}
-		output, err := runner.RunWithInput(ctx, cliBinary, ompModelRoleRPCRequest, args...)
-		if err != nil {
-			return nil, fmt.Errorf("activation role readback %s: %w", role, err)
-		}
-		selector, err := parseOMPModelRoleRPCState(output)
-		if err != nil {
-			return nil, fmt.Errorf("activation role readback %s: %w", role, err)
-		}
-		if selector != expected[role] {
-			return nil, fmt.Errorf("activation role readback mismatch: %s", role)
-		}
-		resolved[role] = selector
+		wg.Add(1)
+		slots <- struct{}{}
+		go func(role string) {
+			defer wg.Done()
+			defer func() { <-slots }()
+			selector, err := readOMPModelRoleViaRPC(ctx, runner, configPath, role, expected[role])
+			mu.Lock()
+			defer mu.Unlock()
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+					cancel()
+				}
+				return
+			}
+			resolved[role] = selector
+		}(role)
+	}
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
 	}
 	return resolved, nil
+}
+
+func readOMPModelRoleViaRPC(
+	ctx context.Context,
+	runner ompModelRoleRPCStateRunner,
+	configPath, role, want string,
+) (string, error) {
+	args := []string{
+		"--config", configPath, "--model", "@" + role, "--mode", "rpc",
+		"--no-tools", "--no-skills", "--no-extensions",
+	}
+	output, err := runner.RunWithInput(ctx, cliBinary, ompModelRoleRPCRequest, args...)
+	if err != nil {
+		return "", fmt.Errorf("activation role readback %s: %w", role, err)
+	}
+	selector, err := parseOMPModelRoleRPCState(output)
+	if err != nil {
+		return "", fmt.Errorf("activation role readback %s: %w", role, err)
+	}
+	if selector != want {
+		return "", fmt.Errorf("activation role readback mismatch: %s", role)
+	}
+	return selector, nil
 }
 
 func parseOMPModelRoleRPCState(output []byte) (string, error) {

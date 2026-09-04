@@ -35,7 +35,7 @@ func TestLoadHarnessConfigForDir_CodexRuntimeOverridesAreEphemeral(t *testing.T)
 	assert.Equal(t, "ultra", effective.Quality.Default)
 	provider := effective.Orchestra.Providers["codex"]
 	assert.Equal(t, config.ProviderModelPolicyQuality, provider.ModelPolicy)
-	assert.Contains(t, provider.Args, config.CodexSolModel)
+	assert.Contains(t, provider.Args, config.CodexAstraModel)
 	assert.Contains(t, provider.Args, `model_reasoning_effort="max"`)
 	assert.Contains(t, provider.PaneArgs, `model_reasoning_effort="max"`)
 
@@ -66,8 +66,8 @@ func TestLoadHarnessConfigForDir_RuntimeBalancedOverridesPersistentUltra(t *test
 	require.NoError(t, err)
 	assert.Equal(t, "balanced", effective.Quality.Default)
 	provider := effective.Orchestra.Providers["codex"]
-	assertCodexProfileInArgs(t, provider.Args, config.CodexSolModel, config.CodexEffortXHigh)
-	assertCodexProfileInArgs(t, provider.PaneArgs, config.CodexSolModel, config.CodexEffortXHigh)
+	assertCodexProfileInArgs(t, provider.Args, config.CodexAstraModel, config.CodexEffortXHigh)
+	assertCodexProfileInArgs(t, provider.PaneArgs, config.CodexAstraModel, config.CodexEffortXHigh)
 
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
@@ -102,8 +102,8 @@ func TestRunOrchestraCommand_AppliesRuntimeCodexQualityAndEffort(t *testing.T) {
 	err = runOrchestraCommand(ctx, "plan", "", []string{"codex"}, 30, "", "topic", 0, 0, OrchestraFlags{NoDetach: true})
 	require.NoError(t, err)
 	require.Len(t, captured.Providers, 1)
-	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexSolModel, config.CodexEffortMax)
-	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, captured.Providers[0].Args, config.CodexAstraModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, captured.Providers[0].PaneArgs, config.CodexAstraModel, config.CodexEffortMax)
 	assert.Contains(t, captured.Providers[0].Args, "read-only")
 	assert.Contains(t, captured.Providers[0].PaneArgs, "read-only")
 	assert.NotContains(t, captured.Providers[0].Args, "workspace-write")
@@ -163,7 +163,7 @@ func installRuntimeCodexCatalogFixture(t *testing.T) {
 		runtimeCodexFallbackWriter = originalWriter
 	})
 	runtimeCodexCatalogProbe = func(context.Context, string) ([]byte, error) {
-		return []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`), nil
+		return []byte(`{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`), nil
 	}
 	runtimeCodexFallbackWriter = io.Discard
 }
@@ -211,7 +211,7 @@ func TestBuildProviderConfigsForRuntime_CodexQualityMatrix(t *testing.T) {
 			t.Parallel()
 			providers := buildProviderConfigsForRuntime([]string{"codex"}, tt.quality, tt.effort)
 			require.Len(t, providers, 1)
-			assert.Contains(t, providers[0].Args, config.CodexSolModel)
+			assert.Contains(t, providers[0].Args, config.CodexAstraModel)
 			assert.Contains(t, providers[0].Args, `model_reasoning_effort="`+tt.want+`"`)
 			assert.Contains(t, providers[0].PaneArgs, `model_reasoning_effort="`+tt.want+`"`)
 			assert.NotEqual(t, "exec", providers[0].PaneArgs[0])

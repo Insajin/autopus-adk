@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 const (
@@ -13,16 +14,9 @@ const (
 	CapabilityIndependentDissent     = "independent_dissent"
 	CapabilityDeterministicTransform = "deterministic_transform"
 
-	OMPRoleDefault  = "default"
-	OMPRoleSmol     = "smol"
-	OMPRoleSlow     = "slow"
-	OMPRolePlan     = "plan"
-	OMPRoleVision   = "vision"
-	OMPRoleDesigner = "designer"
-	OMPRoleCommit   = "commit"
-	OMPRoleTiny     = "tiny"
-	OMPRoleTask     = "task"
-	OMPRoleAdvisor  = "advisor"
+	// ompAgentRolePrefix namespaces every projected OMP model role so Autopus
+	// never owns an OMP native role key.
+	ompAgentRolePrefix = "autopus_"
 )
 
 var providerNeutralCapabilities = []string{
@@ -39,45 +33,53 @@ var ompNativeThinkingLevels = map[string]struct{}{
 	"high": {}, "xhigh": {}, "max": {}, "auto": {},
 }
 
-var canonicalRoleByCapability = map[string]string{
-	CapabilityDeepReasoning:          OMPRolePlan,
-	CapabilityCodingToolUse:          OMPRoleTask,
-	CapabilityFastValidation:         OMPRoleSmol,
-	CapabilityVisionDesign:           OMPRoleVision,
-	CapabilityIndependentDissent:     OMPRoleAdvisor,
-	CapabilityDeterministicTransform: OMPRoleTiny,
+// capabilityBySourceAgent is the SPEC-OMP-005 Policy Contract: every generated
+// agent owns exactly one provider-neutral capability and one role derived by
+// OMPAgentRoleName.
+var capabilityBySourceAgent = map[string]string{
+	"annotator":           CapabilityFastValidation,
+	"architect":           CapabilityDeepReasoning,
+	"debugger":            CapabilityCodingToolUse,
+	"deep-worker":         CapabilityCodingToolUse,
+	"devops":              CapabilityCodingToolUse,
+	"executor":            CapabilityCodingToolUse,
+	"explorer":            CapabilityFastValidation,
+	"frontend-specialist": CapabilityVisionDesign,
+	"perf-engineer":       CapabilityCodingToolUse,
+	"planner":             CapabilityDeepReasoning,
+	"reviewer":            CapabilityIndependentDissent,
+	"security-auditor":    CapabilityIndependentDissent,
+	"spec-writer":         CapabilityDeepReasoning,
+	"tester":              CapabilityCodingToolUse,
+	"ux-validator":        CapabilityVisionDesign,
+	"validator":           CapabilityDeterministicTransform,
 }
 
-var capabilityByNativeRole = map[string]string{
-	OMPRoleDefault:  CapabilityCodingToolUse,
-	OMPRoleSmol:     CapabilityFastValidation,
-	OMPRoleSlow:     CapabilityDeepReasoning,
-	OMPRolePlan:     CapabilityDeepReasoning,
-	OMPRoleVision:   CapabilityVisionDesign,
-	OMPRoleDesigner: CapabilityVisionDesign,
-	OMPRoleCommit:   CapabilityDeterministicTransform,
-	OMPRoleTiny:     CapabilityDeterministicTransform,
-	OMPRoleTask:     CapabilityCodingToolUse,
-	OMPRoleAdvisor:  CapabilityIndependentDissent,
+// canonicalAgentByCapability names the representative agent whose role stands
+// in for a capability in legacy tier routes.
+var canonicalAgentByCapability = map[string]string{
+	CapabilityDeepReasoning:          "planner",
+	CapabilityCodingToolUse:          "executor",
+	CapabilityFastValidation:         "explorer",
+	CapabilityVisionDesign:           "ux-validator",
+	CapabilityIndependentDissent:     "reviewer",
+	CapabilityDeterministicTransform: "validator",
 }
 
-var roleBySourceAgent = map[string]string{
-	"annotator":           OMPRoleSmol,
-	"architect":           OMPRoleSlow,
-	"debugger":            OMPRoleTask,
-	"deep-worker":         OMPRoleTask,
-	"devops":              OMPRoleTask,
-	"executor":            OMPRoleTask,
-	"explorer":            OMPRoleSmol,
-	"frontend-specialist": OMPRoleDesigner,
-	"perf-engineer":       OMPRoleTask,
-	"planner":             OMPRolePlan,
-	"reviewer":            OMPRoleAdvisor,
-	"security-auditor":    OMPRoleAdvisor,
-	"spec-writer":         OMPRolePlan,
-	"tester":              OMPRoleTask,
-	"ux-validator":        OMPRoleVision,
-	"validator":           OMPRoleTiny,
+// agentByOMPRole inverts the role naming rule for every matrix agent.
+var agentByOMPRole = func() map[string]string {
+	result := make(map[string]string, len(capabilityBySourceAgent))
+	for agent := range capabilityBySourceAgent {
+		result[OMPAgentRoleName(agent)] = agent
+	}
+	return result
+}()
+
+var legacyTierCapability = map[string]string{
+	"fable":  CapabilityDeepReasoning,
+	"opus":   CapabilityDeepReasoning,
+	"sonnet": CapabilityCodingToolUse,
+	"haiku":  CapabilityDeterministicTransform,
 }
 
 // OMPProviderNeutralCapabilities returns the canonical v1 capability order.
@@ -92,45 +94,78 @@ func IsOMPNativeThinkingLevel(value string) bool {
 	return ok
 }
 
-// CanonicalOMPRoleForCapability maps a semantic capability to its default native role.
-func CanonicalOMPRoleForCapability(capability string) (string, error) {
-	role, ok := canonicalRoleByCapability[capability]
-	if !ok {
-		return "", fmt.Errorf("capability_unknown: %q", capability)
-	}
-	return role, nil
+// OMPAgentRoleName derives the OMP model role owned by an agent. The rule is
+// purely lexical; OMPAgentRole additionally requires a matrix agent.
+func OMPAgentRoleName(agent string) string {
+	return ompAgentRolePrefix + strings.ReplaceAll(agent, "-", "_")
 }
 
-// OMPNativeRoleCapability returns the semantic capability owned by a native role.
-func OMPNativeRoleCapability(role string) (string, error) {
-	capability, ok := capabilityByNativeRole[role]
+// OMPAgentRole returns the OMP model role of a matrix agent.
+func OMPAgentRole(agent string) (string, error) {
+	if _, ok := capabilityBySourceAgent[agent]; !ok {
+		return "", fmt.Errorf("agent_role_unmapped: %q", agent)
+	}
+	return OMPAgentRoleName(agent), nil
+}
+
+// OMPAgentCapability returns the provider-neutral capability of a matrix agent.
+func OMPAgentCapability(agent string) (string, error) {
+	capability, ok := capabilityBySourceAgent[agent]
 	if !ok {
-		return "", fmt.Errorf("role_unknown: %q", role)
+		return "", fmt.Errorf("agent_role_unmapped: %q", agent)
 	}
 	return capability, nil
 }
 
-// OMPAgentRole returns the exact native role for a generated source agent.
-func OMPAgentRole(agent string) (string, error) {
-	role, ok := roleBySourceAgent[agent]
+// OMPRoleAgent returns the matrix agent that owns an autopus role.
+func OMPRoleAgent(role string) (string, error) {
+	agent, ok := agentByOMPRole[role]
 	if !ok {
-		return "", fmt.Errorf("agent_role_unmapped: %q", agent)
+		return "", fmt.Errorf("role_unknown: %q", role)
 	}
-	return role, nil
+	return agent, nil
 }
 
-// OMPAgentRoleMapping returns a detached copy of the v1 source-agent matrix.
+// OMPRoleCapability returns the capability behind an autopus role. OMP native
+// role names are unknown here by design.
+func OMPRoleCapability(role string) (string, error) {
+	agent, err := OMPRoleAgent(role)
+	if err != nil {
+		return "", err
+	}
+	return capabilityBySourceAgent[agent], nil
+}
+
+// OMPAgentRoleMapping returns a detached agent-to-role copy of the matrix.
 func OMPAgentRoleMapping() map[string]string {
-	result := make(map[string]string, len(roleBySourceAgent))
-	for agent, role := range roleBySourceAgent {
-		result[agent] = role
+	result := make(map[string]string, len(capabilityBySourceAgent))
+	for agent := range capabilityBySourceAgent {
+		result[agent] = OMPAgentRoleName(agent)
 	}
 	return result
 }
 
-// ValidateRoleCapabilityPair rejects role overrides that alter the v1 matrix.
+// OMPAgentCapabilityMapping returns a detached agent-to-capability copy of the matrix.
+func OMPAgentCapabilityMapping() map[string]string {
+	result := make(map[string]string, len(capabilityBySourceAgent))
+	for agent, capability := range capabilityBySourceAgent {
+		result[agent] = capability
+	}
+	return result
+}
+
+// CanonicalOMPRoleForCapability returns the representative agent role of a capability.
+func CanonicalOMPRoleForCapability(capability string) (string, error) {
+	agent, ok := canonicalAgentByCapability[capability]
+	if !ok {
+		return "", fmt.Errorf("capability_unknown: %q", capability)
+	}
+	return OMPAgentRoleName(agent), nil
+}
+
+// ValidateRoleCapabilityPair rejects a role/capability pair that disagrees with the matrix.
 func ValidateRoleCapabilityPair(role, capability string) error {
-	want, err := OMPNativeRoleCapability(role)
+	want, err := OMPRoleCapability(role)
 	if err != nil {
 		return err
 	}
@@ -153,7 +188,7 @@ func ValidateOMPAgentRoleSet(agents []string) error {
 		seen[agent] = true
 	}
 	missing := make([]string, 0)
-	for agent := range roleBySourceAgent {
+	for agent := range capabilityBySourceAgent {
 		if !seen[agent] {
 			missing = append(missing, agent)
 		}
@@ -165,20 +200,19 @@ func ValidateOMPAgentRoleSet(agents []string) error {
 	return nil
 }
 
-// LegacyTierRoute maps the v1 fable/opus/sonnet/haiku compatibility vocabulary.
+// LegacyTierRoute maps the v1 fable/opus/sonnet/haiku compatibility vocabulary
+// onto a capability and that capability's representative agent role.
 func LegacyTierRoute(version, tier string) (LegacyRoleRoute, error) {
 	if version != RoleModelPolicyVersionV1 {
 		return LegacyRoleRoute{}, fmt.Errorf("policy_version_unknown: %q", version)
 	}
-	routes := map[string]LegacyRoleRoute{
-		"fable":  {Capability: CapabilityDeepReasoning, Role: OMPRolePlan, LegacySource: "fable"},
-		"opus":   {Capability: CapabilityDeepReasoning, Role: OMPRolePlan, LegacySource: "opus"},
-		"sonnet": {Capability: CapabilityCodingToolUse, Role: OMPRoleTask, LegacySource: "sonnet"},
-		"haiku":  {Capability: CapabilityDeterministicTransform, Role: OMPRoleTiny, LegacySource: "haiku"},
-	}
-	route, ok := routes[tier]
+	capability, ok := legacyTierCapability[tier]
 	if !ok {
 		return LegacyRoleRoute{}, fmt.Errorf("legacy_tier_unknown: %q", tier)
 	}
-	return route, nil
+	role, err := CanonicalOMPRoleForCapability(capability)
+	if err != nil {
+		return LegacyRoleRoute{}, err
+	}
+	return LegacyRoleRoute{Capability: capability, Role: role, LegacySource: tier}, nil
 }

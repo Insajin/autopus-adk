@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -50,46 +51,71 @@ func TestRoleModelPolicy_SelectedProfile_RoundTrips(t *testing.T) {
 	}
 }
 
+// policyContractMatrix mirrors the SPEC-OMP-005 Policy Contract table.
+var policyContractMatrix = []struct {
+	agent, role, capability string
+}{
+	{"annotator", "autopus_annotator", CapabilityFastValidation},
+	{"architect", "autopus_architect", CapabilityDeepReasoning},
+	{"debugger", "autopus_debugger", CapabilityCodingToolUse},
+	{"deep-worker", "autopus_deep_worker", CapabilityCodingToolUse},
+	{"devops", "autopus_devops", CapabilityCodingToolUse},
+	{"executor", "autopus_executor", CapabilityCodingToolUse},
+	{"explorer", "autopus_explorer", CapabilityFastValidation},
+	{"frontend-specialist", "autopus_frontend_specialist", CapabilityVisionDesign},
+	{"perf-engineer", "autopus_perf_engineer", CapabilityCodingToolUse},
+	{"planner", "autopus_planner", CapabilityDeepReasoning},
+	{"reviewer", "autopus_reviewer", CapabilityIndependentDissent},
+	{"security-auditor", "autopus_security_auditor", CapabilityIndependentDissent},
+	{"spec-writer", "autopus_spec_writer", CapabilityDeepReasoning},
+	{"tester", "autopus_tester", CapabilityCodingToolUse},
+	{"ux-validator", "autopus_ux_validator", CapabilityVisionDesign},
+	{"validator", "autopus_validator", CapabilityDeterministicTransform},
+}
+
 func TestRoleModelPolicy_ProjectionMatrix_IsExact(t *testing.T) {
 	t.Parallel()
 
-	wantCapabilities := map[string]string{
-		CapabilityDeepReasoning:          OMPRolePlan,
-		CapabilityCodingToolUse:          OMPRoleTask,
-		CapabilityFastValidation:         OMPRoleSmol,
-		CapabilityVisionDesign:           OMPRoleVision,
-		CapabilityIndependentDissent:     OMPRoleAdvisor,
-		CapabilityDeterministicTransform: OMPRoleTiny,
-	}
-	for capability, wantRole := range wantCapabilities {
-		gotRole, err := CanonicalOMPRoleForCapability(capability)
-		if err != nil || gotRole != wantRole {
-			t.Errorf("canonical role for %q = %q, %v; want %q", capability, gotRole, err, wantRole)
+	wantRoles := make(map[string]string, len(policyContractMatrix))
+	wantCapabilities := make(map[string]string, len(policyContractMatrix))
+	for _, row := range policyContractMatrix {
+		wantRoles[row.agent] = row.role
+		wantCapabilities[row.agent] = row.capability
+		if got := OMPAgentRoleName(row.agent); got != row.role {
+			t.Errorf("OMPAgentRoleName(%q) = %q, want %q", row.agent, got, row.role)
+		}
+		if got, err := OMPAgentRole(row.agent); err != nil || got != row.role {
+			t.Errorf("OMPAgentRole(%q) = %q, %v; want %q", row.agent, got, err, row.role)
+		}
+		if got, err := OMPAgentCapability(row.agent); err != nil || got != row.capability {
+			t.Errorf("OMPAgentCapability(%q) = %q, %v; want %q", row.agent, got, err, row.capability)
+		}
+		if got, err := OMPRoleAgent(row.role); err != nil || got != row.agent {
+			t.Errorf("OMPRoleAgent(%q) = %q, %v; want %q", row.role, got, err, row.agent)
+		}
+		if got, err := OMPRoleCapability(row.role); err != nil || got != row.capability {
+			t.Errorf("OMPRoleCapability(%q) = %q, %v; want %q", row.role, got, err, row.capability)
+		}
+		if err := ValidateRoleCapabilityPair(row.role, row.capability); err != nil {
+			t.Errorf("ValidateRoleCapabilityPair(%q, %q) = %v", row.role, row.capability, err)
 		}
 	}
-
-	wantAgents := map[string]string{
-		"annotator": OMPRoleSmol, "explorer": OMPRoleSmol,
-		"architect": OMPRoleSlow,
-		"planner":   OMPRolePlan, "spec-writer": OMPRolePlan,
-		"ux-validator":        OMPRoleVision,
-		"frontend-specialist": OMPRoleDesigner,
-		"validator":           OMPRoleTiny,
-		"debugger":            OMPRoleTask, "deep-worker": OMPRoleTask, "devops": OMPRoleTask,
-		"executor": OMPRoleTask, "perf-engineer": OMPRoleTask, "tester": OMPRoleTask,
-		"reviewer": OMPRoleAdvisor, "security-auditor": OMPRoleAdvisor,
+	if got := OMPAgentRoleMapping(); !reflect.DeepEqual(got, wantRoles) {
+		t.Fatalf("agent role mapping mismatch\ngot:  %#v\nwant: %#v", got, wantRoles)
 	}
-	if got := OMPAgentRoleMapping(); !reflect.DeepEqual(got, wantAgents) {
-		t.Fatalf("agent role mapping mismatch\ngot:  %#v\nwant: %#v", got, wantAgents)
+	if got := OMPAgentCapabilityMapping(); !reflect.DeepEqual(got, wantCapabilities) {
+		t.Fatalf("agent capability mapping mismatch\ngot:  %#v\nwant: %#v", got, wantCapabilities)
 	}
-	if err := ValidateOMPAgentRoleSet(mapKeys(wantAgents)); err != nil {
+	canonical := CanonicalAgentNames()
+	sort.Strings(canonical)
+	if got := mapKeys(wantRoles); !reflect.DeepEqual(got, canonical) {
+		t.Fatalf("matrix agents %v differ from canonical agents %v", got, canonical)
+	}
+	if err := ValidateOMPAgentRoleSet(mapKeys(wantRoles)); err != nil {
 		t.Fatalf("exact agent set rejected: %v", err)
 	}
-	if err := ValidateOMPAgentRoleSet(append(mapKeys(wantAgents), "future-agent")); err == nil || !strings.Contains(err.Error(), "agent_role_unmapped") {
+	if err := ValidateOMPAgentRoleSet(append(mapKeys(wantRoles), "future-agent")); err == nil || !strings.Contains(err.Error(), "agent_role_unmapped") {
 		t.Fatalf("unmapped agent error = %v", err)
-	}
-	if err := ValidateRoleCapabilityPair(OMPRoleAdvisor, CapabilityCodingToolUse); err == nil || !strings.Contains(err.Error(), "role_capability_mismatch") {
-		t.Fatalf("mismatched role/capability error = %v", err)
 	}
 }
 
@@ -101,10 +127,10 @@ func TestLegacyTierRoute_V1_FailsClosedForUnknownTier(t *testing.T) {
 		capability string
 		role       string
 	}{
-		{"fable", CapabilityDeepReasoning, OMPRolePlan},
-		{"opus", CapabilityDeepReasoning, OMPRolePlan},
-		{"sonnet", CapabilityCodingToolUse, OMPRoleTask},
-		{"haiku", CapabilityDeterministicTransform, OMPRoleTiny},
+		{"fable", CapabilityDeepReasoning, "autopus_planner"},
+		{"opus", CapabilityDeepReasoning, "autopus_planner"},
+		{"sonnet", CapabilityCodingToolUse, "autopus_executor"},
+		{"haiku", CapabilityDeterministicTransform, "autopus_validator"},
 	}
 	for _, tt := range tests {
 		got, err := LegacyTierRoute(RoleModelPolicyVersionV1, tt.tier)
@@ -144,14 +170,34 @@ func TestRoleModelPolicy_Validation_FailsClosed(t *testing.T) {
 		}, "selector_invalid"},
 		{"unknown agent", func(c *HarnessConfig) {
 			p := c.RoleModelPolicy.Profiles["p1"]
-			p.Agents["future-agent"] = RoleAgentOverrideConf{Role: OMPRoleTask, Capability: CapabilityCodingToolUse}
+			p.Agents["future-agent"] = RoleAgentOverrideConf{}
 			c.RoleModelPolicy.Profiles["p1"] = p
 		}, "agent_role_unmapped"},
-		{"mismatched override", func(c *HarnessConfig) {
+		{"override role off matrix", func(c *HarnessConfig) {
 			p := c.RoleModelPolicy.Profiles["p1"]
-			p.Agents["reviewer"] = RoleAgentOverrideConf{Role: OMPRoleAdvisor, Capability: CapabilityCodingToolUse}
+			p.Agents["executor"] = RoleAgentOverrideConf{Role: "autopus_planner"}
 			c.RoleModelPolicy.Profiles["p1"] = p
-		}, "role_capability_mismatch"},
+		}, "agents[executor].role_capability_mismatch"},
+		{"override capability off matrix", func(c *HarnessConfig) {
+			p := c.RoleModelPolicy.Profiles["p1"]
+			p.Agents["executor"] = RoleAgentOverrideConf{Capability: CapabilityDeepReasoning}
+			c.RoleModelPolicy.Profiles["p1"] = p
+		}, "agents[executor].role_capability_mismatch"},
+		{"override native role", func(c *HarnessConfig) {
+			p := c.RoleModelPolicy.Profiles["p1"]
+			p.Agents["executor"] = RoleAgentOverrideConf{Role: "task", Capability: CapabilityCodingToolUse}
+			c.RoleModelPolicy.Profiles["p1"] = p
+		}, "agents[executor].role_capability_mismatch"},
+		{"override candidate selector", func(c *HarnessConfig) {
+			p := c.RoleModelPolicy.Profiles["p1"]
+			p.Agents["executor"] = RoleAgentOverrideConf{Candidates: []RoleModelCandidateConf{{Selector: "acme"}}}
+			c.RoleModelPolicy.Profiles["p1"] = p
+		}, "agents[executor].candidates[0].selector_invalid"},
+		{"override candidate thinking", func(c *HarnessConfig) {
+			p := c.RoleModelPolicy.Profiles["p1"]
+			p.Agents["executor"] = RoleAgentOverrideConf{Candidates: []RoleModelCandidateConf{{Selector: "acme/model", Thinking: "turbo"}}}
+			c.RoleModelPolicy.Profiles["p1"] = p
+		}, "agents[executor].candidates[0].metadata_invalid"},
 		{"omp quality provider", func(c *HarnessConfig) {
 			c.Quality.Providers = map[string]string{"omp": "balanced"}
 		}, "quality.providers provider"},
@@ -184,9 +230,9 @@ func validRoleModelPolicyFixture() RoleModelPolicyConf {
 				ConfigMode:   RoleModelConfigModeOverlay,
 				Capabilities: routes,
 				Agents: map[string]RoleAgentOverrideConf{
-					"reviewer": {Role: OMPRoleAdvisor, Capability: CapabilityIndependentDissent},
+					"reviewer": {Role: "autopus_reviewer", Capability: CapabilityIndependentDissent},
 				},
-				FamilyDiversity: FamilyDiversityPolicyConf{Enabled: true, Roles: []string{OMPRoleAdvisor}},
+				FamilyDiversity: FamilyDiversityPolicyConf{Enabled: true, Roles: []string{"autopus_reviewer"}},
 				Safety:          RoleSafetyPolicyConf{ApprovalMode: "write", IsolationMode: "auto"},
 			},
 		},
@@ -198,5 +244,6 @@ func mapKeys(values map[string]string) []string {
 	for key := range values {
 		keys = append(keys, key)
 	}
+	sort.Strings(keys)
 	return keys
 }

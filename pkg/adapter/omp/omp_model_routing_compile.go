@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"sort"
+
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 type OMPModelRoutingInput struct {
@@ -89,13 +91,22 @@ func canonicalOMPRoutingWorkItems(routes map[string]OMPModelRouteRequest) []ompR
 	return items
 }
 
-func ompRoutingRoleRank(role string) int {
-	for index, candidate := range ompRoutingRoleOrder {
-		if candidate == role {
-			return index
-		}
+// ompRoutingRoleRanks orders agent roles by canonical agent position so the
+// compiled resolution list is stable regardless of route map insertion order.
+var ompRoutingRoleRanks = func() map[string]int {
+	agents := config.CanonicalAgentNames()
+	ranks := make(map[string]int, len(agents))
+	for index, agent := range agents {
+		ranks[config.OMPAgentRoleName(agent)] = index
 	}
-	return len(ompRoutingRoleOrder)
+	return ranks
+}()
+
+func ompRoutingRoleRank(role string) int {
+	if rank, ok := ompRoutingRoleRanks[role]; ok {
+		return rank
+	}
+	return len(ompRoutingRoleRanks)
 }
 
 func digestOMPModelRouting(resolutions []OMPModelRouteResolution) string {

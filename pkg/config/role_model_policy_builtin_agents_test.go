@@ -1,0 +1,137 @@
+package config
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// S5 (config half): the shipped ultra preset routes every agent on its own
+// tier, so executor stays on opus while debugger runs on fable, and dissent
+// agents take the counterpart ladder.
+func TestBuiltinRoleModelProfile_UltraProjectsEachAgentTier(t *testing.T) {
+	t.Parallel()
+
+	quality := DefaultFullConfig("builtin-ultra-agents").Quality
+	profile, ok := BuiltinRoleModelProfile("ultra", quality, "anthropic", "")
+	require.True(t, ok)
+	require.NoError(t, validateRoleModelProfile("ultra", profile))
+	require.Len(t, profile.Agents, len(CanonicalAgentNames()))
+	assert.Equal(t, builtinDiversityPolicy(), profile.FamilyDiversity)
+
+	astra := []RoleModelCandidateConf{
+		builtinCandidate("openai-codex/"+CodexAstraModel, "max", "openai"),
+		builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
+	}
+	want := map[string][]RoleModelCandidateConf{
+		"architect": fableAnthropicCandidates(), "debugger": fableAnthropicCandidates(),
+		"deep-worker": fableAnthropicCandidates(), "planner": fableAnthropicCandidates(),
+		"spec-writer": fableAnthropicCandidates(),
+		"reviewer":    astra, "security-auditor": astra,
+		"annotator": opusAnthropicCandidates(), "devops": opusAnthropicCandidates(),
+		"executor": opusAnthropicCandidates(), "explorer": opusAnthropicCandidates(),
+		"frontend-specialist": opusAnthropicCandidates(), "perf-engineer": opusAnthropicCandidates(),
+		"tester": opusAnthropicCandidates(), "ux-validator": opusAnthropicCandidates(),
+		"validator": opusAnthropicCandidates(),
+	}
+	for agent, candidates := range want {
+		assert.Equal(t, RoleAgentOverrideConf{Candidates: candidates}, profile.Agents[agent], agent)
+		got, err := profile.AgentCandidates(agent)
+		require.NoError(t, err, agent)
+		assert.Equal(t, candidates, got, agent)
+	}
+	// The coding_tool_use default still folds to fable (debugger), but no
+	// coding agent other than debugger/deep-worker resolves through it.
+	assert.Equal(t, fableAnthropicCandidates(), profile.Capabilities[CapabilityCodingToolUse].Candidates)
+}
+
+func TestBuiltinRoleModelProfile_BalancedKeepsSiblingsUnpromoted(t *testing.T) {
+	t.Parallel()
+
+	quality := DefaultFullConfig("builtin-balanced-agents").Quality
+	profile, ok := BuiltinRoleModelProfile("balanced", quality, "", "")
+	require.True(t, ok)
+	require.NoError(t, validateRoleModelProfile("balanced", profile))
+
+	assert.Equal(t, fableAnthropicCandidates(), profile.Agents["planner"].Candidates)
+	assert.Equal(t, opusAnthropicCandidates(), profile.Agents["executor"].Candidates)
+	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["tester"].Candidates)
+	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["annotator"].Candidates)
+	assert.Equal(t, []RoleModelCandidateConf{
+		builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
+		builtinCandidate("openai-codex/"+CodexTerraModel, "medium", "openai"),
+	}, profile.Agents["reviewer"].Candidates)
+	assert.Equal(t, []RoleModelCandidateConf{
+		builtinCandidate("openai-codex/"+CodexAstraModel, "max", "openai"),
+		builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
+	}, profile.Agents["security-auditor"].Candidates)
+
+	// The capability default folds reviewer onto security-auditor's fable
+	// rung; the reviewer route itself does not.
+	dissent := profile.Capabilities[CapabilityIndependentDissent].Candidates
+	assert.Equal(t, "openai-codex/"+CodexAstraModel, dissent[0].Selector)
+	reviewer, err := profile.AgentCandidates("reviewer")
+	require.NoError(t, err)
+	assert.Equal(t, "openai-codex/"+CodexSolModel, reviewer[0].Selector)
+}
+
+func TestBuiltinRoleModelProfile_AgentsIgnoreSiblingTiers(t *testing.T) {
+	t.Parallel()
+
+	quality := QualityConf{
+		Default: "balanced",
+		Presets: map[string]QualityPreset{"balanced": {Agents: map[string]string{
+			"annotator": "haiku", "executor": "opus",
+		}}},
+	}
+	profile, ok := BuiltinRoleModelProfile("balanced", quality, "", "")
+	require.True(t, ok)
+
+	haiku := []RoleModelCandidateConf{builtinCandidate("anthropic/"+ClaudeHaikuModel, "low", "anthropic")}
+	assert.Equal(t, haiku, profile.Agents["annotator"].Candidates, "haiku has no lower rung")
+	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["explorer"].Candidates, "sibling stays on its own tier")
+	assert.Equal(t, opusAnthropicCandidates(), profile.Agents["executor"].Candidates)
+	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["tester"].Candidates, "no promotion by executor")
+	assert.Equal(t, sonnetAnthropicCandidates(), profile.Capabilities[CapabilityFastValidation].Candidates, "default keeps max-wins")
+	assert.Equal(t, opusAnthropicCandidates(), profile.Capabilities[CapabilityCodingToolUse].Candidates)
+}
+
+func TestBuiltinRoleModelProfile_OpenAIAnchorAgentsUseCounterpartForDissent(t *testing.T) {
+	t.Parallel()
+
+	quality := DefaultFullConfig("builtin-openai-agents").Quality
+	profile, ok := BuiltinRoleModelProfile("ultra", quality, "openai", "")
+	require.True(t, ok)
+
+	for agent, override := range profile.Agents {
+		wantFamily := "openai"
+		if capability, _ := OMPAgentCapability(agent); capability == CapabilityIndependentDissent {
+			wantFamily = "anthropic"
+		}
+		require.NotEmpty(t, override.Candidates, agent)
+		for _, candidate := range override.Candidates {
+			assert.Equal(t, wantFamily, candidate.Family, agent)
+		}
+	}
+	assert.Equal(t, "anthropic/"+ClaudeFableModel, profile.Agents["reviewer"].Candidates[0].Selector)
+	assert.Equal(t, "openai-codex/"+CodexSolModel, profile.Agents["executor"].Candidates[0].Selector)
+}
+
+func TestBuiltinRoleModelProfile_AgentsUseModeTierWhenPresetIsAbsent(t *testing.T) {
+	t.Parallel()
+
+	onlyBalanced := QualityConf{Presets: map[string]QualityPreset{
+		"balanced": {Agents: map[string]string{"planner": "sonnet", "executor": "sonnet"}},
+	}}
+	ultra, ok := BuiltinRoleModelProfile("ultra", onlyBalanced, "", "")
+	require.True(t, ok)
+
+	for agent, override := range ultra.Agents {
+		if capability, _ := OMPAgentCapability(agent); capability == CapabilityIndependentDissent {
+			assert.Equal(t, "openai-codex/"+CodexSolModel, override.Candidates[0].Selector, agent)
+			continue
+		}
+		assert.Equal(t, "anthropic/"+ClaudeOpusModel, override.Candidates[0].Selector, agent)
+	}
+}

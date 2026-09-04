@@ -29,7 +29,7 @@ func TestLoadHarnessConfigForDirUsesPersistedCodexProviderQuality(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, "balanced", effective.Quality.Default)
 	assert.Equal(t, "ultra", effective.Quality.EffectiveMode(config.QualityProviderCodex))
-	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexAstraModel, config.CodexEffortMax)
 }
 
 func TestRuntimeGlobalQualityOverridesPersistedProviderModes(t *testing.T) {
@@ -52,7 +52,7 @@ func TestRuntimeGlobalQualityOverridesPersistedProviderModes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "balanced", effective.Quality.Default)
 	assert.Empty(t, effective.Quality.Providers)
-	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexSolModel, config.CodexEffortXHigh)
+	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexAstraModel, config.CodexEffortXHigh)
 
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)

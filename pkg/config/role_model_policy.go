@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 )
 
 const (
@@ -25,7 +26,8 @@ type RoleModelPolicyConf struct {
 	Profiles   map[string]RoleModelProfileConf `yaml:"profiles,omitempty"`
 }
 
-// RoleModelProfileConf owns capability routes and optional OMP projection policy.
+// RoleModelProfileConf owns capability routes, per-agent overrides, and
+// optional OMP projection policy.
 type RoleModelProfileConf struct {
 	ConfigMode      string                             `yaml:"config_mode,omitempty"`
 	CatalogTrust    string                             `yaml:"catalog_trust,omitempty"`
@@ -57,13 +59,16 @@ type RoleModelCandidateConf struct {
 	Family   string `yaml:"family,omitempty"`
 }
 
-// RoleAgentOverrideConf pins an agent to a valid native role/capability pair.
+// RoleAgentOverrideConf pins one agent's route. Role and Capability are
+// optional assertions that must match the matrix when set; Candidates replace
+// the capability route's ordered candidates for this agent only.
 type RoleAgentOverrideConf struct {
-	Role       string `yaml:"role"`
-	Capability string `yaml:"capability"`
+	Role       string                   `yaml:"role,omitempty"`
+	Capability string                   `yaml:"capability,omitempty"`
+	Candidates []RoleModelCandidateConf `yaml:"candidates,omitempty"`
 }
 
-// FamilyDiversityPolicyConf selects roles that prefer a distinct model family.
+// FamilyDiversityPolicyConf selects agent roles that prefer a distinct model family.
 type FamilyDiversityPolicyConf struct {
 	Enabled bool     `yaml:"enabled,omitempty"`
 	Roles   []string `yaml:"roles,omitempty"`
@@ -96,6 +101,37 @@ func (c RoleModelProfileConf) EffectiveCatalogTrust() string {
 		return RoleModelCatalogTrustStrict
 	}
 	return c.CatalogTrust
+}
+
+// AgentCandidates returns the ordered candidates that route one agent: the
+// agents.<name>.candidates override when present, otherwise the candidates of
+// the agent's capability route.
+func (c RoleModelProfileConf) AgentCandidates(agent string) ([]RoleModelCandidateConf, error) {
+	route, err := c.AgentRoute(agent)
+	if err != nil {
+		return nil, err
+	}
+	return route.Candidates, nil
+}
+
+// AgentRoute returns a copy of the capability route that governs one agent
+// with Candidates replaced by AgentCandidates. Required and DegradedAction
+// always come from the capability route.
+func (c RoleModelProfileConf) AgentRoute(agent string) (RoleCapabilityRouteConf, error) {
+	capability, err := OMPAgentCapability(agent)
+	if err != nil {
+		return RoleCapabilityRouteConf{}, err
+	}
+	route, ok := c.Capabilities[capability]
+	if !ok {
+		return RoleCapabilityRouteConf{}, fmt.Errorf("capability_missing: %s", capability)
+	}
+	candidates := route.Candidates
+	if override, ok := c.Agents[agent]; ok && len(override.Candidates) > 0 {
+		candidates = override.Candidates
+	}
+	route.Candidates = append([]RoleModelCandidateConf(nil), candidates...)
+	return route, nil
 }
 
 // OMPMissingManagedValueFingerprint identifies a managed key that was absent.

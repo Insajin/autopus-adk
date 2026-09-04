@@ -28,14 +28,11 @@ func CompileOMPModelDoctorActivationExpectation(
 	routing := CompileOMPModelRouting(OMPModelRoutingInput{
 		Catalog: catalog, CatalogReason: "catalog_ready", Routes: routes,
 	})
-	capabilities, err := projectOMPIntegrationCapabilities(catalog, routes, routing)
+	agents, err := projectOMPIntegrationAgents(catalog, routes, routing)
 	if err != nil {
 		return OMPModelDoctorActivationExpectation{}, err
 	}
-	projection, err := CompileOMPModelProjection(OMPModelProjectionInput{
-		Capabilities: capabilities,
-		AgentNames:   ompModelDoctorAgentNames(),
-	})
+	projection, err := CompileOMPModelProjection(OMPModelProjectionInput{Agents: agents})
 	if err != nil {
 		return OMPModelDoctorActivationExpectation{}, err
 	}
@@ -55,13 +52,4 @@ func CompileOMPModelDoctorActivationExpectation(
 		ConfigHash: OMPModelSHA256(configData), ConfigBytes: append([]byte(nil), configData...),
 		ExpectedValues: expected,
 	}, nil
-}
-
-func ompModelDoctorAgentNames() []string {
-	mapping := config.OMPAgentRoleMapping()
-	names := make([]string, 0, len(mapping))
-	for name := range mapping {
-		names = append(names, name)
-	}
-	return names
 }

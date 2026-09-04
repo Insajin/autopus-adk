@@ -31,7 +31,7 @@ func TestCheckOMPModelRoutingDoctor_FreshReceiptReturnsSafeRoleRows(t *testing.T
 	assert.Equal(t, "fresh", report.Reason)
 	require.Len(t, report.Roles, 2)
 	assert.Equal(t, OMPModelDoctorRoleRow{
-		Agent: "executor", Role: "task", Capability: "coding_tool_use",
+		Agent: "executor", Role: "autopus_executor", Capability: "coding_tool_use",
 		Status: "supported", Reason: "selected", FamilyDiversity: "not_applicable",
 		FamilyReason:  "not_applicable",
 		EvidenceClass: "availability", QuorumEvidence: false,
@@ -149,8 +149,8 @@ func modelDoctorInput(root string) OMPModelDoctorInput {
 		},
 		Activation: OMPModelActivationEvidence{ConfigHash: doctorHash("b"), ReadbackHash: doctorHash("c")},
 		Compilation: OMPModelRoutingCompilation{ResolutionDigest: doctorHash("9"), Resolutions: []OMPModelRouteResolution{
-			{RouteID: "executor", Agent: "executor", RequestedRole: "task", Capability: "coding_tool_use", Status: "selected", Reason: "selected", EffectiveProvider: "p", EffectiveModel: "code", EffectiveSelector: "p/code:medium", Thinking: "medium", EvidenceClass: "availability"},
-			{RouteID: "reviewer", Agent: "reviewer", RequestedRole: "advisor", Capability: "independent_dissent", Status: "selected", Reason: "selected", EffectiveProvider: "q", EffectiveModel: "review", EffectiveSelector: "q/review:high", Thinking: "high", EvidenceClass: "availability", FamilyDiversity: OMPFamilyDiversity{Status: "satisfied", Executor: "p", Reviewer: "q"}},
+			{RouteID: "executor", Agent: "executor", RequestedRole: "autopus_executor", Capability: "coding_tool_use", Status: "selected", Reason: "selected", EffectiveProvider: "p", EffectiveModel: "code", EffectiveSelector: "p/code:medium", Thinking: "medium", EvidenceClass: "availability"},
+			{RouteID: "reviewer", Agent: "reviewer", RequestedRole: "autopus_reviewer", Capability: "independent_dissent", Status: "selected", Reason: "selected", EffectiveProvider: "q", EffectiveModel: "review", EffectiveSelector: "q/review:high", Thinking: "high", EvidenceClass: "availability", FamilyDiversity: OMPFamilyDiversity{Status: "satisfied", Executor: "p", Reviewer: "q"}},
 		}},
 	}
 }

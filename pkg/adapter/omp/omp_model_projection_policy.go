@@ -4,32 +4,24 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
+// ompProjectionRoleSpec is one agent-owned OMP model role in canonical order.
 type ompProjectionRoleSpec struct {
+	agent      string
 	role       string
 	capability string
 }
 
-var ompProjectionRoleSpecs = []ompProjectionRoleSpec{
-	{role: config.OMPRoleDefault, capability: config.CapabilityCodingToolUse},
-	{role: config.OMPRoleSmol, capability: config.CapabilityFastValidation},
-	{role: config.OMPRoleSlow, capability: config.CapabilityDeepReasoning},
-	{role: config.OMPRolePlan, capability: config.CapabilityDeepReasoning},
-	{role: config.OMPRoleVision, capability: config.CapabilityVisionDesign},
-	{role: config.OMPRoleDesigner, capability: config.CapabilityVisionDesign},
-	{role: config.OMPRoleCommit, capability: config.CapabilityDeterministicTransform},
-	{role: config.OMPRoleTiny, capability: config.CapabilityDeterministicTransform},
-	{role: config.OMPRoleTask, capability: config.CapabilityCodingToolUse},
-	{role: config.OMPRoleAdvisor, capability: config.CapabilityIndependentDissent},
-}
-
-var ompProjectionCapabilities = func() map[string]struct{} {
-	result := make(map[string]struct{})
-	for _, capability := range config.OMPProviderNeutralCapabilities() {
-		result[capability] = struct{}{}
+// ompProjectionRoleSpecs mirrors the policy contract: exactly one
+// autopus_<agent> role per canonical agent, ordered like CanonicalAgentNames.
+var ompProjectionRoleSpecs = func() []ompProjectionRoleSpec {
+	agents := config.CanonicalAgentNames()
+	roles := config.OMPAgentRoleMapping()
+	capabilities := config.OMPAgentCapabilityMapping()
+	specs := make([]ompProjectionRoleSpec, 0, len(agents))
+	for _, agent := range agents {
+		specs = append(specs, ompProjectionRoleSpec{
+			agent: agent, role: roles[agent], capability: capabilities[agent],
+		})
 	}
-	return result
+	return specs
 }()
-
-func validateOMPProjectionAgentSet(agentNames []string) error {
-	return config.ValidateOMPAgentRoleSet(agentNames)
-}

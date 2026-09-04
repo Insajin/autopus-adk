@@ -31,7 +31,10 @@ func integrationHarnessConfig(mode string) *config.HarnessConfig {
 						Required: true, Candidates: []config.RoleModelCandidateConf{{Selector: "openai/beta-coder", Thinking: "high", Family: "openai"}},
 					},
 				},
-				FamilyDiversity: config.FamilyDiversityPolicyConf{Enabled: true, Roles: []string{config.OMPRoleAdvisor}},
+				FamilyDiversity: config.FamilyDiversityPolicyConf{
+					Enabled: true,
+					Roles:   []string{config.OMPAgentRoleName("reviewer"), config.OMPAgentRoleName("security-auditor")},
+				},
 			},
 		},
 	}

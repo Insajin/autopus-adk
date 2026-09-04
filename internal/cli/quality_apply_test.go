@@ -146,7 +146,7 @@ func TestQualitySupervisorApplyUpdatesActualCodexRootAndAgents(t *testing.T) {
 	configData, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	rootSection := strings.SplitN(string(configData), "[agents]", 2)[0]
-	assert.Contains(t, rootSection, `model = "gpt-5.6-sol"`)
+	assert.Contains(t, rootSection, `model = "gpt-6-astra"`)
 	assert.Contains(t, rootSection, `model_reasoning_effort = "xhigh"`)
 	// tester is still a mid-tier role under balanced, so it shows that pinning the
 	// supervisor does not leak into agent models.
@@ -180,34 +180,40 @@ func TestQualityUltraApplyWritesSelectiveCodexAgentEffort(t *testing.T) {
 	root.SetArgs([]string{"--config", filepath.Join(dir, "autopus.yaml"), "quality", "ultra", "--apply"})
 	require.NoError(t, root.Execute())
 
-	maxAgents := map[string]bool{
+	// The ultra preset's seven reasoning-core agents are fable tier and render
+	// Astra/max; every other agent is opus tier and renders Sol/xhigh.
+	fableAgents := map[string]bool{
 		"architect.toml":        true,
+		"debugger.toml":         true,
+		"deep-worker.toml":      true,
 		"planner.toml":          true,
+		"reviewer.toml":         true,
 		"security-auditor.toml": true,
+		"spec-writer.toml":      true,
 	}
 	agentDir := filepath.Join(dir, ".codex", "agents")
 	entries, err := os.ReadDir(agentDir)
 	require.NoError(t, err)
 	require.Len(t, entries, 16)
-	seenMaxAgents := make(map[string]bool, len(maxAgents))
+	seenFableAgents := make(map[string]bool, len(fableAgents))
 	for _, entry := range entries {
 		data, readErr := os.ReadFile(filepath.Join(agentDir, entry.Name()))
 		require.NoError(t, readErr)
-		effort := "xhigh"
-		if maxAgents[entry.Name()] {
-			effort = "max"
-			seenMaxAgents[entry.Name()] = true
+		model, effort := "gpt-5.6-sol", "xhigh"
+		if fableAgents[entry.Name()] {
+			model, effort = "gpt-6-astra", "max"
+			seenFableAgents[entry.Name()] = true
 		}
-		assert.Contains(t, string(data), `model = "gpt-5.6-sol"`, entry.Name())
+		assert.Contains(t, string(data), `model = "`+model+`"`, entry.Name())
 		assert.Contains(t, string(data), `model_reasoning_effort = "`+effort+`"`, entry.Name())
 		assert.NotContains(t, string(data), `model_reasoning_effort = "ultra"`, entry.Name())
 	}
-	assert.Equal(t, maxAgents, seenMaxAgents)
+	assert.Equal(t, fableAgents, seenFableAgents)
 }
 
 func installQualityCodexCatalogFixture(t *testing.T) {
 	t.Helper()
-	catalog := []byte(`{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`)
+	catalog := []byte(`{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}`)
 	originalUpdater := qualityPlatformUpdater
 	qualityPlatformUpdater = func(ctx context.Context, dir, platform string, cfg *config.HarnessConfig) (bool, error) {
 		if platform != "codex" {

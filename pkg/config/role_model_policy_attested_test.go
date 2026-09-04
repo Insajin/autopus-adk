@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRoleModelProfileCatalogTrust_DefaultsToStrictAndValidatesKnownValues(t *testing.T) {
 	t.Parallel()
@@ -33,6 +36,7 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 	tests := []struct {
 		name   string
 		mutate func(*RoleModelProfileConf)
+		code   string
 	}{
 		{
 			name: "optional route",
@@ -41,6 +45,7 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 				route.Required = false
 				profile.Capabilities[CapabilityCodingToolUse] = route
 			},
+			code: "operator_attestation_route_not_closed: coding_tool_use",
 		},
 		{
 			name: "runtime default degradation",
@@ -49,6 +54,7 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 				route.DegradedAction = "runtime_default"
 				profile.Capabilities[CapabilityCodingToolUse] = route
 			},
+			code: "operator_attestation_route_not_closed: coding_tool_use",
 		},
 		{
 			name: "empty family",
@@ -57,6 +63,7 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 				route.Candidates[0].Family = ""
 				profile.Capabilities[CapabilityCodingToolUse] = route
 			},
+			code: "capabilities[coding_tool_use].candidates[0].operator_attestation_family_required",
 		},
 		{
 			name: "conflicting family for one selector",
@@ -65,6 +72,37 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 				route.Candidates[0].Family = "other-family"
 				profile.Capabilities[CapabilityVisionDesign] = route
 			},
+			code: "capabilities[vision_design].operator_attestation_family_conflict: acme/model",
+		},
+		{
+			name: "override candidate without family",
+			mutate: func(profile *RoleModelProfileConf) {
+				profile.Agents["executor"] = RoleAgentOverrideConf{
+					Candidates: []RoleModelCandidateConf{{Selector: "acme/coder", Thinking: "high"}},
+				}
+			},
+			code: "agents[executor].candidates[0].operator_attestation_family_required",
+		},
+		{
+			name: "override family conflicts with capability declaration",
+			mutate: func(profile *RoleModelProfileConf) {
+				profile.Agents["executor"] = RoleAgentOverrideConf{
+					Candidates: []RoleModelCandidateConf{{Selector: "acme/model", Thinking: "high", Family: "other-family"}},
+				}
+			},
+			code: "agents[executor].operator_attestation_family_conflict: acme/model",
+		},
+		{
+			name: "override duplicate declaration",
+			mutate: func(profile *RoleModelProfileConf) {
+				profile.Agents["executor"] = RoleAgentOverrideConf{
+					Candidates: []RoleModelCandidateConf{
+						{Selector: "acme/coder", Thinking: "high", Family: "acme"},
+						{Selector: "acme/coder", Thinking: "high", Family: "acme"},
+					},
+				}
+			},
+			code: "agents[executor].operator_attestation_declaration_duplicate: acme/coder",
 		},
 	}
 
@@ -77,8 +115,9 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedRequiresClosedRoutesAndCon
 			profile.CatalogTrust = RoleModelCatalogTrustOperatorAttested
 			test.mutate(&profile)
 			policy.Profiles[policy.Profile] = profile
-			if err := policy.Validate(); err == nil {
-				t.Fatal("Validate() accepted an invalid operator-attested profile")
+			err := policy.Validate()
+			if err == nil || !strings.Contains(err.Error(), test.code) {
+				t.Fatalf("Validate() error = %v, want %q", err, test.code)
 			}
 		})
 	}
@@ -90,6 +129,12 @@ func TestRoleModelProfileCatalogTrust_OperatorAttestedAcceptsCompleteDeclaration
 	policy := validRoleModelPolicyFixture()
 	profile := policy.Profiles[policy.Profile]
 	profile.CatalogTrust = RoleModelCatalogTrustOperatorAttested
+	profile.Agents["executor"] = RoleAgentOverrideConf{
+		Candidates: []RoleModelCandidateConf{
+			{Selector: "acme/coder", Thinking: "high", Family: "acme"},
+			{Selector: "acme/model", Thinking: "medium", Family: "acme"},
+		},
+	}
 	policy.Profiles[policy.Profile] = profile
 	if err := policy.Validate(); err != nil {
 		t.Fatalf("Validate() rejected a complete operator-attested profile: %v", err)

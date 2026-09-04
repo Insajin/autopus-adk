@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -57,8 +58,8 @@ func (c RoleModelPolicyConf) validateForQuality(quality QualityConf) error {
 	return nil
 }
 
-// @AX:WARN [AUTO]: role-model profile validation contains 9 if branches.
-// @AX:REASON [AUTO]: version, capability, source, alias, fallback, and per-role constraints must all agree.
+// @AX:WARN [AUTO]: role-model profile validation contains 11 if branches.
+// @AX:REASON [AUTO]: version, capability, agent override, trust, diversity, and managed-key constraints must all agree.
 func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 	if profile.ConfigMode != RoleModelConfigModeOverlay && profile.ConfigMode != RoleModelConfigModeProjectManaged {
 		return fmt.Errorf("role_model_policy.profiles[%s].config_mode_invalid: %q", name, profile.ConfigMode)
@@ -80,17 +81,14 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 			return err
 		}
 	}
-	if trust == RoleModelCatalogTrustOperatorAttested {
-		if err := validateOperatorAttestedRoutes(name, profile); err != nil {
+	for _, agent := range sortedAgentOverrides(profile) {
+		if err := validateAgentOverride(name, agent, profile.Agents[agent]); err != nil {
 			return err
 		}
 	}
-	for agent, override := range profile.Agents {
-		if _, err := OMPAgentRole(agent); err != nil {
-			return fmt.Errorf("role_model_policy.profiles[%s].%w", name, err)
-		}
-		if err := ValidateRoleCapabilityPair(override.Role, override.Capability); err != nil {
-			return fmt.Errorf("role_model_policy.profiles[%s].agents[%s].%w", name, agent, err)
+	if trust == RoleModelCatalogTrustOperatorAttested {
+		if err := validateOperatorAttestedRoutes(name, profile); err != nil {
+			return err
 		}
 	}
 	if err := validateFamilyDiversity(name, profile.FamilyDiversity); err != nil {
@@ -105,6 +103,37 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 	return nil
 }
 
+// sortedAgentOverrides orders override validation so error reports are stable.
+func sortedAgentOverrides(profile RoleModelProfileConf) []string {
+	agents := make([]string, 0, len(profile.Agents))
+	for agent := range profile.Agents {
+		agents = append(agents, agent)
+	}
+	sort.Strings(agents)
+	return agents
+}
+
+// validateAgentOverride requires a matrix agent, rejects role or capability
+// assertions that disagree with the matrix, and applies the capability
+// candidate rules to override candidates.
+func validateAgentOverride(profile, agent string, override RoleAgentOverrideConf) error {
+	capability, err := OMPAgentCapability(agent)
+	if err != nil {
+		return fmt.Errorf("role_model_policy.profiles[%s].%w", profile, err)
+	}
+	scope := fmt.Sprintf("role_model_policy.profiles[%s].agents[%s]", profile, agent)
+	if role := OMPAgentRoleName(agent); override.Role != "" && override.Role != role {
+		return fmt.Errorf("%s.role_capability_mismatch: role %q, want %q", scope, override.Role, role)
+	}
+	if override.Capability != "" && override.Capability != capability {
+		return fmt.Errorf("%s.role_capability_mismatch: capability %q, want %q", scope, override.Capability, capability)
+	}
+	return validateRouteCandidates(scope, override.Candidates)
+}
+
+// validateOperatorAttestedRoutes requires closed capability routes and applies
+// the attestation candidate rules to capability and agent override candidates
+// alike, sharing one selector-to-family ledger across all of them.
 func validateOperatorAttestedRoutes(name string, profile RoleModelProfileConf) error {
 	families := make(map[string]string)
 	for _, capability := range providerNeutralCapabilities {
@@ -112,30 +141,39 @@ func validateOperatorAttestedRoutes(name string, profile RoleModelProfileConf) e
 		if !route.Required || route.DegradedAction != "" {
 			return fmt.Errorf("role_model_policy.profiles[%s].operator_attestation_route_not_closed: %s", name, capability)
 		}
-		seen := make(map[string]struct{}, len(route.Candidates))
-		for index, candidate := range route.Candidates {
-			if candidate.Family == "" {
-				return fmt.Errorf(
-					"role_model_policy.profiles[%s].capabilities[%s].candidates[%d].operator_attestation_family_required",
-					name, capability, index,
-				)
-			}
-			if family, ok := families[candidate.Selector]; ok && family != candidate.Family {
-				return fmt.Errorf(
-					"role_model_policy.profiles[%s].operator_attestation_family_conflict: %s",
-					name, candidate.Selector,
-				)
-			}
-			families[candidate.Selector] = candidate.Family
-			declaration := candidate.Selector + "\x00" + candidate.Thinking
-			if _, duplicate := seen[declaration]; duplicate {
-				return fmt.Errorf(
-					"role_model_policy.profiles[%s].capabilities[%s].operator_attestation_declaration_duplicate: %s",
-					name, capability, candidate.Selector,
-				)
-			}
-			seen[declaration] = struct{}{}
+		scope := fmt.Sprintf("role_model_policy.profiles[%s].capabilities[%s]", name, capability)
+		if err := validateOperatorAttestedCandidates(scope, route.Candidates, families); err != nil {
+			return err
 		}
+	}
+	for _, agent := range sortedAgentOverrides(profile) {
+		scope := fmt.Sprintf("role_model_policy.profiles[%s].agents[%s]", name, agent)
+		if err := validateOperatorAttestedCandidates(scope, profile.Agents[agent].Candidates, families); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOperatorAttestedCandidates(
+	scope string,
+	candidates []RoleModelCandidateConf,
+	families map[string]string,
+) error {
+	seen := make(map[string]struct{}, len(candidates))
+	for index, candidate := range candidates {
+		if candidate.Family == "" {
+			return fmt.Errorf("%s.candidates[%d].operator_attestation_family_required", scope, index)
+		}
+		if family, ok := families[candidate.Selector]; ok && family != candidate.Family {
+			return fmt.Errorf("%s.operator_attestation_family_conflict: %s", scope, candidate.Selector)
+		}
+		families[candidate.Selector] = candidate.Family
+		declaration := candidate.Selector + "\x00" + candidate.Thinking
+		if _, duplicate := seen[declaration]; duplicate {
+			return fmt.Errorf("%s.operator_attestation_declaration_duplicate: %s", scope, candidate.Selector)
+		}
+		seen[declaration] = struct{}{}
 	}
 	return nil
 }
@@ -169,27 +207,35 @@ func validRoleManagedFingerprint(value string) bool {
 }
 
 func validateCapabilityRoute(profile, capability string, route RoleCapabilityRouteConf) error {
+	scope := fmt.Sprintf("role_model_policy.profiles[%s].capabilities[%s]", profile, capability)
 	if route.DegradedAction != "" && route.DegradedAction != "runtime_default" {
-		return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].degraded_action_invalid: %q", profile, capability, route.DegradedAction)
+		return fmt.Errorf("%s.degraded_action_invalid: %q", scope, route.DegradedAction)
 	}
 	if len(route.Candidates) == 0 {
-		return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].candidates_required", profile, capability)
+		return fmt.Errorf("%s.candidates_required", scope)
 	}
-	for index, candidate := range route.Candidates {
+	return validateRouteCandidates(scope, route.Candidates)
+}
+
+// validateRouteCandidates applies the selector, thinking, and family rules
+// shared by capability routes and agent overrides.
+func validateRouteCandidates(scope string, candidates []RoleModelCandidateConf) error {
+	for index, candidate := range candidates {
 		if !validSelector(candidate.Selector) {
-			return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].candidates[%d].selector_invalid: %q", profile, capability, index, candidate.Selector)
+			return fmt.Errorf("%s.candidates[%d].selector_invalid: %q", scope, index, candidate.Selector)
 		}
 		if !IsOMPNativeThinkingLevel(candidate.Thinking) || !validPolicyToken(candidate.Family) {
-			return fmt.Errorf("role_model_policy.profiles[%s].capabilities[%s].candidates[%d].metadata_invalid", profile, capability, index)
+			return fmt.Errorf("%s.candidates[%d].metadata_invalid", scope, index)
 		}
 	}
 	return nil
 }
 
+// validateFamilyDiversity accepts only Policy Contract agent roles.
 func validateFamilyDiversity(profile string, policy FamilyDiversityPolicyConf) error {
 	seen := make(map[string]struct{}, len(policy.Roles))
 	for _, role := range policy.Roles {
-		if _, err := OMPNativeRoleCapability(role); err != nil {
+		if _, err := OMPRoleCapability(role); err != nil {
 			return fmt.Errorf("role_model_policy.profiles[%s].family_diversity.%w", profile, err)
 		}
 		if _, duplicate := seen[role]; duplicate {

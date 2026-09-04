@@ -16,37 +16,31 @@ func TestCompileOMPModelProjection_InvalidContractsFailClosed(t *testing.T) {
 		edit func(*OMPModelProjectionInput)
 	}{
 		{
-			name: "unknown capability", code: "capability_unknown",
-			edit: func(input *OMPModelProjectionInput) { input.Capabilities[0].Capability = "unknown" },
+			name: "capability mismatch", code: "role_capability_mismatch",
+			edit: func(input *OMPModelProjectionInput) { input.Agents[0].Capability = "unknown" },
 		},
 		{
-			name: "duplicate capability", code: "capability_duplicate",
+			name: "role mismatch", code: "role_capability_mismatch",
+			edit: func(input *OMPModelProjectionInput) { input.Agents[0].Role = "smol" },
+		},
+		{
+			name: "duplicate agent", code: "agent_duplicate",
 			edit: func(input *OMPModelProjectionInput) {
-				input.Capabilities = append(input.Capabilities, input.Capabilities[0])
+				input.Agents = append(input.Agents, input.Agents[0])
 			},
 		},
 		{
 			name: "invalid fallback", code: "selector_invalid",
 			edit: func(input *OMPModelProjectionInput) {
-				input.Capabilities[1].Fallbacks[0].Selector = "sonnet"
+				input.Agents[1].Fallbacks[0].Selector = "sonnet"
 			},
-		},
-		{
-			name: "duplicate agent", code: "agent_role_duplicate",
-			edit: func(input *OMPModelProjectionInput) {
-				input.AgentNames = append(input.AgentNames, input.AgentNames[0])
-			},
-		},
-		{
-			name: "missing agent", code: "agent_role_missing",
-			edit: func(input *OMPModelProjectionInput) { input.AgentNames = input.AgentNames[1:] },
 		},
 		{
 			name: "conflicting selector chain", code: "fallback_chain_conflict",
 			edit: func(input *OMPModelProjectionInput) {
-				input.Capabilities[0].Selector = "anthropic/alpha-reasoner"
-				input.Capabilities[0].Thinking = "xhigh"
-				input.Capabilities[0].Fallbacks = []OMPProjectionCandidate{
+				input.Agents[0].Selector = "anthropic/alpha-reasoner"
+				input.Agents[0].Thinking = "xhigh"
+				input.Agents[0].Fallbacks = []OMPProjectionCandidate{
 					{Selector: "google/gamma-vision", Thinking: "high"},
 				}
 			},
@@ -130,7 +124,7 @@ func TestPrepareAgentMappingsWithProjection_InvalidAgentShapeFailsClosed(t *test
 		},
 		{
 			name: "wrong role", code: "role_capability_mismatch",
-			edit: func(projection *OMPModelProjection) { projection.Agents[0].Role = "task" },
+			edit: func(projection *OMPModelProjection) { projection.Agents[0].Role = "autopus_executor" },
 		},
 		{
 			name: "missing", code: "agent_role_set_mismatch",

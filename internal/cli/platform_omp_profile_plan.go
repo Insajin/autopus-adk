@@ -95,7 +95,10 @@ func buildOMPProfileProposal(name string, catalog omp.OMPModelCatalog) (ompProfi
 		Capabilities: make(map[string]config.RoleCapabilityRouteConf),
 		FamilyDiversity: config.FamilyDiversityPolicyConf{
 			Enabled: true,
-			Roles:   []string{config.OMPRoleAdvisor},
+			Roles: []string{
+				config.OMPAgentRoleName("reviewer"),
+				config.OMPAgentRoleName("security-auditor"),
+			},
 		},
 	}
 	rows := make([]ompProfileCapabilityPayload, 0, len(config.OMPProviderNeutralCapabilities()))

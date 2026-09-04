@@ -2,6 +2,8 @@ package omp
 
 import (
 	"context"
+	"encoding/json"
+	"sort"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -9,49 +11,122 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestOMPModelIntegration_BuiltinProfileCarriesQualityTiers proves the complete
-// opt-in path from a derived mixed-family profile to every projected OMP agent.
-func TestOMPModelIntegration_BuiltinProfileCarriesQualityTiers(t *testing.T) {
+const (
+	builtinFable  = "anthropic/" + config.ClaudeFableModel + ":max"
+	builtinOpus   = "anthropic/" + config.ClaudeOpusModel + ":xhigh"
+	builtinSonnet = "anthropic/" + config.ClaudeSonnetModel + ":medium"
+	builtinAstra  = "openai-codex/" + config.CodexAstraModel + ":max"
+	builtinSol    = "openai-codex/" + config.CodexSolModel + ":xhigh"
+)
+
+// TestOMPModelIntegration_S5_UltraBuiltinProjectsEachAgentTier proves the
+// derived ultra profile keeps every agent on its own preset rung: sharing a
+// capability with a fable agent no longer promotes an opus agent.
+func TestOMPModelIntegration_S5_UltraBuiltinProjectsEachAgentTier(t *testing.T) {
 	t.Parallel()
 
-	cfg := config.DefaultFullConfig("builtin-omp")
-	cfg.Platforms = []string{"omp"}
-	cfg.RoleModelPolicy = config.RoleModelPolicyConf{
-		Version: config.RoleModelPolicyVersionV1,
-		Profile: "balanced",
-	}
-	require.NoError(t, cfg.Validate())
-
-	integration, err := NewWithRoot(t.TempDir()).
-		WithModelIntegrationRunner(newBuiltinTierIntegrationRunner()).
-		prepareModelIntegration(context.Background(), cfg)
-	require.NoError(t, err)
-	require.NotNil(t, integration)
-	assert.Equal(t, "balanced", integration.profileName)
+	integration := prepareBuiltinIntegration(t, "ultra")
+	assert.Equal(t, "ultra", integration.profileName)
 	assert.Equal(t, config.RoleModelCatalogTrustOperatorAttested, integration.profile.CatalogTrust)
+	assert.Equal(t, []string{"autopus_reviewer", "autopus_security_auditor"},
+		integration.profile.FamilyDiversity.Roles)
 
-	selectors := make(map[string]string, len(integration.projection.Agents))
-	for _, agent := range integration.projection.Agents {
-		selectors[agent.Agent] = agent.EffectiveSelector
+	assert.Equal(t, map[string]string{
+		"autopus_annotator": builtinOpus, "autopus_architect": builtinFable,
+		"autopus_debugger": builtinFable, "autopus_deep_worker": builtinFable,
+		"autopus_devops": builtinOpus, "autopus_executor": builtinOpus,
+		"autopus_explorer": builtinOpus, "autopus_frontend_specialist": builtinOpus,
+		"autopus_perf_engineer": builtinOpus, "autopus_planner": builtinFable,
+		"autopus_reviewer": builtinAstra, "autopus_security_auditor": builtinAstra,
+		"autopus_spec_writer": builtinFable, "autopus_tester": builtinOpus,
+		"autopus_ux_validator": builtinOpus, "autopus_validator": builtinOpus,
+	}, builtinSelectorsByRole(integration.projection))
+}
+
+func TestOMPModelIntegration_S5_BalancedBuiltinKeepsSiblingTiersApart(t *testing.T) {
+	t.Parallel()
+
+	selectors := builtinSelectorsByRole(prepareBuiltinIntegration(t, "balanced").projection)
+	require.Len(t, selectors, len(config.CanonicalAgentNames()))
+	// executor/tester and reviewer/security-auditor share a capability but
+	// sit on different preset rungs; each keeps its own.
+	assert.Equal(t, builtinOpus, selectors["autopus_executor"])
+	assert.Equal(t, builtinSonnet, selectors["autopus_tester"])
+	assert.Equal(t, builtinSol, selectors["autopus_reviewer"])
+	assert.Equal(t, builtinAstra, selectors["autopus_security_auditor"])
+	assert.Equal(t, builtinFable, selectors["autopus_planner"])
+	assert.Equal(t, builtinOpus, selectors["autopus_spec_writer"])
+}
+
+// TestOMPModelIntegration_S6_ProjectsAgentRolesOnly proves the rendered
+// surfaces carry exactly the sixteen agent roles and no OMP native role key.
+func TestOMPModelIntegration_S6_ProjectsAgentRolesOnly(t *testing.T) {
+	t.Parallel()
+
+	integration := prepareBuiltinIntegration(t, "ultra")
+	overlay, err := OMPModelOverlayFromProjection(integration.projection)
+	require.NoError(t, err)
+
+	keys := make([]string, 0, len(overlay.ModelRoles))
+	for role := range overlay.ModelRoles {
+		keys = append(keys, role)
 	}
-	const (
-		fable  = "anthropic/" + config.ClaudeFableModel + ":max"
-		opus   = "anthropic/" + config.ClaudeOpusModel + ":xhigh"
-		astra  = "openai-codex/" + config.CodexAstraModel + ":max"
-		sonnet = "anthropic/" + config.ClaudeSonnetModel + ":medium"
-	)
-	for agent, want := range map[string]string{
-		"architect": fable, "planner": fable, "spec-writer": fable,
-		"debugger": opus, "deep-worker": opus, "devops": opus,
-		"executor": opus, "perf-engineer": opus, "tester": opus,
-		"reviewer": astra, "security-auditor": astra,
-		"annotator": sonnet, "explorer": sonnet,
-		"frontend-specialist": sonnet, "ux-validator": sonnet,
-		"validator": sonnet,
+	sort.Strings(keys)
+	want := make([]string, 0, len(config.CanonicalAgentNames()))
+	for _, agent := range config.CanonicalAgentNames() {
+		want = append(want, config.OMPAgentRoleName(agent))
+	}
+	assert.Equal(t, want, keys)
+	for _, native := range []string{
+		"default", "smol", "slow", "plan", "vision", "designer", "commit", "tiny", "task", "advisor",
 	} {
-		assert.Equal(t, want, selectors[agent], agent)
+		assert.NotContains(t, overlay.ModelRoles, native)
 	}
-	assert.Len(t, selectors, len(config.CanonicalAgentNames()))
+	assert.Equal(t, map[string][]string{
+		builtinFable: {builtinOpus},
+		builtinOpus:  {builtinSonnet},
+		builtinAstra: {builtinSol},
+	}, overlay.FallbackChains)
+
+	byPath := integrationMappingsByPath(integration.agents)
+	assert.Contains(t, string(byPath[".omp/agents/executor.md"].Content),
+		"model: '@autopus_executor'\nthinking: xhigh\n")
+	assert.Contains(t, string(byPath[".omp/agents/debugger.md"].Content),
+		"model: '@autopus_debugger'\nthinking: max\n")
+	assert.Contains(t, string(byPath[".omp/agents/reviewer.md"].Content),
+		"model: '@autopus_reviewer'\nthinking: max\n")
+}
+
+// TestOMPModelIntegration_S7_ReceiptRowsAreKeyedByAgent proves the receipt
+// carries one operator-attested row per agent with the agent's own role.
+func TestOMPModelIntegration_S7_ReceiptRowsAreKeyedByAgent(t *testing.T) {
+	t.Parallel()
+
+	files, err := NewWithRoot(t.TempDir()).
+		WithModelIntegrationRunner(newBuiltinTierIntegrationRunner()).
+		prepareFiles(context.Background(), builtinIntegrationConfig("ultra"))
+	require.NoError(t, err)
+
+	var receipt OMPModelResolutionReceipt
+	require.NoError(t, json.Unmarshal(
+		integrationMappingsByPath(files)[OMPModelReceiptRelativePath].Content, &receipt))
+	require.Len(t, receipt.Roles, len(config.CanonicalAgentNames()))
+	byAgent := make(map[string]OMPModelRoleReceipt, len(receipt.Roles))
+	for _, role := range receipt.Roles {
+		capability, capabilityErr := config.OMPAgentCapability(role.Agent)
+		require.NoError(t, capabilityErr, role.Agent)
+		assert.Equal(t, config.OMPAgentRoleName(role.Agent), role.RequestedRole, role.Agent)
+		assert.Equal(t, role.RequestedRole, role.EffectiveRole, role.Agent)
+		assert.Equal(t, capability, role.Capability, role.Agent)
+		assert.Equal(t, "operator_attested", role.EvidenceClass, role.Agent)
+		byAgent[role.Agent] = role
+	}
+	assert.Equal(t, "anthropic/"+config.ClaudeOpusModel, byAgent["executor"].Selector)
+	assert.Equal(t, "xhigh", byAgent["executor"].Thinking)
+	assert.Equal(t, "anthropic/"+config.ClaudeFableModel, byAgent["debugger"].Selector)
+	assert.Equal(t, "max", byAgent["debugger"].Thinking)
+	assert.Equal(t, "satisfied", byAgent["reviewer"].FamilyDiversity.Status)
+	assert.Equal(t, "not_applicable", byAgent["executor"].FamilyDiversity.Status)
 }
 
 func TestOMPModelIntegration_NoProfileIgnoresQualityPresets(t *testing.T) {
@@ -67,6 +142,38 @@ func TestOMPModelIntegration_NoProfileIgnoresQualityPresets(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, integration, "quality presets alone must not activate model routing")
 	assert.Empty(t, runner.calls, "an unselected policy must not probe the catalog")
+}
+
+func builtinIntegrationConfig(preset string) *config.HarnessConfig {
+	cfg := config.DefaultFullConfig("builtin-omp-" + preset)
+	cfg.Platforms = []string{"omp"}
+	cfg.Quality.Default = preset
+	cfg.RoleModelPolicy = config.RoleModelPolicyConf{
+		Version: config.RoleModelPolicyVersionV1,
+		Profile: preset,
+		Family:  "anthropic",
+	}
+	return cfg
+}
+
+func prepareBuiltinIntegration(t *testing.T, preset string) *ompModelIntegration {
+	t.Helper()
+	cfg := builtinIntegrationConfig(preset)
+	require.NoError(t, cfg.Validate())
+	integration, err := NewWithRoot(t.TempDir()).
+		WithModelIntegrationRunner(newBuiltinTierIntegrationRunner()).
+		prepareModelIntegration(context.Background(), cfg)
+	require.NoError(t, err)
+	require.NotNil(t, integration)
+	return integration
+}
+
+func builtinSelectorsByRole(projection OMPModelProjection) map[string]string {
+	selectors := make(map[string]string, len(projection.ModelRoles))
+	for _, role := range projection.ModelRoles {
+		selectors[role.Role] = role.Selector
+	}
+	return selectors
 }
 
 // newBuiltinTierIntegrationRunner mirrors the metadata-light catalog emitted by

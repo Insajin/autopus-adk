@@ -39,7 +39,7 @@ func TestOMPModelIntegration_S12S14_FailsClosedBeforeProjectWrite(t *testing.T) 
 		{"agent override mismatch", func(_ *modelIntegrationFakeRunner, cfg *config.HarnessConfig) {
 			profile := cfg.RoleModelPolicy.Profiles["p1"]
 			profile.Agents = map[string]config.RoleAgentOverrideConf{
-				"executor": {Role: config.OMPRoleAdvisor, Capability: config.CapabilityIndependentDissent},
+				"executor": {Role: config.OMPAgentRoleName("reviewer"), Capability: config.CapabilityIndependentDissent},
 			}
 			cfg.RoleModelPolicy.Profiles["p1"] = profile
 		}, "role_capability_mismatch"},

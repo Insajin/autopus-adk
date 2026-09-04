@@ -1,23 +1,10 @@
 package omp
 
-import "strings"
+import (
+	"strings"
 
-var ompRoutingRoleCapabilities = map[string]string{
-	"default":  "coding_tool_use",
-	"smol":     "fast_validation",
-	"slow":     "deep_reasoning",
-	"plan":     "deep_reasoning",
-	"vision":   "vision_design",
-	"designer": "vision_design",
-	"commit":   "deterministic_transform",
-	"tiny":     "deterministic_transform",
-	"task":     "coding_tool_use",
-	"advisor":  "independent_dissent",
-}
-
-var ompRoutingRoleOrder = []string{
-	"default", "smol", "slow", "plan", "vision", "designer", "commit", "tiny", "task", "advisor",
-}
+	"github.com/insajin/autopus-adk/pkg/config"
+)
 
 type OMPRoutingCandidate struct {
 	Selector string `json:"selector"`
@@ -88,8 +75,8 @@ func ResolveOMPModelRoute(
 	request OMPModelRouteRequest,
 ) OMPModelRouteResolution {
 	result := newOMPModelRouteResolution(request)
-	wantCapability, roleKnown := ompRoutingRoleCapabilities[request.Role]
-	if !roleKnown {
+	wantCapability, roleErr := config.OMPRoleCapability(request.Role)
+	if roleErr != nil {
 		result.Reason = "role_unknown"
 		return result
 	}

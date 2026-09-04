@@ -67,7 +67,7 @@ func TestUpdateCmdRepairsLegacyOrchestraBeforePersistingSupervisorInherit(t *tes
 	assert.Equal(t, config.SupervisorModelPolicyInherit, updated.Quality.SupervisorModelPolicy)
 	provider := updated.Orchestra.Providers["codex"]
 	assert.Equal(t, config.ProviderModelPolicyQuality, provider.ModelPolicy)
-	assert.Contains(t, provider.Args, config.CodexSolModel)
+	assert.Contains(t, provider.Args, config.CodexAstraModel)
 	assert.NotContains(t, provider.Args, config.CodexLegacyModel)
 }
 

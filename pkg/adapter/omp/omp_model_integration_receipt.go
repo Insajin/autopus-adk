@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
-	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 func (i *ompModelIntegration) receiptMapping(
@@ -28,17 +27,13 @@ func (i *ompModelIntegration) receiptMapping(
 	}
 	resolutions := make(map[string]OMPModelRouteResolution, len(i.routing.Resolutions))
 	for _, resolution := range i.routing.Resolutions {
-		resolutions[resolution.Capability] = resolution
+		resolutions[resolution.Agent] = resolution
 	}
 	roles := make([]OMPModelRoleReceipt, 0, len(i.projection.Agents))
 	for _, agent := range i.projection.Agents {
-		capability, err := config.OMPNativeRoleCapability(agent.Role)
-		if err != nil {
-			return adapter.FileMapping{}, err
-		}
-		resolution, ok := resolutions[capability]
+		resolution, ok := resolutions[agent.Agent]
 		if !ok || resolution.Status != "selected" {
-			return adapter.FileMapping{}, fmt.Errorf("receipt resolution missing: %s", capability)
+			return adapter.FileMapping{}, fmt.Errorf("receipt resolution missing: %s", agent.Agent)
 		}
 		roles = append(roles, ompIntegratedRoleReceipt(
 			i.profileName, configSource, safetySource, agent, resolution,

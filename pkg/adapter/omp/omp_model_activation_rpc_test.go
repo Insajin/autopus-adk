@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ import (
 
 type modelRoleRPCFakeRunner struct {
 	roles    map[string]string
-	rpcCalls int
+	rpcCalls atomic.Int64
 }
 
 func (runner *modelRoleRPCFakeRunner) Run(
@@ -50,7 +51,7 @@ func (runner *modelRoleRPCFakeRunner) RunWithInput(
 	if !ok {
 		return nil, fmt.Errorf("invalid selector")
 	}
-	runner.rpcCalls++
+	runner.rpcCalls.Add(1)
 	frame := map[string]any{
 		"id": "autopus-model-state", "type": "response", "command": "get_state", "success": true,
 		"data": map[string]any{
@@ -65,9 +66,9 @@ func (runner *modelRoleRPCFakeRunner) RunWithInput(
 func TestReadOMPModelExpectedValues_UsesProviderFreeRPCForEveryRole(t *testing.T) {
 	t.Parallel()
 	roles := map[string]string{
-		"advisor": "anthropic/claude-opus-5:max",
-		"plan":    "openai-codex/gpt-5.6-sol:max",
-		"task":    "openai-codex/gpt-5.6-terra:high",
+		"autopus_reviewer": "anthropic/claude-opus-5:max",
+		"autopus_planner":  "openai-codex/gpt-5.6-sol:max",
+		"autopus_executor": "openai-codex/gpt-5.6-terra:high",
 	}
 	runner := &modelRoleRPCFakeRunner{roles: roles}
 
@@ -76,7 +77,7 @@ func TestReadOMPModelExpectedValues_UsesProviderFreeRPCForEveryRole(t *testing.T
 	)
 
 	require.NoError(t, err)
-	require.Equal(t, len(roles), runner.rpcCalls)
+	require.Equal(t, int64(len(roles)), runner.rpcCalls.Load())
 	var decoded map[string]map[string]string
 	require.NoError(t, json.Unmarshal(readback, &decoded))
 	require.Equal(t, roles, decoded["modelRoles"])

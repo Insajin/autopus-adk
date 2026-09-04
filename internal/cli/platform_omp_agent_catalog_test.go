@@ -182,11 +182,10 @@ func assertOMPAgentCatalogBaseline(t *testing.T, rows []ompEffectiveModelProject
 	require.Len(t, rows, 16)
 	for index, row := range rows {
 		name := names[index]
-		role := mapping[name]
-		capability, err := config.OMPNativeRoleCapability(role)
+		capability, err := config.OMPAgentCapability(name)
 		require.NoError(t, err)
 		assert.Equal(t, name, row.Agent)
-		assert.Equal(t, role, row.Role, name)
+		assert.Equal(t, config.OMPAgentRoleName(name), row.Role, name)
 		assert.Equal(t, capability, row.Capability, name)
 		assert.Equal(t, "inherit", row.ModelAlias, name)
 		assert.Empty(t, row.EffectiveSelector, name)

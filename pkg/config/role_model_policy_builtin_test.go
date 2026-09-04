@@ -25,7 +25,7 @@ func TestBuiltinRoleModelProfile_BalancedProjectsPresetTiers(t *testing.T) {
 	assert.Equal(t, "balanced", name)
 	assert.Equal(t, RoleModelConfigModeOverlay, profile.ConfigMode)
 	assert.Equal(t, RoleModelCatalogTrustOperatorAttested, profile.CatalogTrust)
-	assert.Equal(t, FamilyDiversityPolicyConf{Enabled: true, Roles: []string{OMPRoleAdvisor}}, profile.FamilyDiversity)
+	assert.Equal(t, builtinDiversityPolicy(), profile.FamilyDiversity)
 	assert.Empty(t, profile.ManagedKeys)
 	require.NoError(t, validateRoleModelProfile(name, profile))
 
@@ -70,7 +70,7 @@ role_model_policy:
 	assert.Equal(t, "ultra", name)
 	assert.Equal(t, RoleModelConfigModeProjectManaged, profile.ConfigMode)
 	assert.Equal(t, RoleModelCatalogTrustOperatorAttested, profile.CatalogTrust)
-	assert.Equal(t, FamilyDiversityPolicyConf{Enabled: true, Roles: []string{OMPRoleAdvisor}}, profile.FamilyDiversity)
+	assert.Equal(t, builtinDiversityPolicy(), profile.FamilyDiversity)
 	assert.Equal(t, map[string]RoleManagedKeyClaimConf{
 		"modelRoles": {
 			PriorFingerprint: OMPMissingManagedValueFingerprint(), Complete: true,
@@ -124,7 +124,9 @@ func TestBuiltinRoleModelProfile_OpenAIAnchorUsesAnthropicAdvisor(t *testing.T) 
 	}
 }
 
-func TestBuiltinRoleModelProfile_TakesHighestTierPerCapability(t *testing.T) {
+// Capability routes keep the max-wins fold as defaults for hand-written
+// profiles; per-agent routes are covered in role_model_policy_builtin_agents_test.go.
+func TestBuiltinRoleModelProfile_CapabilityDefaultsTakeHighestAgentTier(t *testing.T) {
 	t.Parallel()
 
 	quality := QualityConf{
@@ -236,6 +238,12 @@ func assertBuiltinRoutes(t *testing.T, profile RoleModelProfileConf, wants []wan
 		assert.True(t, route.Required, want.capability)
 		assert.Empty(t, route.DegradedAction, want.capability)
 		assert.Equal(t, want.candidates, route.Candidates, want.capability)
+	}
+}
+
+func builtinDiversityPolicy() FamilyDiversityPolicyConf {
+	return FamilyDiversityPolicyConf{
+		Enabled: true, Roles: []string{"autopus_reviewer", "autopus_security_auditor"},
 	}
 }
 

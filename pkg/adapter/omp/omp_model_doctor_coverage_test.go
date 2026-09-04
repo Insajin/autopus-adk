@@ -26,8 +26,9 @@ func TestCompileOMPModelDoctorActivationExpectation_IsDeterministicAndConcrete(t
 	require.NotEmpty(t, want.ConfigBytes)
 	assert.Equal(t, OMPModelSHA256(want.ConfigBytes), want.ConfigHash)
 	assert.Equal(t, true, want.ExpectedValues["retry.modelFallback"])
-	assert.Equal(t, "anthropic/alpha-reasoner:xhigh", want.ExpectedValues["modelRoles"].(map[string]string)["plan"])
-	assert.Contains(t, string(want.ConfigBytes), "plan: anthropic/alpha-reasoner:xhigh")
+	roles := want.ExpectedValues["modelRoles"].(map[string]string)
+	assert.Equal(t, "anthropic/alpha-reasoner:xhigh", roles["autopus_planner"])
+	assert.Contains(t, string(want.ConfigBytes), "autopus_planner: anthropic/alpha-reasoner:xhigh")
 	assert.NotContains(t, strings.ToLower(string(want.ConfigBytes)), "api_key")
 
 	for iteration := 0; iteration < 40; iteration++ {
@@ -38,14 +39,16 @@ func TestCompileOMPModelDoctorActivationExpectation_IsDeterministicAndConcrete(t
 		assert.True(t, reflect.DeepEqual(want.ExpectedValues, got.ExpectedValues), "iteration=%d", iteration)
 	}
 
-	names := ompModelDoctorAgentNames()
-	sorted := append([]string(nil), names...)
-	sort.Strings(sorted)
-	assert.Equal(t, []string{
-		"annotator", "architect", "debugger", "deep-worker", "devops", "executor", "explorer",
-		"frontend-specialist", "perf-engineer", "planner", "reviewer", "security-auditor",
-		"spec-writer", "tester", "ux-validator", "validator",
-	}, sorted)
+	names := make([]string, 0, len(roles))
+	for role := range roles {
+		names = append(names, role)
+	}
+	sort.Strings(names)
+	wantRoles := make([]string, 0, len(config.CanonicalAgentNames()))
+	for _, agent := range config.CanonicalAgentNames() {
+		wantRoles = append(wantRoles, config.OMPAgentRoleName(agent))
+	}
+	assert.Equal(t, wantRoles, names)
 }
 
 func TestCompileOMPModelDoctorActivationExpectation_FailsClosedOnInvalidInputs(t *testing.T) {
@@ -63,16 +66,14 @@ func TestCompileOMPModelDoctorActivationExpectation_FailsClosedOnInvalidInputs(t
 		{
 			name: "unmapped agent override", want: "agent_role_unmapped",
 			edit: func(profile *config.RoleModelProfileConf, _ *OMPModelCatalog) {
-				profile.Agents = map[string]config.RoleAgentOverrideConf{
-					"future-agent": {Role: config.OMPRoleTask, Capability: config.CapabilityCodingToolUse},
-				}
+				profile.Agents = map[string]config.RoleAgentOverrideConf{"future-agent": {}}
 			},
 		},
 		{
 			name: "override tuple mismatch", want: "role_capability_mismatch",
 			edit: func(profile *config.RoleModelProfileConf, _ *OMPModelCatalog) {
 				profile.Agents = map[string]config.RoleAgentOverrideConf{
-					"executor": {Role: config.OMPRolePlan, Capability: config.CapabilityDeepReasoning},
+					"executor": {Role: config.OMPAgentRoleName("planner")},
 				}
 			},
 		},

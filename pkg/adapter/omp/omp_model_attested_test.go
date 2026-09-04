@@ -37,7 +37,7 @@ func TestProbeOMPModelCatalogForProfile_MetadataInsufficiencyUsesOperatorAttesta
 	}
 
 	resolution := ResolveOMPModelRoute(got.Catalog, got.Reason, OMPModelRouteRequest{
-		Agent: "executor", Role: config.OMPRoleTask, Capability: config.CapabilityCodingToolUse,
+		Agent: "executor", Role: config.OMPAgentRoleName("executor"), Capability: config.CapabilityCodingToolUse,
 		Candidates: []OMPRoutingCandidate{{Selector: "openai/beta-coder", Thinking: "high", Family: "openai"}},
 		Required:   true,
 	})
@@ -179,6 +179,41 @@ func operatorAttestedDoctorInput(root string) OMPModelDoctorInput {
 		resolution.EffectiveFamily = resolution.EffectiveProvider
 	}
 	return input
+}
+
+// TestOMPOperatorAttestedDeclarations_IncludeAgentOverrideCandidates proves a
+// selector declared only by an agent override still receives attested
+// metadata for that agent's capability, and keeps the closed-route rules.
+func TestOMPOperatorAttestedDeclarations_IncludeAgentOverrideCandidates(t *testing.T) {
+	t.Parallel()
+
+	profile := integrationHarnessConfig(config.RoleModelConfigModeOverlay).RoleModelPolicy.Profiles["p1"]
+	profile.Agents = map[string]config.RoleAgentOverrideConf{
+		"executor": {Candidates: []config.RoleModelCandidateConf{
+			{Selector: "openai/delta-coder", Thinking: "medium", Family: "openai"},
+		}},
+	}
+	declarations, ok := ompOperatorAttestedDeclarations(profile)
+	require.True(t, ok)
+	delta, declared := declarations["openai/delta-coder"]
+	require.True(t, declared)
+	require.Equal(t, "openai", delta.family)
+	require.Equal(t, []string{config.CapabilityCodingToolUse}, sortedOMPDeclarationValues(delta.capabilities))
+	require.Equal(t, []string{"medium"}, sortedOMPDeclarationValues(delta.thinking))
+
+	profile.Agents["executor"] = config.RoleAgentOverrideConf{Candidates: []config.RoleModelCandidateConf{
+		{Selector: "openai/delta-coder", Thinking: "medium"},
+	}}
+	_, ok = ompOperatorAttestedDeclarations(profile)
+	require.False(t, ok, "override candidates without a family must not be attested")
+
+	profile.Agents = map[string]config.RoleAgentOverrideConf{
+		"future-agent": {Candidates: []config.RoleModelCandidateConf{
+			{Selector: "openai/delta-coder", Thinking: "medium", Family: "openai"},
+		}},
+	}
+	_, ok = ompOperatorAttestedDeclarations(profile)
+	require.False(t, ok, "unmapped agent overrides must not be attested")
 }
 
 func operatorAttestedAvailableCatalogJSON() []byte {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
@@ -65,18 +64,11 @@ func (a *Adapter) prepareModelIntegration(
 	routing := CompileOMPModelRouting(OMPModelRoutingInput{
 		Catalog: probe.Catalog, CatalogReason: probe.Reason, Routes: routes,
 	})
-	capabilities, err := projectOMPIntegrationCapabilities(probe.Catalog, routes, routing)
+	projected, err := projectOMPIntegrationAgents(probe.Catalog, routes, routing)
 	if err != nil {
 		return nil, err
 	}
-	agentNames := make([]string, 0, len(config.OMPAgentRoleMapping()))
-	for name := range config.OMPAgentRoleMapping() {
-		agentNames = append(agentNames, name)
-	}
-	sort.Strings(agentNames)
-	projection, err := CompileOMPModelProjection(OMPModelProjectionInput{
-		Capabilities: capabilities, AgentNames: agentNames,
-	})
+	projection, err := CompileOMPModelProjection(OMPModelProjectionInput{Agents: projected})
 	if err != nil {
 		return nil, err
 	}

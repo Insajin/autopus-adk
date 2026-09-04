@@ -43,6 +43,10 @@ effective provider/model과 선택 이유를 증명한다.
 
 ### OMP projection matrix
 
+> **Superseded by SPEC-OMP-005 (2026-09-05)**: 아래 native role 행렬은 이력으로 남긴다. 현재 구현은
+> 에이전트마다 `autopus_<agent>` 커스텀 역할을 투영하고 native role 키를 기록하지 않는다. capability
+> 열과 agent 열의 대응은 그대로 유효하다.
+
 | OMP native role | Capability | Current generated Autopus agents |
 |-----------------|------------|-----------------------------------|
 | `default` | `coding_tool_use` | none; non-agent supervisor entry only |

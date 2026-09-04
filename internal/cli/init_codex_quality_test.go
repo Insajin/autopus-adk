@@ -10,12 +10,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// Ultra: the orchestra runs Astra/max, the fable-tier planner Astra/max, and
+// the opus-tier executor Sol/xhigh. Balanced keeps the same tiers but the
+// orchestra drops to Astra/xhigh.
 func TestInitCmd_QualityUltraInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
 	assertInitCodexQualityProfile(t, "ultra", "max", "gpt-5.6-sol", "xhigh", "max")
 }
 
 func TestInitCmd_QualityBalancedInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
-	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-sol", "xhigh", "xhigh")
+	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-sol", "xhigh", "max")
 }
 
 func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorModel, executorEffort, plannerEffort string) {
@@ -39,7 +42,7 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	assert.Contains(t, string(executor), `model_reasoning_effort = "`+executorEffort+`"`)
 	planner, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "planner.toml"))
 	require.NoError(t, err)
-	assert.Contains(t, string(planner), `model = "gpt-5.6-sol"`)
+	assert.Contains(t, string(planner), `model = "gpt-6-astra"`)
 	assert.Contains(t, string(planner), `model_reasoning_effort = "`+plannerEffort+`"`)
 
 	harnessData, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
@@ -47,7 +50,7 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	harness := string(harnessData)
 	assert.Contains(t, harness, "supervisor_model_policy: inherit")
 	assert.Contains(t, harness, "model_policy: quality")
-	assert.Contains(t, harness, "gpt-5.6-sol")
+	assert.Contains(t, harness, "gpt-6-astra")
 	assert.GreaterOrEqual(t, strings.Count(harness, `model_reasoning_effort="`+rootEffort+`"`), 2)
 }
 
@@ -55,7 +58,7 @@ func installCodex56CatalogFixture(t *testing.T) {
 	t.Helper()
 	binDir := t.TempDir()
 	script := `#!/bin/sh
-printf '%s' '{"models":[{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}'
+printf '%s' '{"models":[{"slug":"gpt-6-astra","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-sol","supported_reasoning_levels":[{"effort":"xhigh"},{"effort":"max"},{"effort":"ultra"}]},{"slug":"gpt-5.6-terra","supported_reasoning_levels":[{"effort":"medium"},{"effort":"high"}]},{"slug":"gpt-5.6-luna","supported_reasoning_levels":[{"effort":"low"},{"effort":"medium"},{"effort":"max"}]},{"slug":"gpt-5.5","supported_reasoning_levels":[{"effort":"xhigh"}]}]}'
 `
 	path := filepath.Join(binDir, "codex")
 	require.NoError(t, os.WriteFile(path, []byte(script), 0755))

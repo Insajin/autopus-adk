@@ -22,8 +22,8 @@ func TestBuildReviewProvidersWithConfig_UsesRuntimeCodexQualityProfile(t *testin
 
 	result := buildReviewProvidersWithConfig(effective.Config, []string{"codex"})
 	require.Len(t, result, 1)
-	assertCodexProfileInArgs(t, result[0].Args, config.CodexSolModel, config.CodexEffortMax)
-	assertCodexProfileInArgs(t, result[0].PaneArgs, config.CodexSolModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, result[0].Args, config.CodexAstraModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, result[0].PaneArgs, config.CodexAstraModel, config.CodexEffortMax)
 }
 
 func TestBuildReviewProvidersWithConfig_UsesResolvedProviderSettings(t *testing.T) {

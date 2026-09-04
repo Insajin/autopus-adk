@@ -2,7 +2,6 @@ package omp
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -11,12 +10,14 @@ import (
 // OMPModelProjectionInput is a provider-neutral bridge from the routing
 // resolver into OMP-native config and agent rendering.
 type OMPModelProjectionInput struct {
-	Capabilities []OMPProjectionCapability
-	AgentNames   []string
+	Agents []OMPProjectionAgent
 }
 
-// OMPProjectionCapability is one already-resolved semantic capability.
-type OMPProjectionCapability struct {
+// OMPProjectionAgent is one canonical agent whose route already resolved.
+// Agents without a resolved route are absent and inherit runtime defaults.
+type OMPProjectionAgent struct {
+	Agent      string
+	Role       string
 	Capability string
 	Selector   string
 	Thinking   string
@@ -56,95 +57,85 @@ type OMPAgentModelProjection struct {
 	EffectiveSelector string
 }
 
-// CompileOMPModelProjection deterministically expands selected semantic
-// capabilities; unresolved optional roles and agents intentionally inherit.
+// CompileOMPModelProjection deterministically expands resolved agents into
+// one autopus_<agent> role each; unresolved agents intentionally inherit.
 func CompileOMPModelProjection(input OMPModelProjectionInput) (OMPModelProjection, error) {
-	capabilities, err := validateOMPProjectionCapabilities(input.Capabilities)
+	agents, err := validateOMPProjectionAgents(input.Agents)
 	if err != nil {
-		return OMPModelProjection{}, err
-	}
-	if err := validateOMPProjectionAgentSet(input.AgentNames); err != nil {
 		return OMPModelProjection{}, err
 	}
 
 	projection := OMPModelProjection{
-		ModelRoles: make([]OMPModelRoleProjection, 0, len(ompProjectionRoleSpecs)),
-		Agents:     make([]OMPAgentModelProjection, 0, len(config.OMPAgentRoleMapping())),
+		ModelRoles: make([]OMPModelRoleProjection, 0, len(agents)),
+		Agents:     make([]OMPAgentModelProjection, 0, len(agents)),
 	}
-	roleResults := make(map[string]OMPProjectionCapability, len(ompProjectionRoleSpecs))
 	fallbacksBySelector := make(map[string][]string)
 	for _, spec := range ompProjectionRoleSpecs {
-		resolved, selected := capabilities[spec.capability]
+		resolved, selected := agents[spec.agent]
 		if !selected {
 			continue
 		}
-		// Selected capabilities alone receive native role overrides.
 		selector := formatOMPProjectedSelector(resolved.Selector, resolved.Thinking)
 		projection.ModelRoles = append(projection.ModelRoles, OMPModelRoleProjection{
 			Role: spec.role, Capability: spec.capability, Selector: selector,
 		})
-		roleResults[spec.role] = resolved
-		if len(resolved.Fallbacks) > 0 {
-			chain := OMPFallbackChainProjection{Selector: selector}
-			for _, fallback := range resolved.Fallbacks {
-				chain.Candidates = append(chain.Candidates,
-					formatOMPProjectedSelector(fallback.Selector, fallback.Thinking))
-			}
-			if previous, exists := fallbacksBySelector[selector]; exists {
-				if !equalOMPProjectedStrings(previous, chain.Candidates) {
-					return OMPModelProjection{}, fmt.Errorf("fallback_chain_conflict: %s", selector)
-				}
-			} else {
-				fallbacksBySelector[selector] = append([]string(nil), chain.Candidates...)
-				projection.FallbackChains = append(projection.FallbackChains, chain)
-			}
-		}
-	}
-
-	agents := append([]string(nil), input.AgentNames...)
-	sort.Strings(agents)
-	for _, agent := range agents {
-		role, roleErr := config.OMPAgentRole(agent)
-		if roleErr != nil {
-			return OMPModelProjection{}, roleErr
-		}
-		resolved, selected := roleResults[role]
-		if !selected {
+		projection.Agents = append(projection.Agents, OMPAgentModelProjection{
+			Agent: spec.agent, Role: spec.role, Model: "@" + spec.role,
+			Thinking: resolved.Thinking, EffectiveSelector: selector,
+		})
+		if len(resolved.Fallbacks) == 0 {
 			continue
 		}
-		projection.Agents = append(projection.Agents, OMPAgentModelProjection{
-			Agent:             agent,
-			Role:              role,
-			Model:             "@" + role,
-			Thinking:          resolved.Thinking,
-			EffectiveSelector: formatOMPProjectedSelector(resolved.Selector, resolved.Thinking),
-		})
+		// Fallback chains stay keyed by effective selector: agents sharing a
+		// selector must agree on the chain or the projection fails closed.
+		chain := OMPFallbackChainProjection{Selector: selector}
+		for _, fallback := range resolved.Fallbacks {
+			chain.Candidates = append(chain.Candidates,
+				formatOMPProjectedSelector(fallback.Selector, fallback.Thinking))
+		}
+		if previous, exists := fallbacksBySelector[selector]; exists {
+			if !equalOMPProjectedStrings(previous, chain.Candidates) {
+				return OMPModelProjection{}, fmt.Errorf("fallback_chain_conflict: %s", selector)
+			}
+			continue
+		}
+		fallbacksBySelector[selector] = append([]string(nil), chain.Candidates...)
+		projection.FallbackChains = append(projection.FallbackChains, chain)
 	}
 	return projection, nil
 }
 
-func validateOMPProjectionCapabilities(
-	inputs []OMPProjectionCapability,
-) (map[string]OMPProjectionCapability, error) {
-	capabilities := make(map[string]OMPProjectionCapability, len(inputs))
+func validateOMPProjectionAgents(
+	inputs []OMPProjectionAgent,
+) (map[string]OMPProjectionAgent, error) {
+	agents := make(map[string]OMPProjectionAgent, len(inputs))
 	for _, input := range inputs {
-		if _, ok := ompProjectionCapabilities[input.Capability]; !ok {
-			return nil, fmt.Errorf("capability_unknown: %q", input.Capability)
+		role, err := config.OMPAgentRole(input.Agent)
+		if err != nil {
+			return nil, fmt.Errorf("agent_role_unmapped: %q", input.Agent)
 		}
-		if _, exists := capabilities[input.Capability]; exists {
-			return nil, fmt.Errorf("capability_duplicate: %q", input.Capability)
+		capability, err := config.OMPAgentCapability(input.Agent)
+		if err != nil {
+			return nil, fmt.Errorf("agent_role_unmapped: %q", input.Agent)
+		}
+		if input.Role != role || input.Capability != capability {
+			return nil, fmt.Errorf("role_capability_mismatch: agent=%s role=%s capability=%s",
+				input.Agent, input.Role, input.Capability)
+		}
+		if _, exists := agents[input.Agent]; exists {
+			return nil, fmt.Errorf("agent_duplicate: %q", input.Agent)
 		}
 		if err := validateOMPProjectedSelector(input.Selector, input.Thinking); err != nil {
-			return nil, fmt.Errorf("capability %s: %w", input.Capability, err)
+			return nil, fmt.Errorf("agent %s: %w", input.Agent, err)
 		}
 		for index, fallback := range input.Fallbacks {
 			if err := validateOMPProjectedSelector(fallback.Selector, fallback.Thinking); err != nil {
-				return nil, fmt.Errorf("capability %s fallback[%d]: %w", input.Capability, index, err)
+				return nil, fmt.Errorf("agent %s fallback[%d]: %w", input.Agent, index, err)
 			}
 		}
-		capabilities[input.Capability] = input
+		agents[input.Agent] = input
 	}
-	return capabilities, nil
+	return agents, nil
 }
 
 func validateOMPProjectedSelector(selector, thinking string) error {

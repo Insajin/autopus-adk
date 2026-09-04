@@ -61,14 +61,62 @@ func TestOMPModelDoctor_GeneratedOverlayAndProjectSourcesDetectMutation(t *testi
 	}
 }
 
-type ompModelDoctorE2ERunner struct{}
+// TestOMPModelDoctor_S7_EmitsOneRoleCheckPerAgent fixes SPEC-OMP-005 S7: a
+// generated ultra workspace yields sixteen agent-keyed doctor role checks.
+func TestOMPModelDoctor_S7_EmitsOneRoleCheckPerAgent(t *testing.T) {
+	t.Parallel()
 
-func (*ompModelDoctorE2ERunner) Run(_ context.Context, _ string, args ...string) ([]byte, error) {
+	root := t.TempDir()
+	cfg := config.DefaultFullConfig("doctor-ultra")
+	cfg.Platforms = []string{"omp"}
+	cfg.Quality.Default = "ultra"
+	cfg.RoleModelPolicy = config.RoleModelPolicyConf{
+		Version: config.RoleModelPolicyVersionV1, Profile: "ultra", Family: "anthropic",
+	}
+	runner := &ompModelDoctorE2ERunner{catalog: ompModelDoctorPresetCatalogJSON()}
+	_, err := omp.NewWithRoot(root).WithModelIntegrationRunner(runner).
+		Generate(context.Background(), cfg)
+	require.NoError(t, err)
+
+	input := buildOMPModelDoctorInput(context.Background(), root, cfg, runner)
+	report := omp.CheckOMPModelRoutingDoctor(input)
+	require.Equal(t, "supported", report.Status)
+	require.Equal(t, "fresh", report.Reason)
+	require.Len(t, report.Roles, len(config.CanonicalAgentNames()))
+	for _, row := range report.Roles {
+		assert.Equal(t, config.OMPAgentRoleName(row.Agent), row.Role, row.Agent)
+		assert.Equal(t, "operator_attested", row.EvidenceClass, row.Agent)
+	}
+
+	details := make([]string, 0, len(report.Roles))
+	for _, check := range projectOMPModelRoutingDoctorChecks(report) {
+		if strings.HasPrefix(check.ID, "doctor.platform.omp.model-routing.role.") {
+			details = append(details, check.Detail)
+		}
+	}
+	assert.Len(t, details, 16)
+	joined := strings.Join(details, "\n")
+	assert.Contains(t, joined, "agent=executor role=autopus_executor capability=coding_tool_use status=supported")
+	assert.Contains(t, joined, "agent=debugger role=autopus_debugger capability=coding_tool_use status=supported")
+	assert.Contains(t, joined, "agent=reviewer role=autopus_reviewer capability=independent_dissent status=supported reason=selected family_diversity=satisfied")
+	for _, native := range []string{"role=task ", "role=advisor ", "role=plan ", "role=tiny "} {
+		assert.NotContains(t, joined, native)
+	}
+}
+
+type ompModelDoctorE2ERunner struct {
+	catalog []byte
+}
+
+func (runner *ompModelDoctorE2ERunner) Run(_ context.Context, _ string, args ...string) ([]byte, error) {
 	joined := strings.Join(args, " ")
 	if joined == "--version" {
 		return []byte("omp/17.2.6\n"), nil
 	}
 	if joined == "models --json --no-extensions" {
+		if runner.catalog != nil {
+			return append([]byte(nil), runner.catalog...), nil
+		}
 		return []byte(`{"models":[{"provider":"acme","id":"model","family":"acme","capabilities":["coding_tool_use","deep_reasoning","deterministic_transform","fast_validation","independent_dissent","vision_design"],"thinking":["high"],"auth_enabled":true}]}`), nil
 	}
 	key := ompModelDoctorConfigGetKey(args)
@@ -123,7 +171,8 @@ func ompModelDoctorE2EConfig(mode string) *config.HarnessConfig {
 	profile := cfg.RoleModelPolicy.Profiles["balanced"]
 	profile.ConfigMode = mode
 	profile.FamilyDiversity = config.FamilyDiversityPolicyConf{
-		Enabled: true, Roles: []string{config.OMPRoleAdvisor},
+		Enabled: true,
+		Roles:   []string{config.OMPAgentRoleName("reviewer"), config.OMPAgentRoleName("security-auditor")},
 	}
 	if mode == config.RoleModelConfigModeProjectManaged {
 		missing := omp.OMPMissingManagedValueFingerprint()
@@ -137,4 +186,27 @@ func ompModelDoctorE2EConfig(mode string) *config.HarnessConfig {
 	}
 	cfg.RoleModelPolicy.Profiles["balanced"] = profile
 	return cfg
+}
+
+// ompModelDoctorPresetCatalogJSON mirrors the metadata-light OMP catalog the
+// built-in profiles attest: four Claude rungs and four Codex rungs.
+func ompModelDoctorPresetCatalogJSON() []byte {
+	rungs := []struct{ provider, model, thinking string }{
+		{"anthropic", config.ClaudeFableModel, "max"},
+		{"anthropic", config.ClaudeOpusModel, "xhigh"},
+		{"anthropic", config.ClaudeSonnetModel, "medium"},
+		{"anthropic", config.ClaudeHaikuModel, "low"},
+		{"openai-codex", config.CodexAstraModel, "max"},
+		{"openai-codex", config.CodexSolModel, "xhigh"},
+		{"openai-codex", config.CodexTerraModel, "medium"},
+		{"openai-codex", config.CodexLunaModel, "low"},
+	}
+	entries := make([]string, 0, len(rungs))
+	for _, rung := range rungs {
+		entries = append(entries, fmt.Sprintf(
+			`{"provider":%q,"id":%q,"selector":%q,"thinking":[%q]}`,
+			rung.provider, rung.model, rung.provider+"/"+rung.model, rung.thinking,
+		))
+	}
+	return []byte(`{"models":[` + strings.Join(entries, ",") + `]}`)
 }

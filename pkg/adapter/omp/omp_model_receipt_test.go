@@ -21,8 +21,8 @@ func modelReceiptFixture(generatedAt time.Time) OMPModelResolutionReceipt {
 			ReadbackHash: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
 		},
 		Roles: []OMPModelRoleReceipt{
-			{Agent: "reviewer", Profile: "balanced", ConfigSource: "overlay", RequestedRole: "advisor", EffectiveRole: "advisor", Capability: "independent_dissent", Provider: "q", Model: "review", Selector: "q/review", Thinking: "high", FamilyDiversity: OMPModelFamilyDiversityReceipt{Status: "satisfied", ExecutorFamily: "p", EffectiveFamily: "q"}, SafetySource: "user_effective"},
-			{Agent: "executor", Profile: "balanced", ConfigSource: "overlay", RequestedRole: "task", EffectiveRole: "task", Capability: "coding_tool_use", Provider: "p", Model: "code", Selector: "p/code", Thinking: "medium", FallbackAttempts: []OMPModelFallbackAttemptReceipt{{Selector: "p/old", Reason: "disabled"}}, SafetySource: "user_effective"},
+			{Agent: "reviewer", Profile: "balanced", ConfigSource: "overlay", RequestedRole: "autopus_reviewer", EffectiveRole: "autopus_reviewer", Capability: "independent_dissent", Provider: "q", Model: "review", Selector: "q/review", Thinking: "high", FamilyDiversity: OMPModelFamilyDiversityReceipt{Status: "satisfied", ExecutorFamily: "p", EffectiveFamily: "q"}, SafetySource: "user_effective"},
+			{Agent: "executor", Profile: "balanced", ConfigSource: "overlay", RequestedRole: "autopus_executor", EffectiveRole: "autopus_executor", Capability: "coding_tool_use", Provider: "p", Model: "code", Selector: "p/code", Thinking: "medium", FallbackAttempts: []OMPModelFallbackAttemptReceipt{{Selector: "p/old", Reason: "disabled"}}, SafetySource: "user_effective"},
 		},
 		Safety:      OMPModelSafetyReceipt{ApprovalMode: "write", IsolationMode: "auto", Source: "autopus_profile"},
 		GeneratedAt: generatedAt,
