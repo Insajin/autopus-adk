@@ -81,23 +81,7 @@ Before spawning workers, decide whether the pipeline can proceed autonomously:
 
 ## Pipeline Overview
 
-` + "```text" + `
-Step 0:    Triage          -> main session
-Phase 0.7: Authenticity    -> main session  (verify real worker dispatch plan)
-Phase 1:   Planning        -> planner
-Phase 1.5: Test Scaffold   -> tester        (optional)
-Gate 1:    Approval        -> main session  (skip with --auto)
-Phase 1.8: Doc Fetch       -> main session  (fetch current docs if needed)
-Phase 2:   Implementation  -> executor x N  (parallel only with disjoint ownership)
-Phase 2.1: Integration     -> main session  (inspect and integrate worker returns)
-Gate 2:    Validation      -> validator
-Phase 2.5: Annotation      -> annotator
-Phase 3:   Testing         -> tester
-Phase 3.5: UX Verify       -> frontend-specialist (optional)
-Gate 3:    Acceptance      -> main session  (coverage of MUST acceptance)
-Phase 4A:  Review          -> reviewer + security-auditor (+ optional multi-provider discovery)
-Phase 4B:  Verify Fixes    -> reviewer/security follow-up, diff-only
-` + "```" + `
+` + codexAgentPipelinePhaseFlow() + `
 
 ## Quality Mode
 
@@ -206,7 +190,7 @@ Doc-fetch rules:
 - if Context7 fails, use web search with official docs, release notes, and API references first
 - cache only the minimum relevant excerpts under a ` + "`## Reference Documentation`" + ` section
 - do not block implementation when both Context7 and web fallback fail
-
+` + codexRiskFirstProbeGate() + `
 ### Phase 2: Implementation
 
 Parallel implementation is valid only with disjoint ownership. Prefer narrow workers over broad ones.

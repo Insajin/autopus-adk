@@ -176,15 +176,14 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// report, the typed GUI capture contract, the `report` route in its command
 	// description, and the scenario authoring contract (`auto qa scenario`, the
 	// closed read-only step vocabulary, and the screen_ref link that makes
-	// gui.screen_matrix enforceable). It last moved when the five skills
-	// adapted from mattpocock/skills were revised after their first trial
-	// run: grilling gained a materiality rule, one-message rounds, a final
-	// confirm gate, and the Grilling Summary handoff; domain-modeling a
-	// proposal-only mode and contradiction template; codebase-design an
-	// implicit-input checklist and adapter counting rules; debugging the
-	// flaky-test stress loop and no-modification observation; review a
-	// capability precondition and per-requirement coverage marking.
-	const priorPreparedFilesFingerprint = "2cf38585872a07310238f6f5ceda98f2d3eeac19a540bde300e235363d238fdb"
+	// gui.screen_matrix enforceable). It last moved for two changes landing
+	// together: issue #185 reclassified context7-docs, doc-storage, spec-quality,
+	// and techstack-freshness as skill-scoped, and OMP re-emits rule frontmatter
+	// verbatim so the added `skillScoped: true` key reaches
+	// .omp/rules/autopus-*.md — OMP keeps its own rule placement, only
+	// claude-code relocates those bodies out of baseline context — and issue #186
+	// revised the agent-pipeline skill body and its shared OMP template.
+	const priorPreparedFilesFingerprint = "843bbcab34fe647da9c650d29608e44963df3c089c3c26ea0844f7adb033c75f"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

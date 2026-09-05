@@ -127,6 +127,13 @@ Reason length is sanitized to 200 runes (`pkg/spec/provider_health.go::sanitizeN
 - FAIL 기준: 필수 누락 작업을 Evolution Ideas로 낮추거나, 선택 개선 제안에 SPEC ID/acceptance/task를 붙여 자동 후속 작업으로 승격하거나, reviewer-discovered future idea를 REQUEST_CHANGES 근거로 삼게 만든다.
 - Example: "더 다양한 export 포맷"이 Outcome Lock 밖의 개선이면 Evolution Ideas에만 기록하고, 사용자가 명시적으로 요청하기 전까지 `/auto plan`이나 sibling SPEC을 추천하지 않는다.
 
+### Q-COMP-08 — Risk-First Integration Probe records honest verdicts
+
+- PASS 기준: `plan.md`에 `## Risk-First Integration Probe`가 있고, 1-3개 행이 각각 `PASS` / `FAIL` / `not-run` status와 non-empty reason을 갖는다. `PASS` 행은 실제 실행에서 얻은 evidence ref를 참조하고, plan 진술은 `requirement_invariant` / `implementation_assumption` / `verified_fact`로 분류된다.
+- FAIL 기준: 섹션이 없거나, `not-run`을 이유 없이 남기거나 PASS로 승격하거나, evidence 없는 행을 `PASS`로 표기하거나, 구현 가정을 요구사항이나 검증된 사실과 섞어 서술한다.
+- Fix guidance: 지금 실행 가능한 probe는 `Phase 1.9: Risk-First Probe Gate`에서 실행해 evidence를 남기고, 실행 불가한 행은 `not-run` + 이유로 유지한다. 각 게이트의 적용 여부는 `required | not_applicable | blocked` + 이유로 기록한다.
+- Example: doc-only SPEC은 섹션을 유지하고 `not-run | no integration boundary` 한 행만 남긴다. composition-root boot, browser -> BFF -> API round trip, logout/cancel/account-switch 같은 in-flight 상태 경계는 fan-out 전에 실제로 probe해야 한다.
+
 ## feasibility
 
 ### Q-FEAS-01 — Scope matches the real implementation layer

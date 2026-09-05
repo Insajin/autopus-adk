@@ -77,7 +77,13 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 					assert.Contains(t, body, `"agent"`, "custom legacy roles must map to the per-item agent field")
 				}
 				if name == "agent-pipeline" || name == "worktree-isolation" {
-					assert.LessOrEqual(t, strings.Count(body, "\n"), 320,
+					// A no-growth ratchet on the OMP-native core coordination skills:
+					// they are injected into every OMP session, so the bound is set to
+					// the current emitted size and only moves when a phase is genuinely
+					// added. Raised from 320 for Phase 1.9 (Risk-First Probe Gate) and
+					// the Gate Applicability contract; additions were compressed to 27
+					// template lines before the bound moved.
+					assert.LessOrEqual(t, strings.Count(body, "\n"), 345,
 						"OMP-native core coordination skills must stay bounded")
 					for _, token := range []string{
 						"sonnet", "haiku", `model: "opus"`, "Opus-tier",

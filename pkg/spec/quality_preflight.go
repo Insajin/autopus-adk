@@ -35,6 +35,7 @@ func ValidateSpecSet(specDir string, doc *SpecDocument) []ValidationError {
 	errs = append(errs, validateTraceability(files["spec.md"], files["research.md"], files["acceptance.md"])...)
 	errs = append(errs, validateSelfVerifySummary(files["research.md"])...)
 	errs = append(errs, validateCompletionDebtSeparation(files["research.md"])...)
+	errs = append(errs, validateRiskFirstProbe(files["plan.md"])...)
 	errs = append(errs, validateDocLineCap(files)...)
 	return errs
 }
@@ -101,7 +102,7 @@ func readSpecValidationFiles(specDir string) (map[string]string, []ValidationErr
 func validateRequiredSections(files map[string]string) []ValidationError {
 	required := map[string][]string{
 		"spec.md":       {"## Outcome Boundary", "## Requirements", "## Traceability Matrix"},
-		"plan.md":       {"## Implementation Strategy", "## Visual Planning Brief", "## Feature Completion Scope", "## Tasks"},
+		"plan.md":       {"## Implementation Strategy", "## Visual Planning Brief", "## Feature Completion Scope", probeSectionHeading, "## Tasks"},
 		"acceptance.md": {"## Test Scenarios", "## Oracle Acceptance Notes"},
 		"research.md": {
 			"## Outcome Lock",

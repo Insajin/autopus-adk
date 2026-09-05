@@ -57,6 +57,7 @@ func isHeaderRow(cells []string) bool {
 		"invariant type":      true,
 		"affected outputs":    true,
 		"acceptance ids":      true,
+		"assumption_id":       true,
 	}
 	for _, cell := range cells {
 		if headerNames[strings.ToLower(cell)] {

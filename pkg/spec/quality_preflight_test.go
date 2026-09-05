@@ -153,6 +153,7 @@ flow: draft -> preflight -> review
 
 The Primary SPEC closes the Outcome Lock without sibling dependencies.
 
+` + probeSection(defaultProbeRow) + `
 ## Tasks
 
 - [ ] T1: Add deterministic SPEC package validation.

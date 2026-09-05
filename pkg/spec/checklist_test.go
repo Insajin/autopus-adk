@@ -47,31 +47,65 @@ func TestBuildReviewPrompt_InjectsChecklistBeforeInstructions(t *testing.T) {
 	assert.Contains(t, prompt, "CHECKLIST: <항목 ID> | FAIL | <reason>")
 }
 
-func TestBuildReviewPrompt_TrimsChecklistToDocContextMaxLines(t *testing.T) {
+// The checklist is a stable instruction document: the reviewer must answer every
+// Q-* item, so DocContextMaxLines (a compression-fallback threshold) must not
+// head-trim it. Only a checklist beyond the generous budget is trimmed, and then
+// only with a visible notice.
+func TestBuildReviewPrompt_ChecklistBudgetIgnoresDocContextMaxLines(t *testing.T) {
 	t.Parallel()
 
-	lines := make([]string, 300)
+	prompt := buildPromptWithChecklistLines(t, 300, 200)
+
+	assert.NotContains(t, prompt, "additional lines were omitted",
+		"a 300-line checklist fits the generous budget and must inject in full")
+	assert.Contains(t, prompt, strings.Repeat("checklist line\n", 299))
+}
+
+func TestBuildReviewPrompt_TrimsChecklistBeyondGenerousBudget(t *testing.T) {
+	t.Parallel()
+
+	prompt := buildPromptWithChecklistLines(t, DefaultAuxTotalBudgetLines+100, 200)
+
+	assert.Contains(t, prompt, "[Review-context notice: 100 additional lines were omitted")
+	assert.Contains(t, prompt, "not a source document defect")
+}
+
+// The canonical checklist must inject whole: a trimmed tail silently removes
+// checklist items from the contract the reviewer is asked to report on.
+func TestBuildReviewPrompt_CanonicalChecklistInjectsInFull(t *testing.T) {
+	t.Parallel()
+
+	body, err := LoadChecklist(content.FS)
+	require.NoError(t, err)
+
+	doc := &SpecDocument{ID: "SPEC-CHECKLIST-004", Title: "Canonical", RawContent: "# SPEC-CHECKLIST-004"}
+	prompt := BuildReviewPrompt(doc, "", ReviewPromptOptions{DocContextMaxLines: 200})
+
+	assert.NotContains(t, prompt, "additional lines were omitted")
+	assert.Contains(t, prompt, strings.TrimSpace(body))
+}
+
+func buildPromptWithChecklistLines(t *testing.T, count, docContextMaxLines int) string {
+	t.Helper()
+
+	lines := make([]string, count)
 	for i := range lines {
 		lines[i] = "checklist line"
 	}
 
 	doc := &SpecDocument{
 		ID:         "SPEC-CHECKLIST-002",
-		Title:      "Checklist Trim",
+		Title:      "Checklist Budget",
 		RawContent: "# SPEC-CHECKLIST-002",
 	}
 	opts := ReviewPromptOptions{
-		DocContextMaxLines: 200,
+		DocContextMaxLines: docContextMaxLines,
 		checklistFS: fstest.MapFS{
 			checklistEmbedPath: &fstest.MapFile{Data: []byte(strings.Join(lines, "\n"))},
 		},
 	}
 
-	prompt := BuildReviewPrompt(doc, "", opts)
-
-	assert.Contains(t, prompt, "[Review-context notice: 100 additional lines were omitted")
-	assert.Contains(t, prompt, "not a source document defect")
-	assert.NotContains(t, prompt, strings.Repeat("checklist line\n", 250))
+	return BuildReviewPrompt(doc, "", opts)
 }
 
 func TestBuildReviewPrompt_SoftFallbackWhenChecklistMissing(t *testing.T) {

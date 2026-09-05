@@ -78,6 +78,18 @@ Before implementation assignment, apply the minimality ladder: `actual need` →
 - Final handoff must include a concise receipt of important choices: reused existing code/helper/pattern, skipped dependency or abstraction, accepted new dependency or abstraction with evidence, and selected verification.
 - `qualityloop`/`skillevolve` signals are candidate-only and remain isolated/quarantined; do not apply them during this workflow.
 
+## Phase 1.9: Risk-First Probe Gate
+
+Phase 1.8 이후, Phase 2 fan-out 전에 메인 세션에서 실행합니다. 이 게이트는 기본 prompt-driven pipeline에 적용되며 deterministic Route A / Route Team 계약은 변경하지 않습니다.
+
+- `plan.md`의 `## Risk-First Integration Probe` 표(1-3개 행)를 읽습니다.
+- 지금 실행 가능한 `not-run` 행(실제 boundary, 격리된 fixture, 승인되지 않은 외부 효과 없음)은 실제로 실행하고 `PASS` 또는 `FAIL`을 실행 evidence ref와 함께 기록합니다.
+- 계속 `not-run`인 행은 reason을 유지한 채 handoff의 명시적 limitation으로 넘깁니다. 절대 `PASS`로 보고하지 않습니다.
+- high/critical 가정이 `FAIL`이면 planning으로 돌아가 `plan.md`를 수정합니다. re-plan은 최대 1회이며, 두 번째 `FAIL`은 세 번째 시도 대신 사용자에게 surface합니다.
+- 구현자가 요구사항보다 넓은 제약(신규 ACL, 호환성 제한, 보안 제한)을 도입하면 scope expansion이므로 fan-out 전에 기존 런타임에서 probe합니다.
+
+Gate applicability: 통합 경계가 있으면 `required`, doc-only 또는 low-risk면 `not_applicable`(단, `not-run` 한 행과 `no integration boundary` 이유 유지), fixture/환경이 없으면 `blocked`입니다. `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`은 `not_applicable`이 될 수 없고, `reusable`은 이 릴리스에서 유효한 값이 아닙니다.
+
 ## Frontend Design Preflight
 
 - UI 관련 변경(`.tsx`, `.jsx`, CSS-family, theme/token/design-system 경로, configured UI globs)이 있으면 구현 전에 `auto design pack --format markdown`을 실행하거나 동등한 local evidence를 수집합니다.
@@ -223,6 +235,7 @@ approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 curre
 - [ ] Phase 1.5: Test Scaffold 완료 또는 `--skip-scaffold`
 - [ ] Gate 1: Approval 완료 또는 `--auto`
 - [ ] Phase 1.8: Doc Fetch 완료 또는 skip
+- [ ] Phase 1.9: Risk-First Probe Gate 완료 (executed 또는 이유가 있는 `not-run`)
 - [ ] Phase 2: Implementation 완료
 - [ ] Gate 2: Validation PASS
 - [ ] Phase 2.5: Annotation 완료

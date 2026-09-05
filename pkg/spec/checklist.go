@@ -21,13 +21,14 @@ func LoadChecklist(fsys fs.FS) (string, error) {
 }
 
 // InjectChecklistSection appends the quality checklist section to a review prompt.
+// The line budget is resolved through ResolveAuxTotalBudget, the single
+// budget-resolution authority (SPEC-ADK-REVIEW-INTEGRITY-001 REQ-RINT-FULL-02):
+// DocContextMaxLines is only a compression-fallback threshold, so using it
+// directly head-trimmed the checklist and silently dropped the trailing Q-*
+// items the reviewer is required to answer.
 func InjectChecklistSection(sb *strings.Builder, body string, maxLines int) {
-	if maxLines <= 0 {
-		maxLines = defaultDocContextMaxLines
-	}
-
 	sb.WriteString("## Quality Checklist\n\n")
-	sb.WriteString(trimToLines(strings.TrimSpace(body), maxLines))
+	sb.WriteString(trimToLines(strings.TrimSpace(body), ResolveAuxTotalBudget(maxLines)))
 	sb.WriteString("\n\n")
 }
 

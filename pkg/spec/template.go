@@ -174,6 +174,17 @@ Mermaid flowchart:
 
 Primary SPEC가 Outcome Lock을 닫는 방법, 승인된 sibling 의존성, 남은 Completion Debt 여부를 설명합니다.
 
+## Risk-First Integration Probe
+
+구현 fan-out 전에 가장 위험한 가정 1-3개를 실제 boundary에서 검증하고 결과를 기록합니다.
+class는 implementation_assumption, requirement_invariant, verified_fact 중 하나이고, status는 PASS, FAIL, not-run 중 하나입니다.
+PASS는 실제 실행에서 얻은 evidence ref가 있을 때만 기록합니다. not-run은 반드시 reason을 남기며 PASS로 승격되지 않습니다.
+doc-only 또는 low-risk SPEC도 이 섹션을 유지하고 not-run 한 행과 no integration boundary 이유를 남깁니다.
+
+| assumption_id | class | risk | boundary | input | oracle | isolation | status | reason | evidence |
+|---------------|-------|------|----------|-------|--------|-----------|--------|--------|----------|
+| A1 | implementation_assumption | high | 검증할 실제 integration boundary | 최소 입력 또는 fixture ref | 기대 관측 결과 | 격리 방식 | not-run | probe not executed yet | - |
+
 ## Tasks
 
 - [ ] 태스크 1

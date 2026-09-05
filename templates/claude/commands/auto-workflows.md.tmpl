@@ -874,10 +874,13 @@ Agent(
     15. For any new dependency or new abstraction, require evidence in this order: `actual need`, `existing code/helper/pattern`, `stdlib/native`, `existing dependency`, `new dependency or abstraction`. Missing prior evidence makes the item a `revise-target` or risk; explicit user intent still needs alternatives, justification, and verification obligation.
     16. Keep `minimum sufficient verification` focused on closing the Outcome Lock while preserving security, validation, accessibility, data-loss, deterministic-oracle, and generated-surface-hygiene gates.
     17. Write `## Reviewer Brief` in research.md with intended scope, explicit non-goals, self-verified evidence, and reviewer focus.
-    18. Apply Q-CORR-04, Q-COMP-05, and Q-COMP-06 from `.claude/rules/autopus/spec-quality.md` during Self-Verify Summary.
-    19. For greenfield/new project/scaffold work, apply techstack-freshness and write `## Technology Stack Decision` in research.md or prd.md with concrete stable versions, source refs, checked_at, and rejected alternatives.
-    20. For prompt-state work, record the prompt layer manifest contract: stable instructions, frozen snapshot recall, ephemeral request/evidence, and cache invalidation scope.
-    21. After writing all four SPEC files, run `auto spec validate {SPEC_DIR} --strict` before provider review. Fix deterministic authoring preflight errors locally and rerun validation before returning.
+    18. Write `## Risk-First Integration Probe` in plan.md: 1-3 rows of `assumption_id`, `class`, `risk`, `boundary`, `input`, `oracle`, `isolation`, `status`, `reason`, `evidence`. Name the riskiest implementation assumptions — composition-root boot with real restricted permissions, a browser → BFF → API minimal round trip, and in-flight state boundaries such as logout/cancel/account switch are the canonical examples.
+    19. Classify every plan statement as `requirement_invariant`, `implementation_assumption`, or `verified_fact`. `status` is `PASS`, `FAIL`, or `not-run`; `PASS` requires an evidence ref from a real execution, `not-run` must carry a reason and is never treated as PASS, and doc-only/low-risk SPECs keep the section with one `not-run` row and the reason `no integration boundary`.
+    20. Record that an implementer-introduced constraint broader than the requirement (a new ACL, compatibility limit, or security limit) is a scope expansion that must be flagged and probed against the existing runtime before fan-out. `Phase 1.9: Risk-First Probe Gate` consumes this table, and each gate reports `required | not_applicable | blocked` with a reason (`reusable` is not a valid value in this release).
+    21. Apply Q-CORR-04, Q-COMP-05, Q-COMP-06, and Q-COMP-08 from `.claude/rules/autopus/spec-quality.md` during Self-Verify Summary.
+    22. For greenfield/new project/scaffold work, apply techstack-freshness and write `## Technology Stack Decision` in research.md or prd.md with concrete stable versions, source refs, checked_at, and rejected alternatives.
+    23. For prompt-state work, record the prompt layer manifest contract: stable instructions, frozen snapshot recall, ephemeral request/evidence, and cache invalidation scope.
+    24. After writing all four SPEC files, run `auto spec validate {SPEC_DIR} --strict` before provider review. Fix deterministic authoring preflight errors locally and rerun validation before returning.
   """
 )
 ```
@@ -1279,6 +1282,7 @@ Phase 1: Planning        → planner
 Phase 1.5: Test Scaffold → tester — skip if --skip-scaffold
 Gate 1:  Approval        → skip if AUTO_MODE
 Phase 1.8: Doc Fetch     → main session (Context7 MCP) — skip if no external libs detected
+Phase 1.9: Probe Gate    → main session (Risk-First Integration Probe rows before fan-out)
 Phase 2: Implementation  → executor×N (parallel with explicit integration)
 Gate 2:  Validation      → validator — retry up to 3× on FAIL
 Phase 2.5: Annotation    → annotator — @AX tags on modified files
@@ -1510,7 +1514,22 @@ Error handling: Context7 failures trigger web fallback. Only when both Context7 
 
 Ref: `.claude/rules/autopus/context7-docs.md` for full detection heuristics, token limits, and anti-patterns. Ref: `.claude/rules/autopus/techstack-freshness.md` for greenfield version evidence.
 
-> **⏭ POST-PHASE**: Doc Fetch complete (or skipped). NEXT REQUIRED STEP: Phase 2: Implementation. Do NOT skip to Completion.
+> **⏭ POST-PHASE**: Doc Fetch complete (or skipped). NEXT REQUIRED STEP: Phase 1.9: Risk-First Probe Gate. Do NOT skip to Completion.
+
+**[REQUIRED] Phase 1.9 — Risk-First Probe Gate (main session)**
+
+WHEN Phase 1.8 completes (or is skipped), THE SYSTEM SHALL consume the `## Risk-First Integration Probe` table in `plan.md` before any executor is spawned. This gate belongs to the default prompt-driven pipeline; the deterministic `--workflow route_a` / `route_team` contracts are unchanged.
+
+1. **Read the table**: 1-3 rows of `assumption_id`, `class`, `risk`, `boundary`, `input`, `oracle`, `isolation`, `status`, `reason`, `evidence`
+2. **Execute executable probes**: run every `not-run` row that can run now — a real boundary, an isolated fixture, and no unapproved external effect — and record `PASS` or `FAIL` with an evidence ref from that execution
+3. **Keep honest not-run**: a row that stays `not-run` keeps its reason and travels into the handoff as an explicit limitation; it is never reported as `PASS`
+4. **Bounded re-plan**: on `FAIL` for a high or critical assumption, return to planning and revise `plan.md`; this is bounded to 1 re-plan, and a second `FAIL` surfaces to the user instead of a third attempt
+
+Gate applicability: `required` whenever the change touches an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep one `not-run` row with the reason `no integration boundary`; `blocked` when the fixture or environment is missing. Mandatory safety gates (`security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`) can never be `not_applicable`, and `reusable` is not a valid value in this release.
+
+An implementer-introduced constraint broader than the requirement (new ACL, compatibility limit, security limit) is a scope expansion: probe it against the existing runtime here, before fan-out multiplies the assumption across workers.
+
+> **⏭ POST-PHASE**: Probe gate closed (executed, re-planned once, or carried as an explicit `not-run` limitation). NEXT REQUIRED STEP: Phase 2: Implementation. Do NOT skip to Completion.
 
 **[REQUIRED] Phase 2 — Implementation (MUST call Agent tool)**
 
@@ -1838,6 +1857,7 @@ Before displaying completion output, verify ALL phases were evaluated:
 - [ ] Phase 1.5: Test Scaffold — completed OR skipped (--skip-scaffold)
 - [ ] Gate 1: Approval — completed OR skipped (AUTO_MODE)
 - [ ] Phase 1.8: Doc Fetch — completed OR skipped (no external libs)
+- [ ] Phase 1.9: Risk-First Probe Gate — probe rows executed, or carried as explicit `not-run` with reason
 - [ ] Phase 2: Implementation — all tasks completed
 - [ ] Phase 2.1: Worktree Merge — completed (if parallel tasks existed) OR N/A
 - [ ] Gate 2: Validation — PASS

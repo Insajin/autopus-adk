@@ -123,6 +123,16 @@ Required return fields:
 - `blockers`
 - `next_required_step`
 
+## Gate Applicability
+
+Every phase gate records `required | not_applicable | blocked` plus a reason in its handoff.
+`reusable` is intentionally not valid in this release: no exact-input evidence engine exists, so
+reusing an earlier verdict would be unverifiable. The mandatory safety gates `security`,
+`validation`, `accessibility`, `data-loss`, and `deterministic-oracle` can never be
+`not_applicable`. An auxiliary step reports `blocked` with a named fallback instead of stalling:
+@AX annotation with a missing reference source is `blocked`, while having nothing to annotate is
+`not_applicable`.
+
 ## Model and Thinking Policy
 
 Default behavior inherits the current OMP parent-session model and thinking configuration.
@@ -141,6 +151,7 @@ Phase 1:   planning                                 -> planner
 Phase 1.5: failing test scaffold                    -> tester (unless explicitly skipped)
 Gate 1:    user approval                            -> main session (skipped only by --auto)
 Phase 1.8: external documentation, when required    -> main session
+Phase 1.9: risk-first probe gate                    -> main session
 Phase 2:   implementation fan-out                   -> executor batch
 Gate 2:    deterministic validation                 -> validator
 Phase 2.5: annotation, when applicable              -> annotator
@@ -176,6 +187,21 @@ The tester owns only test files declared by the planner.
 Run in the main session only when the SPEC depends on external APIs or libraries. Use the active
 OMP documentation/search tools and stable primary sources. Subagents receive bounded references,
 not copied provider payloads. Skip this phase when no external dependency is involved.
+
+## Phase 1.9: Risk-First Probe Gate
+
+Run in the main session before the Phase 2 batch. Read the `## Risk-First Integration Probe`
+table in `plan.md` (1-3 rows: `assumption_id`, `class`, `risk`, `boundary`, `input`, `oracle`,
+`isolation`, `status`, `reason`, `evidence`). Execute every `not-run` row that is executable now
+— real boundary, isolated fixture, no unapproved external effect — and record `PASS` or `FAIL`
+with an evidence ref from that execution. A row that stays `not-run` keeps its reason and travels
+into the handoff as an explicit limitation, never as `PASS`. On `FAIL` for a high or critical
+assumption, revise `plan.md` once; a second `FAIL` surfaces to the user. An implementer-introduced
+constraint broader than the requirement is a scope expansion: probe it here, before fan-out. This
+gate belongs to the default prompt-driven pipeline; the deterministic Route A / Route Team
+contracts are unchanged. Applicability is `required` at an integration boundary,
+`not_applicable` only for a doc-only or low-risk SPEC that keeps one `not-run` row reasoned
+`no integration boundary`, and `blocked` when the fixture or environment is missing.
 
 ## Phase 2: Implementation
 
@@ -263,7 +289,8 @@ Before returning success, the main session must:
 1. verify all Must acceptance and the Outcome Lock;
 2. run the real changed path as a smoke test;
 3. confirm no blocking validator, reviewer, or security finding remains;
-4. record changed files, exact verification commands, and observed results;
+4. record changed files, exact verification commands, observed results, and every probe row that
+   stayed `not-run` with its reason and applicability verdict;
 5. set `spec_status_after_go = implemented` only when the sync-readiness contract is satisfied;
 6. provide `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `decision_receipt`,
    `next_required_step`, and the surface-native `/auto sync <SPEC-ID>` handoff.

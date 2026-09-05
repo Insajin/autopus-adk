@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-const defaultDocContextMaxLines = 200
 const trimNoticeFormat = "[Review-context notice: %d additional lines were omitted from this injected excerpt because of the prompt context limit. This notice is not a source document defect and must not be used as SPEC quality finding evidence.]"
 
 // BuildReviewPrompt constructs a review prompt from a SPEC document and code context.
@@ -89,8 +88,6 @@ func BuildReviewPrompt(doc *SpecDocument, codeContext string, opts ReviewPromptO
 	maxLines := opts.DocContextMaxLines
 	if opts.RequireCompleteDocuments {
 		maxLines = int(^uint(0) >> 1)
-	} else if maxLines <= 0 {
-		maxLines = defaultDocContextMaxLines
 	}
 	if checklistBody, checklistPath, err := loadChecklistForPrompt(opts); err != nil {
 		fmt.Fprintf(os.Stderr, "경고: 체크리스트 로드 실패 (%s): %v\n", checklistPath, err)

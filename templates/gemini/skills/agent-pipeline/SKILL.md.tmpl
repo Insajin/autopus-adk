@@ -121,6 +121,16 @@ Repeated complexity signals may be mentioned as `qualityloop` or `skillevolve` i
 
 The terminal handoff must include a concise receipt of important choices, for example reused existing helper, skipped dependency, accepted abstraction with evidence, or selected focused verification.
 
+## Gate Applicability
+
+Every phase gate records its applicability in the handoff as `required | not_applicable | blocked` plus a reason. `reusable` is intentionally not a valid value in this release: no exact-input evidence engine exists, so claiming a gate was satisfied by earlier evidence would be unverifiable.
+
+- `required`: the gate applies and must return a verdict from a real execution.
+- `not_applicable`: the gate has no surface in this change. Mandatory safety gates — `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle` — can never be `not_applicable`.
+- `blocked`: the gate applies but its input is unavailable. Auxiliary steps report `blocked` with a named fallback instead of stalling the pipeline; for example @AX annotation whose reference source or annotator surface is missing reports `blocked` with the fallback "record modified files, defer tagging" rather than looping.
+
+An auxiliary step that is genuinely a no-op (nothing to annotate) is `not_applicable`; one whose reference source is missing is `blocked`. Collapsing the two hides a setup gap behind a green gate.
+
 ## Pipeline Overview
 
 ```
@@ -129,6 +139,7 @@ Phase 1:   Planning        → planner     (fable, plan)
 Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip if --skip-scaffold
 Gate 1:    Approval        → skipped if --auto
 Phase 1.8: Doc Fetch       → main session (Context7 MCP) — skip if no external libs detected
+Phase 1.9: Probe Gate      → main session (execute Risk-First Integration Probe rows before fan-out)
 Phase 2:   Implementation  → executor×N  (opus, acceptEdits, parallel with worktree isolation)
 Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
 Gate 2:    Validation      → validator   (sonnet, plan)  — retry up to 3x on FAIL
@@ -335,6 +346,29 @@ Step 4 (optional): Per-Executor Refinement
 **Error handling**: Context7 failures (MCP unavailable, no match, empty response) first trigger web fallback. Only when both Context7 and web fallback fail does the pipeline log and skip — documentation is supplementary, never blocks the pipeline.
 
 Ref: `.gemini/rules/autopus/context7-docs.md` for detection heuristics, token limits, and anti-patterns. Ref: `.gemini/rules/autopus/techstack-freshness.md` for greenfield version evidence.
+
+### Phase 1.9: Risk-First Probe Gate
+
+WHEN Phase 1.8 completes (or is skipped), THE SYSTEM SHALL consume the `## Risk-First Integration Probe` table in `plan.md` in the **main session** before any implementation worker is dispatched. This gate applies to the default prompt-driven pipeline; the deterministic Route A / Route Team contracts are unchanged.
+
+```
+Step 1: Read the probe table (1-3 rows: assumption_id, class, risk, boundary,
+        input, oracle, isolation, status, reason, evidence)
+Step 2: For every not-run row, execute the probe when it is executable now:
+        a real boundary, an isolated fixture, and no unapproved external effect
+        → record status PASS or FAIL plus an evidence ref from that execution
+Step 3: A not-run row that stays not-run keeps its reason and is carried into
+        the handoff as an explicit limitation. It is never reported as PASS
+Step 4: On FAIL for a high or critical assumption, return to planning and
+        revise plan.md. Bounded to 1 re-plan; a second FAIL surfaces to the user
+Step 5: Only then dispatch Phase 2
+```
+
+Gate applicability: `required` for any change with an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep the section with one `not-run` row and the reason `no integration boundary`. A probe that cannot run because its fixture or environment is missing is `blocked` with the reason recorded, not `not_applicable`.
+
+An implementer-introduced constraint broader than the requirement (a new ACL, compatibility limit, or security limit) is a scope expansion: add it as a probe row against the existing runtime and resolve it here, before fan-out multiplies the assumption across workers.
+
+> **⏭ POST-PHASE**: Probe gate closed (executed, re-planned once, or carried as an explicit `not-run` limitation). NEXT REQUIRED STEP: Phase 2: Implementation. Do NOT skip to Completion.
 
 ### Phase 2: Implementation
 
@@ -741,6 +775,7 @@ Completed Files:
 
 - [ ] All Phases executed in order
 - [ ] PASS verdict received at each Gate
+- [ ] Phase 1.9 probe gate closed: every row executed, or carried as an explicit `not-run` with a reason and a `required | not_applicable | blocked` applicability verdict
 - [ ] Coverage 85%+ confirmed
 - [ ] subagent_dispatch_count recorded, roles listed, degraded-mode state explicit
 - [ ] Sync Readiness Gate passed with `completion_verdict_preview` recorded
