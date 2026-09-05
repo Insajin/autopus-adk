@@ -10,6 +10,7 @@ skills:
   - planning
   - brainstorming
   - double-diamond
+  - grilling
 ---
 
 # Planner Agent

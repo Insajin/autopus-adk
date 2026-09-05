@@ -24,6 +24,11 @@ func TestOMPDoctorSelectorCollection_ProjectsRejectedAgentsToTextAndJSON(t *test
 		[]byte("---\nmodel: sonnet\n---\n"+strings.Repeat("x", ompDoctorAgentMaxSize)), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(agentDir, "bad-model.md"),
 		[]byte("---\nmodel: provider//secret\n---\n# agent\n"), 0o600))
+	// SPEC-OMP-005 role references are valid selectors, not malformed models.
+	require.NoError(t, os.WriteFile(filepath.Join(agentDir, "role-ref.md"),
+		[]byte("---\nmodel: '@autopus_executor'\nthinking: xhigh\n---\n# agent\n"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(agentDir, "bad-role-ref.md"),
+		[]byte("---\nmodel: '@auto/pus//x'\n---\n# agent\n"), 0o600))
 
 	installDoctorOMPFixture(t)
 	checks := probeAndProjectOMPDoctorChecks(context.Background(), root, nil)
@@ -41,6 +46,11 @@ func TestOMPDoctorSelectorCollection_ProjectsRejectedAgentsToTextAndJSON(t *test
 	}
 	assert.NotContains(t, text.String(), "provider//secret")
 	assert.NotContains(t, string(encoded), "provider//secret")
+	assert.Equal(t, 2, strings.Count(string(encoded), "reason=model_malformed"),
+		"provider//secret and the malformed role reference fail; the valid role reference does not")
+	collection := collectOMPDoctorSelectors(root)
+	assert.Contains(t, collection.selectors, "@autopus_executor")
+	assert.Len(t, collection.findings, 4)
 }
 
 func TestOMPDoctorSelectorCollection_ReportsUnreadableAgent(t *testing.T) {

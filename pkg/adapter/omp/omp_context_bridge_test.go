@@ -176,12 +176,13 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// report, the typed GUI capture contract, the `report` route in its command
 	// description, and the scenario authoring contract (`auto qa scenario`, the
 	// closed read-only step vocabulary, and the screen_ref link that makes
-	// gui.screen_matrix enforceable). It last moved when the quality tiers
-	// became four-way (fable > opus > sonnet > haiku): the planner and
-	// validator agent bodies and the adaptive-quality, agent-pipeline,
-	// using-autopus, subagent-dev, and writing-skills skill bodies now describe
-	// the Fable/Astra/Gemini 3.x projection.
-	const priorPreparedFilesFingerprint = "06cc58dbd3527d19f24f8e0882c67672ff7eeba01815d00de37d7d677b77caa5"
+	// gui.screen_matrix enforceable). It last moved when five skills adapted
+	// from mattpocock/skills (grilling, domain-modeling, codebase-design,
+	// wait-what, resolving-merge-conflicts) joined the catalog, the debugging,
+	// tdd, review, and writing-skills bodies grew their feedback-loop, seam,
+	// two-axis review, and writing-for-agents sections, and the planner,
+	// spec-writer, and architect agents started referencing the new skills.
+	const priorPreparedFilesFingerprint = "f6587e426238abd234788105876e19db5285b33d79e278e74aa78886f53a5f17"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

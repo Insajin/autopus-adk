@@ -6,7 +6,7 @@
 
 Make your AI coding tools (Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi) work like a real engineering team — with planning, testing, code review, and security audits built in.
 
-**16 agents. 40 skills. One config. Every platform.**
+**16 agents. 53 skills. One config. Every platform.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -1406,7 +1406,7 @@ autopus-adk/
 │   ├── terminal/       # Terminal multiplexer adapters (cmux, tmux, plain)
 │   └── version/        # Build metadata
 ├── templates/          # Platform-specific templates
-├── content/            # Embedded content (16 agents, 40 skills)
+├── content/            # Embedded content (16 agents, 53 skills)
 └── configs/            # Default configuration
 ```
 

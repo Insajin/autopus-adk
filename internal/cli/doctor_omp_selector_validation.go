@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -18,6 +19,8 @@ type ompDoctorSelectorCollection struct {
 	selectors []string
 	findings  []adapter.ValidationError
 }
+
+var ompDoctorRoleReference = regexp.MustCompile(`^@[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,63}$`)
 
 func collectOMPDoctorSelectors(root string) ompDoctorSelectorCollection {
 	var result ompDoctorSelectorCollection
@@ -109,6 +112,11 @@ func parseOMPDoctorFrontmatterModel(data []byte) (string, string) {
 	selector := strings.TrimSpace(frontmatter.Model)
 	if selector == "" {
 		return "", ""
+	}
+	// SPEC-OMP-005 projects agents onto modelRoles as `@<role>`; the role
+	// itself is validated by the model-routing doctor against the readback.
+	if ompDoctorRoleReference.MatchString(selector) {
+		return selector, ""
 	}
 	if !ompDoctorSafeToken.MatchString(selector) || strings.Contains(selector, "//") ||
 		strings.HasSuffix(selector, "/") {

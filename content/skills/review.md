@@ -8,7 +8,7 @@ triggers:
   - 코드 검토
   - PR 검토
 category: quality
-level1_metadata: "TRUST 5 기준 검토, 자동화 품질 게이트"
+level1_metadata: "TRUST 5 기준 검토, Standards/Spec 두 축 병렬 리뷰, 자동화 품질 게이트"
 ---
 
 # Code Review Skill
@@ -73,6 +73,64 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 - [ ] External imported design references are untrusted until explicitly promoted; flag canonical/source-of-truth mismatches
 - [ ] Review remains read-only: report findings and delegate fixes, do not edit files from review mode
 
+## 두 축 리뷰: Standards와 Spec
+
+리뷰는 고정점(커밋, 브랜치, 태그, merge-base) 이후의 diff를 서로 다른 두 축으로 본다.
+한 축을 통과하고 다른 축을 실패할 수 있으므로 — 표준은 다 지켰지만 엉뚱한 것을 구현했거나,
+이슈가 시킨 그대로 했지만 프로젝트 규약을 깼거나 — 두 축을 **분리해서** 보고한다.
+
+### 1. 고정점 고정
+
+사용자가 말한 고정점을 쓴다. 없으면 묻는다. diff 명령은 한 번 잡는다:
+`git diff <fixed-point>...HEAD`(세 점: merge-base 기준), 커밋 목록은
+`git log <fixed-point>..HEAD --oneline`. 진행 전에 ref가 해석되고(`git rev-parse`) diff가
+비어 있지 않은지 확인한다 — 잘못된 ref는 병렬 서브에이전트 안이 아니라 여기서 실패해야 한다.
+
+### 2. Spec 출처 찾기
+
+순서대로: (1) 커밋 메시지의 SPEC-ID/이슈 참조(`Related: SPEC-…`, `#123`) → `.autopus/specs/<ID>/`,
+(2) 사용자가 준 경로, (3) 브랜치/기능 이름과 맞는 SPEC 디렉터리, (4) 없으면 사용자에게 묻고,
+없다고 하면 Spec 축은 "no spec available"로 건너뛴다.
+
+### 3. Standards 출처와 smell baseline
+
+저장소가 문서화한 코딩 표준(`AGENTS.md`/`CLAUDE.md`, `.autopus/project/tech.md`, `CONTRIBUTING`)에
+더해 Standards 축은 항상 아래 **smell baseline**(Fowler, _Refactoring_ 3장)을 든다. 두 규칙:
+**저장소가 이긴다**(문서화된 표준이 baseline이 지적할 것을 허용하면 smell을 억제한다),
+**항상 판단 사항이다**("possible Feature Envy"처럼 라벨 붙은 휴리스틱이지 위반이 아니다).
+도구가 이미 강제하는 것은 건너뛴다.
+
+- **Mysterious Name**: 이름이 하는 일을 드러내지 않는다 → 이름을 바꾼다; 정직한 이름이 안 나오면 설계가 흐리다
+- **Duplicated Code**: 같은 로직 모양이 여러 hunk/파일에 있다 → 공통 모양을 추출해 양쪽에서 부른다
+- **Feature Envy**: 자기 데이터보다 남의 데이터를 더 많이 만진다 → 메서드를 그 데이터 쪽으로 옮긴다
+- **Data Clumps**: 같은 필드/파라미터 몇 개가 늘 함께 다닌다 → 타입 하나로 묶어 넘긴다
+- **Primitive Obsession**: 도메인 개념을 primitive/string이 대신한다 → 작은 전용 타입을 준다
+- **Repeated Switches**: 같은 타입에 대한 같은 switch/if 사다리가 반복된다 → 다형성 또는 공유 map
+- **Shotgun Surgery**: 논리적 변경 하나가 여러 파일의 흩어진 편집을 강제한다 → 함께 변하는 것을 한 모듈로 모은다
+- **Divergent Change**: 한 파일이 무관한 여러 이유로 편집된다 → 이유 하나당 모듈 하나로 나눈다
+- **Speculative Generality**: 스펙에 없는 필요를 위한 추상화·파라미터·훅 → 지운다; 실제 필요가 나올 때까지 inline
+- **Message Chains**: `a.b().c().d()` 탐색을 호출자가 의존한다 → 첫 객체의 메서드 하나 뒤에 숨긴다
+- **Middle Man**: 거의 위임만 하는 클래스/함수 → 잘라내고 실제 대상을 직접 부른다
+- **Refused Bequest**: 상속받은 대부분을 무시/덮어쓴다 → 상속을 버리고 조합한다
+
+### 4. 병렬 서브에이전트
+
+**Standards 서브에이전트**에는 diff 명령·커밋 목록, 3단계의 표준 출처 목록, smell baseline 전문
+(서브에이전트는 달리 접근할 수 없다), 그리고 브리프: "파일/hunk별로 (a) 문서화된 표준 위반은
+표준(파일+규칙)을 인용하고, (b) baseline smell은 이름을 붙이고 hunk를 인용하라. 하드 위반과
+판단 사항을 구분하라. 도구가 강제하는 것은 건너뛰어라. 400단어 이내."
+
+**Spec 서브에이전트**에는 diff 명령·커밋 목록, 스펙 경로/내용, 브리프: "(a) 스펙이 요구했지만
+빠지거나 부분인 요구사항, (b) 요구하지 않은 동작(scope creep), (c) 구현된 듯하지만 틀려 보이는
+요구사항. 각 finding에 스펙 줄을 인용하라. 400단어 이내."
+
+### 5. 취합
+
+두 보고를 `## Standards`와 `## Spec` 아래 그대로(가볍게 정리만) 놓는다. **병합하거나 순위를 다시
+매기지 않는다** — 축을 분리한 이유가 그것이다. 한 줄 요약으로 축별 finding 수와 축 안에서 가장
+나쁜 이슈를 적되, 축을 가로질러 하나의 승자를 뽑지 않는다. 그 뒤 아래 Findings Taxonomy로
+Correctness/Security와 Complexity를 나눈다.
+
 ## Findings Taxonomy
 
 리뷰 출력은 반드시 `Correctness/Security Findings`와 `Complexity Findings`를 분리합니다.
@@ -128,3 +186,5 @@ TRUST 5 기준으로 코드를 체계적으로 검토하는 스킬입니다.
 | 스텁 검사 | `grep -rn 'TODO\|stub\|placeholder' {changed}` | 동일 | 동일 | `grep -rn 'todo!\|unimplemented!' {changed}` |
 
 스택은 `.autopus/project/tech.md` 또는 프로젝트 루트의 매니페스트(`go.mod`, `package.json`, `pyproject.toml`, `Cargo.toml`)에서 자동 감지합니다.
+
+두 축 리뷰와 smell baseline은 mattpocock/skills `code-review`(MIT)에서 가져와 다듬었다.

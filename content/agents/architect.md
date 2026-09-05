@@ -10,6 +10,7 @@ skills:
   - planning
   - subagent-dev
   - entropy-scan
+  - codebase-design
 ---
 
 # Architect Agent

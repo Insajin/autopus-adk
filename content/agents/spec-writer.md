@@ -8,6 +8,8 @@ permissionMode: acceptEdits
 maxTurns: 30
 skills:
   - planning
+  - grilling
+  - domain-modeling
 ---
 
 # Spec Writer Agent

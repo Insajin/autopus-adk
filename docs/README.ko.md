@@ -6,7 +6,7 @@
 
 AI 코딩 도구(Claude Code, Codex, Antigravity CLI, OpenCode, Oh My Pi)가 진짜 개발팀처럼 일하게 만듭니다 — 기획, 테스트, 코드 리뷰, 보안 감사까지 자동으로.
 
-**16개 에이전트. 40개 스킬. 하나의 설정. 모든 플랫폼.**
+**16개 에이전트. 53개 스킬. 하나의 설정. 모든 플랫폼.**
 
 [![GitHub Stars](https://img.shields.io/github/stars/Insajin/autopus-adk?style=social)](https://github.com/Insajin/autopus-adk/stargazers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -1306,7 +1306,7 @@ autopus-adk/
 │   ├── terminal/       # 터미널 멀티플렉서 어댑터 (cmux, tmux, plain)
 │   └── version/        # 빌드 메타데이터
 ├── templates/          # 플랫폼별 템플릿
-├── content/            # 임베디드 콘텐츠 (16개 에이전트, 40개 스킬)
+├── content/            # 임베디드 콘텐츠 (16개 에이전트, 53개 스킬)
 └── configs/            # 기본 설정
 ```
 
