@@ -116,6 +116,12 @@ func ompContextDoctorSafeReason(value string) string {
 		"memory_provenance_unproved": true, "verified": true,
 		"required-source-changed": true, "ephemeral-state-unavailable": true,
 		"runtime-cleanup-failed": true, "rehydration-verification-failed": true,
+		// The compaction benefit is measured by a cohort run, not by the probe,
+		// so its verdict needs its own vocabulary here. Three states, kept
+		// distinct on purpose: proved good, measured to deliver nothing, and
+		// never measured by this repository.
+		"measured_reduction_verified": true, "measured_zero_reduction": true,
+		"reduction_unmeasured": true, "version_unavailable": true,
 	}
 	if allowed[strings.TrimSpace(value)] {
 		return strings.TrimSpace(value)

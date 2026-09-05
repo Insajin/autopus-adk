@@ -38,22 +38,48 @@ if [[ "$from_version" == "$to_version" ]]; then
   exit 0
 fi
 
-# Versions this repository measured as incompatible, with the observation that
-# proved it. The probe below cannot reach these: manual compaction needs a live
-# provider session, so the 40-call cohort in --apply is the only place the
-# compaction protocol is exercised. Paying that cost twice for the same version
-# is waste, so a known failure refuses here with its reason.
+# Upstream ships every few days, so a refusal keyed to one version number does
+# not scale: 18.1.5 was named here and 18.2.0 would have walked straight past
+# it into another cohort run. What follows is a verdict table instead, and it
+# distinguishes the two states that matter.
+#
+# The probe below cannot decide either one. It proves the launch contract —
+# protocol v2, the asset's own version, the measured digest — and nothing about
+# compaction, because manual compaction needs a live provider session with
+# history. Only the cohort measures reduction.
+#
+# Measured 2026-09-03, same plan generator and workload, binary swapped:
+#
+#   omp/17.2.7  8 compactions, median reduction cleared 2000 bp   -> in use
+#   omp/18.1.2  emits "snapcompact would not reduce context locally." (6x)
+#   omp/18.1.5  2 compactions, median reduction 0 bp              -> refused
+#
+# Clearing a refusal is a measurement, not an edit: run the standalone cohort
+# from docs/runbooks/omp-pin-advance.md and move the verdict here with its
+# numbers.
 case "$to_version" in
-  18.1.5)
+  17.2.7)
+    : # the pin in use; measured good
+    ;;
+  18.1.2 | 18.1.5)
     fail "$(printf '%s\n' \
-      "omp/18.1.5 was measured incompatible on 2026-09-03." \
-      "  The v0.50.114 canary failed closed at call 6 of 42:" \
-      "    managed active OMP manual compaction response is invalid" \
-      "  That is the contract snapcompact-image-schema names in the active" \
-      "  policy identity, and it is not what negotiate_protocol advertises." \
-      "  Adapting the harness to 18.1.5's compaction response is its own task;" \
-      "  it changes the evidence oracle, so it needs its own cohort run." \
-      "  No tag was created and the coordinate survived.")"
+      "omp/${to_version} was measured on 2026-09-03 and does not reduce context." \
+      "  Standalone cohort, identical workload to the passing omp/17.2.7 run:" \
+      "    compactions=2/2 median_reduction_bp=0/2000" \
+      "  Every other gate passed. The promotion evidence attests a >=20% median" \
+      "  reduction, so admitting this version would attest zero as reduction." \
+      "  That is an upstream question about snapcompact, not a harness change." \
+      "  See docs/runbooks/omp-pin-advance.md for the full comparison.")"
+    ;;
+  *)
+    fail "$(printf '%s\n' \
+      "omp/${to_version} has not been measured against the reduction floor." \
+      "  The handshake probe proves the launch contract only. omp/18.1.x passed" \
+      "  that probe and still delivered 0 bp of median reduction, so passing it" \
+      "  is not evidence of anything the promotion report claims." \
+      "  Measure first with the standalone cohort in" \
+      "  docs/runbooks/omp-pin-advance.md, then add the verdict above with its" \
+      "  numbers. A release attempt is the expensive way to learn this.")"
     ;;
 esac
 

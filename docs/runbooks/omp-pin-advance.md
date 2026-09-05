@@ -261,6 +261,53 @@ a legitimate refusal is not a protocol violation, 17.2.7 never emits the new
 message, and without it the failure hides behind a misleading error instead of
 landing on `median_reduction_bp=0/2000`.
 
+## The pin governs evidence; the runtime is the operator's own OMP
+
+Two things drift apart and it is worth being explicit about which one the pin
+holds.
+
+`prepare-release.sh` pins the OMP that **produces the promotion evidence**. The
+pipeline at runtime resolves whatever OMP the operator has installed —
+`observePipelineOMPVersion` compares it to its own model receipt, never to the
+release pin. So a machine can run omp/18.1.10 against evidence measured on
+omp/17.2.7, and nothing refuses it.
+
+That is not a lie in the evidence: the report names the version and the
+executable digest it measured. What was missing is any signal to the operator,
+and the gap was live — this machine runs omp/18.1.10, every doctor capability
+row passed, and the compaction benefit measured zero.
+
+So `auto doctor` now carries the measured verdict:
+
+```
+compaction.measured_reduction  supported=false  required=false
+                               reason=measured_zero_reduction
+```
+
+Three states, kept apart on purpose:
+
+| reason | meaning |
+|---|---|
+| `measured_reduction_verified` | this repository measured the floor cleared |
+| `measured_zero_reduction` | measured, and it delivers 0 bp |
+| `reduction_unmeasured` | never measured here — unknown, not broken |
+
+The row is advisory rather than required, because an unmeasured version is not a
+failure. Claiming otherwise would be a claim this repository cannot support.
+
+### The refusal is a table now, not a version number
+
+`advance-omp-pin.sh` first refused `18.1.5` by name, which would have let
+18.2.0 walk straight past it into another cohort run. Upstream ships every few
+days, so the guard is a verdict table with the same three states, and clearing a
+refusal is a measurement rather than an edit:
+
+```
+17.2.7            -> in use, measured good
+18.1.2 | 18.1.5   -> refused with compactions=2/2 median_reduction_bp=0/2000
+anything else     -> refused as unmeasured, with the command to measure it
+```
+
 ## Why not drop the pin and measure at release time
 
 Because then nothing in the repository states which executable the evidence will

@@ -21,6 +21,24 @@ func ompContextDoctorCapabilities(input ompContextDoctorInput, receiptUsable boo
 		ompContextDoctorCapabilityRow("persistence.no_session", persistence, active, ompContextDoctorPersistenceReason(input.RuntimeRootPolicy), "persistence_control_unproved"),
 		ompContextDoctorCapabilityRow("artifact.cleanup", cleanup, active, "cleanup_verified", "cleanup_unproved"),
 		ompContextDoctorCapabilityRow("memory.interception", receiptUsable && receipt.Capabilities.MemoryInterception, memory, "memory_interception_proved", "memory_interception_unproved"),
+		// The probe rows above all pass on omp/18.1.x, and the compaction
+		// benefit is still absent: a standalone cohort measured 0 basis points
+		// of median context reduction there against 2000 required, while the
+		// pinned omp/17.2.7 cleared the floor on the identical workload.
+		//
+		// Reporting only what the handshake proves would tell an operator that
+		// context compaction is healthy while it silently does nothing. This row
+		// is advisory rather than required, because a version this repository
+		// has not measured is unknown, not broken.
+		// Built inline rather than through ompContextDoctorCapabilityRow: that
+		// helper replaces the reason with "not_requested" for advisory rows,
+		// which would throw away the only thing this row exists to say.
+		{
+			ID:        "compaction.measured_reduction",
+			Supported: ompContextReductionMeasuredGood(input.Current.Version),
+			Required:  false,
+			Reason:    ompContextReductionReason(input.Current.Version),
+		},
 	}
 	sortOMPContextDoctorCapabilities(rows)
 	return rows
