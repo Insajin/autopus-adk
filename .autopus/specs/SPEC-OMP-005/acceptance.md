@@ -2,19 +2,12 @@
 
 ## Oracle Acceptance Notes
 
-- 모든 S1-S8은 **Must**다. 역할 이름·selector·thinking은 정확 일치로 비교한다.
+- 모든 S1-S11은 **Must**다. 역할 이름·selector·thinking은 정확 일치로 비교한다.
 - fake 카탈로그는 operator-attested 경로를 쓰며 `anthropic/claude-{fable-5-1,opus-5,sonnet-5,haiku-4-5}`와 `openai-codex/gpt-{6-astra,5.6-sol,5.6-terra,5.6-luna}`를 포함한다.
-- 실측 scenario(S8)는 autopus-workspace의 실제 `omp/18.1.10`으로 수행한다.
+- 실측 scenario(S8, S10의 워크스페이스 부분)는 autopus-workspace의 실제 `omp/18.1.10`으로 수행한다.
+- 바이트 동일성은 `diff` 무출력 또는 `os.ReadFile` 결과 완전 일치로 판정한다.
 
 ## Test Scenarios
-
-## Current Acceptance State
-
-- S1-S7은 `pkg/config`(`role_model_policy_test.go`, `role_model_policy_agents_test.go`, `role_model_policy_builtin_agents_test.go`, `role_model_policy_attested_test.go`)와 `pkg/adapter/omp`(`omp_model_integration_builtin_test.go`, `omp_model_projection_test.go`, doctor 테스트)로 고정됐고 통과했다.
-- S8은 2026-09-05 autopus-workspace(`omp/18.1.10`)에서 실측했다: `auto update --local` 후 `.omp/config.yml`의 native 키 0개·`autopus_*` 16개, `omp config get modelRoles`가 전역 `default=claude-fable-5-1:xhigh`/`tiny=gpt-5.6-luna:max`/`task=gpt-5.6-sol:max`와 프로젝트 `autopus_executor=claude-opus-5:xhigh`를 함께 반환, `--model @autopus_executor` RPC가 `claude-opus-5`/`xhigh`, `@autopus_planner`가 `claude-fable-5-1`/`max`, `@autopus_reviewer`가 `gpt-6-astra`/`max`, `auto doctor` `model-routing.receipt`가 `supported/fresh`.
-- 실측 중 발견: 역할 16개의 직렬 RPC readback이 doctor의 공유 20s 데드라인을 넘겨 `projection_mismatch`가 났다. readback을 4-way 병렬로 바꿔 `auto update`가 22s→12s로 줄었고 doctor가 통과한다(plan.md Risks의 첫 항목 해소).
-- 실측 중 발견 2: hand-written 프로필(`agents.executor.candidates` 오버라이드, overlay 모드)로 전환하자 `.omp/config.yml`의 관리 키는 남고 ownership ledger만 prune되어, project-managed로 되돌릴 때 `managed_key_conflict: prior fingerprint mismatch`로 막혔다. `Update`에 ledger preimage 복원(`releaseOMPProjectManagedConfigAt`)을 추가해 모드 왕복이 byte-identical로 돌아오는 것을 워크스페이스에서 확인했다. 오버라이드 자체는 `autopus_executor: anthropic/claude-sonnet-5:high`, `autopus_tester: anthropic/claude-opus-5:xhigh`(capability 기본값)로 정확히 투영됐다.
-- `family: openai` anchor는 `auto update --local --preview`(RPC readback 포함)로 검증했다.
 
 ### S1: 역할 이름 규칙과 native 키 부재
 Given canonical agent 16개.
@@ -67,3 +60,33 @@ Then `.omp/config.yml`의 `modelRoles`에 native 키가 0개, `autopus_*` 키가
 And `omp config get modelRoles`(cwd=repo)는 전역 `tiny`/`task` 값과 프로젝트 `autopus_*` 값을 함께 보인다.
 And `omp --model @autopus_executor --mode rpc get_state`는 `claude-opus-5`/`xhigh`, `@autopus_planner`는 `claude-fable-5-1`/`max`를 반환한다.
 And `auto doctor`의 `model-routing.receipt`가 pass다.
+
+### S9: 소유하지 않은 modelRoles는 건드리지 않는다
+Given ledger가 없는 `.omp/config.yml`에 사용자가 쓴 `modelRoles:\n  task: user/model:high\nunknown: keep\n`.
+When project-managed 프로필로 `Generate`한다.
+Then `managed_key_conflict: prior fingerprint mismatch`로 실패한다.
+And 파일 바이트는 원본과 완전히 같고 `.autopus/omp-model-*`·overlay 산출물이 하나도 생성되지 않는다.
+
+### S10: project-managed 이탈 시 preimage 복원과 왕복
+Given `.omp/config.yml`이 없던 워크스페이스에 project-managed 프로필이 적용돼 파일과 ownership ledger가 생겼다.
+When 프로필을 overlay 모드(`agents.executor.candidates = [anthropic/claude-sonnet-5:high]`)로 바꿔 `Update`한다.
+Then `.omp/config.yml`과 `.autopus/omp-model-project-ownership-v1.json`이 모두 사라지고 overlay의 `autopus_executor`는 `anthropic/claude-sonnet-5:high`, `autopus_tester`는 capability 기본값 `anthropic/claude-opus-5:xhigh`다.
+When 프로필을 다시 project-managed로 되돌려 `Update`한다.
+Then `Update`가 성공하고 `.omp/config.yml`은 최초 적용 결과와 byte-identical이며 overlay 파일은 prune된다.
+
+### S11: readback 신뢰 경계와 병렬 상한
+Given 역할 16개 projection과 세션 겹침을 기록하는 fake RPC runner(호출당 20ms 지연).
+When `readOMPModelRolesViaRPC`를 호출한다.
+Then RPC 호출은 정확히 16회, 결과 `modelRoles`는 projection과 같고, 동시에 열린 세션의 최댓값은 `1 < peak <= 4`다.
+And `SafeOMPModelRoleRPCArgs`는 `--config`가 절대경로가 아니거나 개행을 포함하거나, `--model`이 `@identifier`가 아니거나, `--mode rpc`·`--no-tools`·`--no-skills`·`--no-extensions` 중 하나라도 빠지거나 추가 인자가 있는 argv를 거부한다.
+And 프로브 프로세스는 `--config <path>` argv에 대해 `PI_CONFIG_FILES=<path>`를 함께 전달하고 metadata 프로브에는 전달하지 않으며, 출력이 `maxOutput`을 넘으면 프로세스 그룹을 종료한다.
+When 한 역할(`autopus_tester`)의 RPC 응답만 `thinkingLevel=low`로 바뀐다.
+Then `readOMPModelRolesViaRPC`는 결과 없이 `activation role readback mismatch: autopus_tester`로 실패한다.
+
+## Current Acceptance State
+
+- S1-S7, S9는 `pkg/config`(`role_model_policy_test.go`, `role_model_policy_agents_test.go`, `role_model_policy_builtin_agents_test.go`, `role_model_policy_attested_test.go`)와 `pkg/adapter/omp`(`omp_model_integration_builtin_test.go`, `omp_model_projection_test.go`, `omp_model_integration_lifecycle_test.go` S11 conflict 테스트, doctor 테스트)로 고정됐고 통과했다.
+- S11은 `omp_model_activation_rpc_test.go`의 `TestReadOMPModelRolesViaRPC_BoundsInFlightSessionsToWorkerCount`(16회 호출, `1 < peak <= 4`), `TestReadOMPModelRolesViaRPC_FailsWholeReadbackOnOneMismatchedRole`(`activation role readback mismatch: autopus_tester`), `TestSafeOMPModelRoleRPCArgs_AcceptsOnlyProviderFreeRoleSessions`(argv allowlist 8종 거부)와 `omp_model_probe_process_test.go`의 `PI_CONFIG_FILES` 전달 테스트, `pkg/processprobe`의 출력 상한 테스트로 고정됐고 `-race`로 통과했다.
+- S10은 `TestOMPModelIntegration_ProjectManagedToOverlayRestoresPreimageAndRoundTrips`로 고정됐고(수정 전 실패 확인), autopus-workspace에서 같은 왕복을 실측해 `.omp/config.yml` byte-identical·ledger/overlay 정리를 확인했다.
+- S8은 2026-09-05 autopus-workspace(`omp/18.1.10`)에서 실측했다: `auto update --local` 후 `.omp/config.yml`의 native 키 0개·`autopus_*` 16개, `omp config get modelRoles`가 전역 `default=claude-fable-5-1:xhigh`/`tiny=gpt-5.6-luna:max`/`task=gpt-5.6-sol:max`와 프로젝트 `autopus_executor=claude-opus-5:xhigh`를 함께 반환, `--model @autopus_executor` RPC가 `claude-opus-5`/`xhigh`, `@autopus_planner`가 `claude-fable-5-1`/`max`, `@autopus_reviewer`가 `gpt-6-astra`/`max`, `auto doctor` `model-routing.receipt`가 `supported/fresh`.
+- `family: openai` anchor는 `auto update --local --preview`(RPC readback 포함)로 검증했다.

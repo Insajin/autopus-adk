@@ -3,7 +3,7 @@
 ---
 id: SPEC-OMP-005
 title: OMP 에이전트별 모델 역할 투영
-version: 0.1.0
+version: 0.2.0
 status: implemented
 priority: HIGH
 created: 2026-09-05
@@ -23,9 +23,9 @@ SPEC-OMP-003은 16개 생성 에이전트를 OMP native role 10개(`default`, `s
 ## Outcome Boundary
 
 - **Outcome Lock**: `auto update`가 `.omp/config.yml`(project-managed) 또는 overlay의 `modelRoles`에 `autopus_<agent>` 16개 키만 기록하고, 각 `.omp/agents/<agent>.md`가 `model: '@autopus_<agent>'`와 그 에이전트의 quality 티어에서 파생된 `thinking`을 가지며, OMP native role 키는 Autopus가 소유하거나 기록하지 않는다.
-- **Mandatory requirements**: 역할 이름 규칙, 에이전트→capability 행렬 유지, 프로필 `agents.<name>.candidates` 오버라이드, built-in 파생의 max-wins 제거, family diversity를 에이전트 역할 기준으로, receipt·doctor·agent catalog의 역할 값 교체, native role 상수 제거, 기존 native 키 ledger를 통한 교체.
-- **Explicit non-goals**: OMP native role 자체의 의미 변경, 사용자 전역 `modelRoles` 편집, capability 어휘 변경, Claude/Codex/Gemini 투영 변경, SPEC-OMP-004 컨텍스트 최적화.
-- **Completion evidence**: S1-S8 Must oracle 통과, `go test ./...` 통과, autopus-workspace에서 `auto update` 후 `.omp/config.yml`에 native 키 0개·`autopus_*` 16개, `omp --model @autopus_executor --mode rpc get_state`가 프리셋 티어 모델을 반환, doctor `model-routing.receipt` pass.
+- **Mandatory requirements**: 역할 이름 규칙, 에이전트→capability 행렬 유지, 프로필 `agents.<name>.candidates` 오버라이드, built-in 파생의 max-wins 제거, family diversity를 에이전트 역할 기준으로, receipt·doctor·agent catalog의 역할 값 교체, native role 상수 제거, 기존 native 키 ledger를 통한 교체, 역할 16개 readback의 병렬화와 신뢰 경계 유지, project-managed 모드를 떠날 때 config preimage 복원.
+- **Explicit non-goals**: OMP native role 자체의 의미 변경, 사용자 전역 `modelRoles` 편집, capability 어휘 변경, Claude/Codex/Gemini 투영 변경, SPEC-OMP-004 컨텍스트 최적화, `modelTags` 메타데이터 투영.
+- **Completion evidence**: S1-S11 Must oracle 통과, `go test ./...` 통과, autopus-workspace에서 `auto update` 후 `.omp/config.yml`에 native 키 0개·`autopus_*` 16개, `omp --model @autopus_executor --mode rpc get_state`가 프리셋 티어 모델을 반환, doctor `model-routing.receipt` pass, 모드 왕복 후 `.omp/config.yml` byte-identical.
 
 ## Policy Contract
 
@@ -74,6 +74,11 @@ Type: Ubiquitous | Priority: Must
 THE SYSTEM SHALL accept `family_diversity.roles` values only from the Policy Contract role set and SHALL request a distinct executor family for exactly those agents.
 Observability: route request `prefer_distinct_executor_family` per agent.
 
+**REQ-READBACK-001 — 역할 readback의 병렬화와 신뢰 경계**
+Type: Ubiquitous | Priority: Must
+THE SYSTEM SHALL read back every projected role through one OMP RPC process per role with at most four processes in flight, SHALL accept only the argv shape `--config <absolute path> --model @<identifier> --mode rpc --no-tools --no-skills --no-extensions` (`SafeOMPModelRoleRPCArgs`), SHALL bound each process's output by the probe's `maxOutput`, SHALL forward the overlay only through `--config` plus `PI_CONFIG_FILES`, and SHALL fail the whole readback on the first role whose resolved selector differs from the projection.
+Observability: `readOMPModelRolesViaRPC` worker bound, argv allowlist rejection, `activation role readback mismatch: <role>` error, and `auto update` wall time.
+
 ### Event-driven
 
 **REQ-BUILTIN-001 — built-in 파생은 에이전트 티어를 그대로 투영한다**
@@ -86,21 +91,32 @@ Type: Event-driven | Priority: Must
 WHEN routes are compiled, THE SYSTEM SHALL key route requests, resolutions, projection rows, receipt role rows, and doctor role checks by agent, SHALL keep fallback chains keyed by effective selector with the existing conflict detection, and SHALL keep the RPC readback of every projected role.
 Observability: receipt `roles[].role` values are Policy Contract roles; doctor emits 16 `model-routing.role.*` checks.
 
+**REQ-OWN-002 — project-managed 모드를 떠나면 preimage를 복원한다**
+Type: Event-driven | Priority: Must
+WHEN an update's file set no longer manages `.omp/config.yml` while an ownership ledger exists, THE SYSTEM SHALL validate the current file against the ledger's last emitted bytes, SHALL restore the ledger preimage (delete the file when the preimage was missing, otherwise write the original bytes with the original mode), and SHALL prune the ledger, so that a later project-managed apply starts from a clean takeover.
+Observability: after switching to overlay mode neither `.omp/config.yml` (when it did not pre-exist) nor `.autopus/omp-model-project-ownership-v1.json` remains; switching back succeeds and yields byte-identical managed output.
+
 ### Unwanted
 
 **REQ-OWN-001 — native 키는 소유하지 않는다**
 Type: Unwanted | Priority: Must
-IF a project-managed `.omp/config.yml` already carries native role keys written by SPEC-OMP-003, THEN THE SYSTEM SHALL replace the whole ledger-owned `modelRoles` value with the agent role set so that native keys fall back to the user's global settings, and SHALL NOT touch a `modelRoles` value it does not own.
-Observability: post-update `.omp/config.yml` contains no native role key; `omp config get modelRoles` shows global native values plus project agent roles.
+IF a project-managed `.omp/config.yml` already carries native role keys written by SPEC-OMP-003, THEN THE SYSTEM SHALL replace the whole ledger-owned `modelRoles` value with the agent role set so that native keys fall back to the user's global settings; IF `.omp/config.yml` carries a `modelRoles` value the ledger does not own, THEN THE SYSTEM SHALL fail closed with `managed_key_conflict` and SHALL leave the file byte-identical.
+Observability: post-update `.omp/config.yml` contains no native role key; `omp config get modelRoles` shows global native values plus project agent roles; the conflict path leaves the original bytes untouched and writes no integration artifact.
 
-## Traceability
+## Traceability Matrix
 
-| Requirement | Task | Scenario |
-|---|---|---|
-| REQ-ROLE-001 | T1, T3 | S1, S6 |
-| REQ-ROLE-002 | T1 | S2 |
-| REQ-ROLE-003 | T1, T3 | S3 |
-| REQ-ROLE-004 | T1, T3 | S4 |
-| REQ-BUILTIN-001 | T2 | S5 |
-| REQ-PROJ-001 | T3, T4 | S6, S7 |
-| REQ-OWN-001 | T5 | S8 |
+| Requirement | Plan Task | Acceptance Scenario | Semantic Invariant |
+|-------------|-----------|---------------------|--------------------|
+| REQ-ROLE-001 | T1, T3 | S1, S6 | INV-001, INV-002 |
+| REQ-ROLE-002 | T1 | S2 | INV-003 |
+| REQ-ROLE-003 | T1, T3 | S3 | INV-004 |
+| REQ-ROLE-004 | T1, T3 | S4 | INV-003 |
+| REQ-READBACK-001 | T7 | S11 | INV-008 |
+| REQ-BUILTIN-001 | T2 | S5 | INV-004, INV-005 |
+| REQ-PROJ-001 | T3, T4 | S6, S7 | INV-001, INV-006 |
+| REQ-OWN-002 | T8 | S10 | INV-007 |
+| REQ-OWN-001 | T5 | S8, S9 | INV-002, INV-007 |
+
+## Out of Scope
+
+Outcome Boundary의 explicit non-goals와 동일하다.
