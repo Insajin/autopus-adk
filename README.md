@@ -910,6 +910,30 @@ auto update --self && auto update
 > **When to update:** `auto update --self` installs the new binary. The release is reflected in the
 > current project's generated surfaces only after the following `auto update` succeeds.
 
+### Autopus Desktop managed launcher
+
+On machines with Autopus Desktop installed, the app owns the `auto` entry on your PATH
+(usually `~/.local/bin/auto`) and replaces it with a small launcher script that brokers every call
+into the Desktop-managed CLI slot. When the app rejects the brokered call, `auto` exits with code
+126 and prints:
+
+```text
+Autopus Desktop managed ADK broker: managed_adk_broker_current_slot_rejected
+```
+
+The CLI itself is still installed. Invoke the managed binary directly — quote the path, it contains
+spaces — or alias it for the session:
+
+```bash
+"$HOME/Library/Application Support/co.autopus.desktop/managed-adk/current/auto" doctor
+alias auto="$HOME/Library/Application Support/co.autopus.desktop/managed-adk/current/auto"
+```
+
+Then run `auto update` from that managed binary, or reinstall Autopus Desktop, so the launcher and
+the managed slot agree again. `auto doctor` reports the launcher as the
+`doctor.launcher.desktop_shim` check — it names the launcher path, the managed slot, and whether the
+managed binary is present.
+
 ### Common Scenarios
 
 <details>

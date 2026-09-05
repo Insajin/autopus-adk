@@ -809,6 +809,28 @@ auto update --self && auto update
 > **언제 업데이트하나요?** `auto update --self`로 새 바이너리를 설치한 뒤 `auto update`까지
 > 성공해야 현재 프로젝트에 생성된 규칙, 스킬, 에이전트와 플랫폼 파일에 새 버전이 반영됩니다.
 
+### Autopus Desktop 관리 런처
+
+Autopus Desktop을 설치한 macOS에서는 앱이 PATH의 `auto` 항목(보통 `~/.local/bin/auto`)을
+소유하며, 모든 호출을 Desktop이 관리하는 CLI 슬롯으로 넘기는 작은 런처 스크립트로 대체합니다.
+앱이 이 호출을 거절하면 `auto`는 종료 코드 126과 함께 다음 메시지를 출력합니다.
+
+```text
+Autopus Desktop managed ADK broker: managed_adk_broker_current_slot_rejected
+```
+
+이때도 CLI 자체는 설치돼 있습니다. 관리 슬롯의 바이너리를 직접 실행하거나(경로에 공백이 있으니
+반드시 따옴표로 감싸세요) 현재 셸에 alias를 걸면 됩니다.
+
+```bash
+"$HOME/Library/Application Support/co.autopus.desktop/managed-adk/current/auto" doctor
+alias auto="$HOME/Library/Application Support/co.autopus.desktop/managed-adk/current/auto"
+```
+
+그다음 이 관리 바이너리에서 `auto update`를 실행하거나 Autopus Desktop을 재설치하면 런처와
+관리 슬롯이 다시 일치합니다. `auto doctor`는 이 런처를 `doctor.launcher.desktop_shim` 검사로
+보고하며, 런처 경로와 관리 슬롯 경로, 관리 바이너리 존재 여부를 함께 알려 줍니다.
+
 ### 일반적인 시나리오
 
 <details>
