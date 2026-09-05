@@ -36,8 +36,6 @@ var baselineRuleFiles = []string{
 	"subagent-delegation.md",
 }
 
-var hookFiredRuleFiles = []string{"lore-commit.md", "shell-portability.md", "worktree-safety.md"}
-
 // skillScopedRuleFiles are the four `/auto`-only rules issue #185 moved off the
 // always-loaded surface. They were 38 KB of the baseline before relocation.
 var skillScopedRuleFiles = []string{
