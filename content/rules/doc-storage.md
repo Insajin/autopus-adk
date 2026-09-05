@@ -1,3 +1,10 @@
+---
+name: doc-storage
+description: Storage locations for SPEC, brainstorm, and generated documents across the workspace
+category: workflow
+skillScoped: true
+---
+
 # Document Storage Rules
 
 IMPORTANT: All documents MUST be stored in the correct location based on their scope. Misplaced documents cause sync failures and version control gaps.

@@ -113,6 +113,9 @@ func (a *Adapter) prepareFiles(cfg *config.HarnessConfig) ([]adapter.FileMapping
 		files = append(files, workflowFiles...)
 	}
 
+	// One finalization seam: every Claude markdown emitter above has produced
+	// its bytes, so relocated rule references are repointed exactly once here.
+	conditional.rewriteRelocatedRuleReferences(files)
 	return files, nil
 }
 

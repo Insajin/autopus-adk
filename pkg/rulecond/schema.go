@@ -63,6 +63,11 @@ type Rule struct {
 	Globs []string
 	// AlwaysApply is the `alwaysApply` flag consumed by SPEC-STICKYRULE-001.
 	AlwaysApply bool
+	// SkillScoped marks a rule that only applies inside the `/auto` workflow
+	// skills that reference it. It carries no runtime trigger: the claude-code
+	// compiler relocates the body out of baseline context and no dispatcher
+	// entry is produced, so the referencing skill is what loads it.
+	SkillScoped bool
 	// InterruptMode is preserved verbatim and never interpreted here
 	// (REQ-CONDRULE-SCHEMA-04).
 	InterruptMode string
@@ -89,6 +94,7 @@ type ruleFrontmatter struct {
 	Scope         stringList `yaml:"scope"`
 	Globs         stringList `yaml:"globs"`
 	AlwaysApply   bool       `yaml:"alwaysApply"`
+	SkillScoped   bool       `yaml:"skillScoped"`
 	InterruptMode string     `yaml:"interruptMode"`
 	AstCondition  string     `yaml:"astCondition"`
 }
@@ -158,6 +164,7 @@ func ParseRule(filename string, raw []byte) (*Rule, error) {
 		rule.Scopes = typed.Scope
 		rule.Globs = typed.Globs
 		rule.AlwaysApply = typed.AlwaysApply
+		rule.SkillScoped = typed.SkillScoped
 		rule.InterruptMode = typed.InterruptMode
 		rule.AstCondition = typed.AstCondition
 	}

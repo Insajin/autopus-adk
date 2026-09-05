@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Class is the classification of a rule. The three values partition every rule
+// Class is the classification of a rule. The four values partition every rule
 // exactly once (REQ-CONDRULE-SCHEMA-02).
 type Class string
 
@@ -20,13 +20,20 @@ const (
 	// ClassHookFired is a rule with a `condition` and a tool `scope`. Its body
 	// leaves baseline context and the dispatcher injects it on a match.
 	ClassHookFired Class = "hook-fired"
+	// ClassSkillScoped is a rule with `skillScoped: true` and no other trigger
+	// field. Its body leaves baseline context like a hook-fired body, but no
+	// dispatcher or manifest entry is produced: the `/auto` workflow skills and
+	// agents that reference the relocated path are the only thing that loads it.
+	ClassSkillScoped Class = "skill-scoped"
 )
 
 // Classify returns the single class of a rule. A `condition` with a tool scope
-// wins over `globs`, because the condition is the narrower trigger.
+// wins over `skillScoped` and `globs`, because the condition is the narrower
+// trigger, and `skillScoped` wins over `globs` because a rule the compiler
+// relocates has no baseline file left for a native `paths:` list to sit in.
 //
-// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONDRULE-001: total 3-way partition that decides where every rule lands — the claude adapter's relocates(), the compiler, and `auto rules list` all branch on it.
-// @AX:REASON: A rule that classifies differently between call sites is emitted twice or not at all; the condition-over-globs precedence is what keeps that decision single-valued.
+// @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-CONDRULE-001: total 4-way partition that decides where every rule lands — the claude adapter's relocates(), the compiler, and `auto rules list` all branch on it.
+// @AX:REASON: A rule that classifies differently between call sites is emitted twice or not at all; the condition-over-skillScoped-over-globs precedence is what keeps that decision single-valued.
 func Classify(rule *Rule) Class {
 	if rule == nil {
 		return ClassAlways
@@ -34,29 +41,46 @@ func Classify(rule *Rule) Class {
 	if len(rule.Conditions) > 0 && len(toolTriggers(rule)) > 0 {
 		return ClassHookFired
 	}
+	if rule.SkillScoped {
+		return ClassSkillScoped
+	}
 	if len(rule.Globs) > 0 && len(rule.Conditions) == 0 {
 		return ClassPathsScoped
 	}
 	return ClassAlways
 }
 
+// RelocatesBody reports whether a class moves its rule body out of
+// ClaudeRulesRelDir into BodyRootRelPath, costing no baseline context.
+//
+// Hook-fired and skill-scoped bodies differ only in what re-attaches them: a
+// dispatcher match for the former, a skill reference for the latter. Every
+// consumer that cares about placement rather than about triggering — the
+// compiler, IsSticky, the update prune, `auto rules list` — asks this instead
+// of enumerating classes, so a new relocated class cannot land in one of them
+// and be forgotten in the others.
+func RelocatesBody(class Class) bool {
+	return class == ClassHookFired || class == ClassSkillScoped
+}
+
 // IsSticky reports whether a rule is re-attached on the SPEC-STICKYRULE-001
 // prompt cadence.
 //
-// Sticky is an orthogonal boolean on top of the three-value partition, never a
-// fourth Class (REQ-STICKYRULE-SCHEMA-01): an `always` or `paths-scoped` rule
+// Sticky is an orthogonal boolean on top of the class partition, never a class
+// of its own (REQ-STICKYRULE-SCHEMA-01): an `always` or `paths-scoped` rule
 // keeps its baseline load placement and merely gains a periodic restatement. A
-// hook-fired rule can never be sticky, because SPEC-CONDRULE-001 relocates its
-// body to BodyRootRelPath and this SPEC resolves sticky bodies from
-// ClaudeRulesRelDir only. Validate refuses that combination outright, so this
-// predicate and the validator agree on the same unrepresentable case.
+// rule whose class relocates its body can never be sticky, because
+// RelocatesBody moves that body to BodyRootRelPath while this SPEC resolves
+// sticky bodies from ClaudeRulesRelDir only. Validate refuses both
+// combinations outright, so this predicate and the validator agree on the same
+// unrepresentable cases.
 //
-// @AX:NOTE [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: paired invariant — this predicate and the REQ-STICKYRULE-SCHEMA-03 branch of Validate below must exclude the same case; if they drift, a sticky hook-fired rule compiles to a manifest entry whose body the runtime can never resolve.
+// @AX:NOTE [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: paired invariant — this predicate and the REQ-STICKYRULE-SCHEMA-03 branch of Validate below must exclude the same classes; if they drift, a sticky relocated rule compiles to a manifest entry whose body the runtime can never resolve.
 func IsSticky(rule *Rule) bool {
 	if rule == nil {
 		return false
 	}
-	return rule.AlwaysApply && Classify(rule) != ClassHookFired
+	return rule.AlwaysApply && !RelocatesBody(Classify(rule))
 }
 
 // Triggers returns the parsed tool scopes of a rule, deduplicated by event and
@@ -121,6 +145,33 @@ func Validate(rule *Rule) error {
 	if len(rule.Conditions) > 0 && len(toolTriggers(rule)) == 0 {
 		return fmt.Errorf(
 			"rule %s: field condition requires a tool scope such as `scope: tool:bash`", name)
+	}
+
+	// The refusals below keep `skillScoped` a standalone trigger instead of a
+	// modifier that silently loses to a neighbouring field. Each combination is
+	// unrepresentable rather than merely redundant: a skill-scoped rule is
+	// relocated with no dispatcher entry and no baseline file, so a `condition`
+	// would classify as hook-fired and be injected by a matcher the author did
+	// not ask for, a `globs` list would have no baseline file left to carry its
+	// native `paths:` frontmatter, and `alwaysApply` would name a sticky body
+	// the runtime resolves under ClaudeRulesRelDir and can never find.
+	if rule.SkillScoped {
+		switch {
+		case len(rule.Conditions) > 0:
+			return fmt.Errorf(
+				"rule %s: field skillScoped cannot combine with field condition, because a "+
+					"skill-scoped rule is loaded by the skill that references it and gets no "+
+					"dispatcher entry", name)
+		case len(rule.Globs) > 0:
+			return fmt.Errorf(
+				"rule %s: field skillScoped cannot combine with field globs, because a "+
+					"skill-scoped body is relocated out of the baseline rule directory that "+
+					"carries the native paths: list", name)
+		case rule.AlwaysApply:
+			return fmt.Errorf(
+				"rule %s: field skillScoped cannot combine with field alwaysApply, because a "+
+					"skill-scoped body is relocated out of the sticky body root", name)
+		}
 	}
 
 	// REQ-STICKYRULE-SCHEMA-03: the combination is unrepresentable rather than

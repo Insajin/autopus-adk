@@ -52,7 +52,14 @@ func runRulesSticky(t *testing.T, dir, stdin string) (string, string) {
 // stickyProjectRoot builds a project root with one sticky rule installed.
 func stickyProjectRoot(t *testing.T, marker string) string {
 	t.Helper()
-	dir := t.TempDir()
+	return stickyProjectRootIn(t, t.TempDir(), marker)
+}
+
+// stickyProjectRootIn installs the same fixture into a caller-chosen root, so a
+// test can place the project at the home directory the resolver treats
+// specially.
+func stickyProjectRootIn(t *testing.T, dir, marker string) string {
+	t.Helper()
 
 	bodyRoot := filepath.Join(dir, filepath.FromSlash(rulecond.ClaudeRulesRelDir))
 	require.NoError(t, os.MkdirAll(bodyRoot, 0o755))
@@ -158,6 +165,38 @@ func TestRulesSticky_UnresolvedProjectRootIsObservable(t *testing.T) {
 		"the unresolved root is the one diagnostic this case writes")
 }
 
+// TestRulesSticky_HomeConfigRootStillInjects is the issue #185 sticky row. A
+// project rooted at the home directory reported `sticky project_root_unresolved`
+// on every prompt: `~/.claude` is refused as evidence on purpose, and before the
+// fallback nothing else was accepted there, so an installed sticky surface was
+// unreachable. The regular `~/autopus.yaml` is the evidence that resolves it,
+// and the refusal of `~/.claude` itself is unchanged.
+//
+// HOME is set to the symlink-evaluated path because os.Getwd returns the
+// physical directory; without that the resolver would never recognise the
+// working directory as the home directory and the test would pass through the
+// `.claude` marker it is meant to exclude.
+func TestRulesSticky_HomeConfigRootStillInjects(t *testing.T) {
+	const marker = "CLI-HOME-ROOT-BODY"
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
+	t.Setenv("HOME", home)
+	stickyProjectRootIn(t, home, marker)
+
+	withoutConfig, stderrWithoutConfig := runRulesSticky(t, home,
+		cliStickyPayload("S-home-noconfig", "hello"))
+	require.Empty(t, withoutConfig, "`~/.claude` alone must stay refused as a project root")
+	require.Equal(t, unresolvedRootLine, strings.TrimSpace(stderrWithoutConfig))
+
+	require.NoError(t, os.WriteFile(filepath.Join(home, projectConfigMarker),
+		[]byte("version: 1\n"), 0o644))
+
+	stdout, stderr := runRulesSticky(t, home, cliStickyPayload("S-home-config", "hello"))
+
+	assert.Empty(t, stderr, "a config-rooted project is resolved, not reported")
+	assert.Contains(t, stdout, marker, "the sticky body must reach the payload")
+}
+
 // TestRulesSticky_CadenceComesFromTheProjectConfig pins what a project's
 // autopus.yaml does to the cadence the CLI actually applies.
 //
@@ -205,28 +244,6 @@ func TestRulesSticky_CadenceComesFromTheProjectConfig(t *testing.T) {
 				"an unreadable cadence resolves to the default of 8, so prompt index 2 is off-cadence")
 		})
 	}
-}
-
-// TestReportUnresolvedStickyRoot_HandlesEveryStreamShape pins the diagnostic
-// format and the nil-stream guard.
-//
-// The guard is tested here rather than through fireStickyRules because that
-// function recovers panics: a nil write target that panicked would be swallowed
-// there and the missing guard would look identical to a working one.
-func TestReportUnresolvedStickyRoot_HandlesEveryStreamShape(t *testing.T) {
-	t.Run("a present stream receives exactly one diagnostic line", func(t *testing.T) {
-		var stderr bytes.Buffer
-
-		reportUnresolvedStickyRoot(&stderr)
-
-		assert.Equal(t, "sticky project_root_unresolved\n", stderr.String(),
-			"REQ-STICKYRULE-FIRE-04: one newline-terminated line, naming no path")
-	})
-
-	t.Run("a nil stream is a no-op, not a panic", func(t *testing.T) {
-		assert.NotPanics(t, func() { reportUnresolvedStickyRoot(nil) },
-			"REQ-STICKYRULE-FIRE-03: a panic exits 2, which erases the user's prompt")
-	})
 }
 
 // TestRulesList_StickyColumnAndCadenceAreInspectable is the S11 oracle for

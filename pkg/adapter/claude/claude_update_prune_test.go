@@ -14,16 +14,27 @@ import (
 	"github.com/insajin/autopus-adk/pkg/config"
 )
 
-// relocatedRuleFiles are the rules SPEC-CONDRULE-001 moves out of the baseline
-// rule directory into the conditional body root.
-var relocatedRuleFiles = []string{"lore-commit.md", "shell-portability.md", "worktree-safety.md"}
+// relocatedRuleFiles are the rules SPEC-CONDRULE-001 and issue #185 move out of
+// the baseline rule directory into the conditional body root. The four
+// skill-scoped members are the 38 KB the reporter of #185 kept paying for on
+// every session of an already-installed harness, so the prune half of the fix
+// is what actually reclaims it on upgrade.
+var relocatedRuleFiles = []string{
+	"context7-docs.md",
+	"doc-storage.md",
+	"lore-commit.md",
+	"shell-portability.md",
+	"spec-quality.md",
+	"techstack-freshness.md",
+	"worktree-safety.md",
+}
 
 func baselineRulePath(name string) string {
 	return filepath.ToSlash(filepath.Join(".claude", "rules", "autopus", name))
 }
 
-// seedPreCondruleState reproduces a workspace installed before the relocation:
-// the three rule bodies exist under the baseline rule directory and the
+// seedPreCondruleState reproduces a workspace installed before the relocations:
+// every relocated rule body exists under the baseline rule directory and the
 // manifest still claims them as managed files.
 func seedPreCondruleState(t *testing.T, root string) {
 	t.Helper()
@@ -115,11 +126,13 @@ func TestBuildUpdateTransactionPlan_PruneSetCoversRelocation(t *testing.T) {
 	}
 	sort.Strings(removed)
 
-	assert.Equal(t, []string{
-		baselineRulePath("lore-commit.md"),
-		baselineRulePath("shell-portability.md"),
-		baselineRulePath("worktree-safety.md"),
-	}, removed, "exactly the relocated rules are pruned; a still-generated rule is retained")
+	want := make([]string, 0, len(relocatedRuleFiles))
+	for _, name := range relocatedRuleFiles {
+		want = append(want, baselineRulePath(name))
+	}
+	sort.Strings(want)
+	assert.Equal(t, want, removed,
+		"exactly the relocated rules are pruned; a still-generated rule is retained")
 }
 
 // TestUpdate_NeverPrunesUnmanagedFiles is the orphan-safety assertion: pruning

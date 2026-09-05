@@ -1,3 +1,10 @@
+---
+name: context7-docs
+description: Context7 documentation fetch heuristics for library and framework work
+category: workflow
+skillScoped: true
+---
+
 # Context7 Documentation Auto-Fetch
 
 IMPORTANT: Before any technology/library/framework-related work, fetch the latest documentation via Context7 MCP. If Context7 MCP is unavailable, returns no match, or the docs query fails, fall back to targeted web search. Subagents cannot call MCP tools — the main session MUST fetch and inject docs into subagent prompts.

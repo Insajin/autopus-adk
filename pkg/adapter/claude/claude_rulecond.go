@@ -26,15 +26,19 @@ const fileSizeLimitRuleFile = "file-size-limit.md"
 type claudeConditionalSurface struct {
 	// classes maps a rule source file name to its classification.
 	classes map[string]rulecond.Class
-	// mappings are the files the compiler owns: relocated hook-fired bodies,
-	// the dispatcher manifest, and every paths-scoped rule the template path
-	// does not already render.
+	// mappings are the files the compiler owns: relocated hook-fired and
+	// skill-scoped bodies, the dispatcher manifest, and every paths-scoped rule
+	// the template path does not already render.
 	mappings []adapter.FileMapping
+	// relocated holds the file names whose bodies the compiler moved out of
+	// rulecond.ClaudeRulesRelDir, so prose references can be repointed once.
+	relocated []string
 }
 
 // relocates reports whether a rule source file is emitted by the compiler
 // rather than by the verbatim copy path. An `always` rule stays on the copy
-// path so its emitted bytes are unchanged (REQ-CONDRULE-SCHEMA-02).
+// path so its emitted bytes are unchanged (REQ-CONDRULE-SCHEMA-02), and both
+// relocated classes leave the baseline directory entirely.
 func (s *claudeConditionalSurface) relocates(filename string) bool {
 	if s == nil {
 		return false
@@ -74,6 +78,9 @@ func claudeConditionalRules() (*claudeConditionalSurface, error) {
 		surface.mappings = append(surface.mappings, file)
 	}
 	surface.mappings = append(surface.mappings, compiled.Bodies...)
+	for _, body := range compiled.Bodies {
+		surface.relocated = append(surface.relocated, filepath.Base(body.TargetPath))
+	}
 	surface.mappings = append(surface.mappings, compiled.Manifest)
 	return surface, nil
 }

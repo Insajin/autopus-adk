@@ -153,6 +153,117 @@ func TestCompileClaude_PathsScopedRuleStaysInBaselineDir(t *testing.T) {
 	assert.Contains(t, content, "300 lines is the hard limit.")
 }
 
+// TestCompileClaude_SkillScopedRuleRelocatesWithoutATrigger is the issue #185
+// oracle: a skill-scoped rule leaves baseline context exactly like a hook-fired
+// one, but earns no manifest rule and no dispatcher entry, so the manifest bytes
+// are the ones a harness with no skill-scoped rule already had.
+func TestCompileClaude_SkillScopedRuleRelocatesWithoutATrigger(t *testing.T) {
+	t.Parallel()
+
+	rule := &rulecond.Rule{
+		Name:        "spec-quality",
+		SourceFile:  "spec-quality.md",
+		SkillScoped: true,
+		Body:        "# SPEC Quality Checklist\n\nRun the checklist before review.\n",
+	}
+
+	compiled, err := rulecond.CompileClaude([]*rulecond.Rule{rule})
+	require.NoError(t, err)
+
+	require.Len(t, compiled.Bodies, 1)
+	assert.Equal(t, ".claude/hooks/autopus/conditional/spec-quality.md",
+		filepath.ToSlash(compiled.Bodies[0].TargetPath))
+	assert.Equal(t, rule.Body, string(compiled.Bodies[0].Content),
+		"the relocated body is the source body, frontmatter already removed by ParseRule")
+
+	assert.Empty(t, compiled.RuleFiles, "a skill-scoped rule keeps no baseline file")
+	assert.Empty(t, compiled.Hooks, "a skill-scoped rule registers no dispatcher entry")
+	assert.Empty(t, parseManifest(t, compiled.Manifest).Rules,
+		"a skill-scoped rule gets no manifest entry")
+
+	empty, err := rulecond.CompileClaude(nil)
+	require.NoError(t, err)
+	assert.Equal(t, string(empty.Manifest.Content), string(compiled.Manifest.Content),
+		"a skill-scoped rule must not move conditional-rules.json bytes")
+
+	assert.False(t, rulecond.IsSticky(&rulecond.Rule{
+		Name: "spec-quality", SkillScoped: true, AlwaysApply: true,
+	}), "a relocated body can never be resolved by the sticky runtime")
+}
+
+// TestCompileClaude_SkillScopedBodyIsNotBoundByTheInjectionBudget separates the
+// two size contracts that share MaxBodyBytes. The cap bounds what a dispatcher
+// pastes into a PreToolUse payload; a skill-scoped body is read by the skill
+// that references it and is never pasted anywhere, so capping it would refuse
+// generation over a budget the class never spends. Every shipped skill-scoped
+// rule is already larger than the cap, so this is the difference between a
+// working harness and a hard generation failure.
+func TestCompileClaude_SkillScopedBodyIsNotBoundByTheInjectionBudget(t *testing.T) {
+	t.Parallel()
+
+	oversize := padTo("SKILL-SCOPED-BODY", rulecond.MaxBodyBytes+1)
+	skillScoped := &rulecond.Rule{
+		Name: "spec-quality", SourceFile: "spec-quality.md", SkillScoped: true, Body: oversize,
+	}
+
+	compiled, err := rulecond.CompileClaude([]*rulecond.Rule{skillScoped})
+
+	require.NoError(t, err, "the injection budget must not gate a body nothing injects")
+	require.Len(t, compiled.Bodies, 1)
+	assert.Equal(t, oversize, string(compiled.Bodies[0].Content))
+
+	hookFired := hookFiredRule("worktree-safety", condWorktreeSafety)
+	hookFired.Body = oversize
+	_, err = rulecond.CompileClaude([]*rulecond.Rule{hookFired})
+	require.Error(t, err, "the same body still fails for a class the dispatcher injects")
+	assert.Contains(t, err.Error(), string(rulecond.ReasonBodyTooLarge))
+}
+
+// TestValidate_SkillScopedRefusesEveryOtherTriggerField pins the refusals that
+// keep `skillScoped` a standalone trigger: each combination would classify or
+// place the rule somewhere the author did not ask for.
+func TestValidate_SkillScopedRefusesEveryOtherTriggerField(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		mutit func(*rulecond.Rule)
+		field string
+	}{
+		{name: "condition", field: "condition", mutit: func(r *rulecond.Rule) {
+			r.Conditions = []string{`\bgit\s+commit\b`}
+			r.Scopes = []string{"tool:bash"}
+		}},
+		{name: "globs", field: "globs", mutit: func(r *rulecond.Rule) {
+			r.Globs = []string{"**/*.go"}
+		}},
+		{name: "alwaysApply", field: "alwaysApply", mutit: func(r *rulecond.Rule) {
+			r.AlwaysApply = true
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rule := &rulecond.Rule{
+				Name: "spec-quality", SourceFile: "spec-quality.md", SkillScoped: true,
+			}
+			tt.mutit(rule)
+
+			err := rulecond.Validate(rule)
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "spec-quality.md", "the error must name the rule")
+			assert.Contains(t, err.Error(), tt.field, "the error must name the offending field")
+			assert.Contains(t, err.Error(), "skillScoped")
+		})
+	}
+
+	assert.NoError(t, rulecond.Validate(&rulecond.Rule{
+		Name: "spec-quality", SourceFile: "spec-quality.md", SkillScoped: true,
+	}), "skillScoped alone is the representable shape")
+}
+
 // TestCompileClaude_OversizeBodyFailsGeneration is the compile-time half of S14
 // for REQ-CONDRULE-COMPILE-06.
 func TestCompileClaude_OversizeBodyFailsGeneration(t *testing.T) {

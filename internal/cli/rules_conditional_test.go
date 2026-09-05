@@ -17,15 +17,15 @@ import (
 // shippedRuleClassification is the S11 expected classification per rule.
 var shippedRuleClassification = map[string]string{
 	"branding":            "always",
-	"context7-docs":       "always",
 	"deferred-tools":      "always",
-	"doc-storage":         "always",
 	"language-policy":     "always",
 	"objective-reasoning": "always",
 	"project-identity":    "always",
-	"spec-quality":        "always",
 	"subagent-delegation": "always",
-	"techstack-freshness": "always",
+	"context7-docs":       "skill-scoped",
+	"doc-storage":         "skill-scoped",
+	"spec-quality":        "skill-scoped",
+	"techstack-freshness": "skill-scoped",
 	"file-size-limit":     "paths-scoped",
 	"lore-commit":         "hook-fired",
 	"shell-portability":   "hook-fired",
@@ -70,7 +70,8 @@ func TestRulesList_ClassificationIsInspectable(t *testing.T) {
 	}
 	assert.Equal(t, 3, counts["hook-fired"])
 	assert.Equal(t, 1, counts["paths-scoped"])
-	assert.Equal(t, 10, counts["always"])
+	assert.Equal(t, 4, counts["skill-scoped"])
+	assert.Equal(t, 6, counts["always"])
 
 	lore := rowFor(t, output, "lore-commit")
 	assert.Contains(t, lore, "tool:bash", "hook-fired rules print their trigger")
@@ -82,24 +83,69 @@ func TestRulesList_ClassificationIsInspectable(t *testing.T) {
 
 	branding := rowFor(t, output, "branding")
 	assert.Contains(t, branding, ".claude/rules/autopus/branding.md")
+
+	specQuality := rowFor(t, output, "spec-quality")
+	assert.Contains(t, specQuality, ".claude/hooks/autopus/conditional/spec-quality.md",
+		"a skill-scoped rule prints the relocated body destination it actually has")
+	assert.NotContains(t, specQuality, "tool:",
+		"a skill-scoped rule has no runtime trigger to print")
 }
 
 // TestRulesFire_MissingManifestExitsZeroWithNoOutput keeps the CLI entry point
 // aligned with the REQ-CONDRULE-FIRE-03 fail-open contract.
+//
+// The fixture carries a marker on purpose. Without one this exercised the
+// unresolved-root branch instead, so the missing-manifest silence it claims to
+// pin was never reached — and once the unresolved case gained a diagnostic, the
+// two cases became observably different.
 func TestRulesFire_MissingManifestExitsZeroWithNoOutput(t *testing.T) {
-	t.Chdir(t.TempDir())
+	dir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, ".claude"), 0o755))
 
-	cmd := newRulesCmd()
-	var out, errOut bytes.Buffer
-	cmd.SetIn(strings.NewReader(
-		`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`))
-	cmd.SetOut(&out)
-	cmd.SetErr(&errOut)
-	cmd.SetArgs([]string{"fire", "--event", "PreToolUse"})
+	stdout, stderr := runRulesFire(t, dir,
+		`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`)
 
-	require.NoError(t, cmd.Execute(), "the dispatcher must never block a tool call")
-	assert.Empty(t, out.String())
-	assert.Empty(t, errOut.String())
+	assert.Empty(t, stdout)
+	assert.Empty(t, stderr, "a resolved root with no manifest is benign absence")
+}
+
+// TestRulesFire_UnresolvedProjectRootIsObservable is the issue #185 conditional
+// row: outside any project the dispatcher used to exit zero with nothing on
+// either stream, which is indistinguishable from "no rule matched". One stderr
+// line makes the two cases tellable apart without weakening the exit-zero
+// contract or naming the working directory.
+func TestRulesFire_UnresolvedProjectRootIsObservable(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	start := filepath.Join(home, "work", "sub")
+	require.NoError(t, os.MkdirAll(start, 0o755))
+
+	stdout, stderr := runRulesFire(t, start,
+		`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`)
+
+	assert.Empty(t, stdout, "no project root means no manifest to read")
+	assert.Equal(t, unresolvedConditionalRootLine, strings.TrimSpace(stderr),
+		"the unresolved root is the one diagnostic this case writes")
+}
+
+// TestRulesFire_ConfigOnlyRootIsResolved is the other half of issue #185: a
+// project whose only evidence is autopus.yaml is a project, so the dispatcher
+// stops reporting an unresolved root there and falls back to the ordinary
+// missing-manifest silence.
+func TestRulesFire_ConfigOnlyRootIsResolved(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	project := filepath.Join(home, "proj")
+	start := filepath.Join(project, "pkg", "sub")
+	require.NoError(t, os.MkdirAll(start, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(project, projectConfigMarker),
+		[]byte("version: 1\n"), 0o644))
+
+	stdout, stderr := runRulesFire(t, start,
+		`{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit -m x"}}`)
+
+	assert.Empty(t, stdout)
+	assert.Empty(t, stderr, "an autopus.yaml root is resolved, not reported")
 }
 
 // runRulesFire executes `auto rules fire` in dir with the given stdin and
@@ -220,59 +266,5 @@ func TestHygieneSourceMapping_ConditionalPaths(t *testing.T) {
 		assert.Contains(t, prefixes, "content/rules/", "source mapping for %s", generated)
 		assert.True(t, sourceMatchesGenerated(generated, "content/rules/lore-commit.md"),
 			"%s must be attributable to a rule source edit", generated)
-	}
-}
-
-// TestResolveProjectRoot_RequiresMarkerAndStopsAtHome pins REQ-CONDRULE-FIRE-11
-// root resolution. The bare working directory is an implicit redirection
-// channel, so a marker is required, and the home directory is never itself a
-// project root even though `~/.claude` exists on most installs.
-func TestResolveProjectRoot_RequiresMarkerAndStopsAtHome(t *testing.T) {
-	tests := []struct {
-		name        string
-		markerDir   string // relative to home; "-" creates no marker at all
-		markerName  string
-		markerIsLnk bool   // ship the marker as a symlink, as a clone can
-		startDir    string // relative to home
-		wantDir     string // relative to home; empty means unresolved
-	}{
-		{name: "claude marker in the start directory", markerDir: "proj", markerName: ".claude", startDir: "proj", wantDir: "proj"},
-		{name: "git marker in an ancestor", markerDir: "proj", markerName: ".git", startDir: "proj/pkg/sub", wantDir: "proj"},
-		{name: "no marker anywhere", markerDir: "-", startDir: "work/sub"},
-		{name: "home marker is not a project root", markerDir: ".", markerName: ".claude", startDir: "work/sub"},
-		// A symlinked marker is not evidence of a project root: accepting it
-		// would anchor the conditional surface outside the checkout.
-		{name: "symlinked claude marker is refused", markerDir: "proj", markerName: ".claude", markerIsLnk: true, startDir: "proj"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			home := t.TempDir()
-			t.Setenv("HOME", home)
-			start := filepath.Join(home, filepath.FromSlash(tt.startDir))
-			require.NoError(t, os.MkdirAll(start, 0o755))
-			if tt.markerDir != "-" {
-				marker := filepath.Join(home, filepath.FromSlash(tt.markerDir), tt.markerName)
-				require.NoError(t, os.MkdirAll(filepath.Dir(marker), 0o755))
-				if tt.markerIsLnk {
-					outside := t.TempDir()
-					if err := os.Symlink(outside, marker); err != nil {
-						t.Skipf("symlink unavailable: %v", err)
-					}
-				} else {
-					require.NoError(t, os.MkdirAll(marker, 0o755))
-				}
-			}
-
-			got, ok := resolveProjectRoot(start)
-
-			if tt.wantDir == "" {
-				assert.False(t, ok, "resolution must fail open outside a project")
-				assert.Empty(t, got)
-				return
-			}
-			assert.True(t, ok)
-			assert.Equal(t, filepath.Join(home, filepath.FromSlash(tt.wantDir)), got)
-		})
 	}
 }

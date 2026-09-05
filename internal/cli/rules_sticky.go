@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"io"
 	"os"
 
@@ -11,10 +10,12 @@ import (
 	"github.com/insajin/autopus-adk/pkg/rulecond"
 )
 
-// stickyRootMarkers is the evidence REQ-STICKYRULE-FIRE-12 accepts as a project
-// root: a `.claude` directory and nothing else. The sticky body root and the
-// manifest both live under it, so a checkout without one has nothing to inject
-// and must say so rather than resolve to a root with no installed surface.
+// stickyRootMarkers is the directory evidence REQ-STICKYRULE-FIRE-12 accepts as
+// a project root: a `.claude` directory and nothing else. The sticky body root
+// and the manifest both live under it, so a checkout without one has nothing to
+// inject and must say so rather than resolve to a root with no installed
+// surface. The shared walk adds one non-directory fallback on top, the regular
+// autopus.yaml every configured project has.
 var stickyRootMarkers = []string{".claude"}
 
 // unresolvedRootLine is the single diagnostic the unresolved-root case writes.
@@ -66,12 +67,12 @@ func fireStickyRules(event string, stdin io.Reader, stdout, stderr io.Writer) {
 	if err != nil {
 		// An unreadable working directory is the same observable condition as a
 		// missing ancestor: no root could be resolved from it.
-		reportUnresolvedStickyRoot(stderr)
+		reportUnresolvedRoot(stderr, unresolvedRootLine)
 		return
 	}
 	root, ok := resolveStickyRoot(cwd)
 	if !ok {
-		reportUnresolvedStickyRoot(stderr)
+		reportUnresolvedRoot(stderr, unresolvedRootLine)
 		return
 	}
 	// Any residual error stays swallowed. StickyFire already contracts to return
@@ -81,13 +82,15 @@ func fireStickyRules(event string, stdin io.Reader, stdout, stderr io.Writer) {
 }
 
 // resolveStickyRoot walks up from start to the nearest ancestor holding a
-// `.claude` directory (REQ-STICKYRULE-FIRE-12).
+// `.claude` directory or a regular autopus.yaml (REQ-STICKYRULE-FIRE-12).
 //
-// The walk is the shared one, so the sticky runtime inherits its two trust
-// decisions unchanged: it stops at the home directory without testing it,
-// because `~/.claude` exists on most Claude Code installs and accepting it would
-// anchor the sticky surface outside any checkout, and it rejects a symlinked
-// marker, because a cloned repository can ship `.claude` as a symlink.
+// The walk is the shared one, so the sticky runtime inherits its trust
+// decisions unchanged: it refuses `~/.claude` as a project root, because that
+// directory exists on most Claude Code installs and accepting it would anchor
+// the sticky surface outside any checkout, and it rejects a symlinked marker,
+// because a cloned repository can ship `.claude` as a symlink. The config
+// fallback keeps a project whose harness is configured but not yet generated
+// resolvable instead of reporting an unresolved root at every prompt.
 func resolveStickyRoot(start string) (string, bool) {
 	return resolveRootWithMarkers(start, stickyRootMarkers)
 }
@@ -107,13 +110,4 @@ func stickyCadence(root string) int {
 		return 0
 	}
 	return config.StickyCadence(cfg)
-}
-
-// reportUnresolvedStickyRoot writes the one diagnostic line the unresolved-root
-// case produces, and no stdout at all.
-func reportUnresolvedStickyRoot(stderr io.Writer) {
-	if stderr == nil {
-		return
-	}
-	fmt.Fprintln(stderr, unresolvedRootLine)
 }

@@ -51,6 +51,8 @@ func listFixtureRows() []ruleListRow {
 			Destination: ".claude/rules/autopus/file-size-limit.md"},
 		{Name: "lore-commit", Class: "hook-fired", Trigger: "tool:bash",
 			Destination: ".claude/hooks/autopus/conditional/lore-commit.md"},
+		{Name: "spec-quality", Class: "skill-scoped", Trigger: "-",
+			Destination: ".claude/hooks/autopus/conditional/spec-quality.md"},
 	}
 }
 
@@ -133,7 +135,7 @@ func TestRenderRuleListRows_SummarisesCountsAndAlignsColumns(t *testing.T) {
 	require.NoError(t, renderRuleListRows(&out, listFixtureRows(), 3))
 
 	assert.True(t, strings.HasSuffix(out.String(),
-		"\n4 rules: 2 always, 1 paths-scoped, 1 hook-fired\n"+
+		"\n5 rules: 2 always, 1 paths-scoped, 1 hook-fired, 1 skill-scoped\n"+
 			"1 sticky, re-attached on an effective cadence of 3 prompts\n"),
 		"totals must count the rows and echo the resolved cadence:\n%s", out.String())
 

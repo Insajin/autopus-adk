@@ -2,6 +2,7 @@
 name: techstack-freshness
 description: Greenfield technology stack choices require current stable version evidence
 category: workflow
+skillScoped: true
 ---
 
 # Technology Stack Freshness

@@ -1,3 +1,10 @@
+---
+name: spec-quality
+description: SPEC self-verify checklist applied by spec-writer and spec-review before provider review
+category: workflow
+skillScoped: true
+---
+
 # SPEC Quality Checklist
 
 Use this checklist after `spec.md`, `plan.md`, `acceptance.md`, and `research.md` are drafted, and before the SPEC enters `.claude/skills/spec-review/SKILL.md`.

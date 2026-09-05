@@ -17,7 +17,8 @@ import (
 )
 
 // TestParity_ClassifyFileCountsConditionalBodies is the S16 oracle for
-// REQ-CONDRULE-VERIFY-02.
+// REQ-CONDRULE-VERIFY-02. Both relocated classes must keep counting as rules,
+// or the parity census would report a relocation as a lost rule.
 func TestParity_ClassifyFileCountsConditionalBodies(t *testing.T) {
 	t.Parallel()
 
@@ -28,6 +29,8 @@ func TestParity_ClassifyFileCountsConditionalBodies(t *testing.T) {
 		{".claude/hooks/autopus/conditional/lore-commit.md", "rules"},
 		{".claude/hooks/autopus/conditional/shell-portability.md", "rules"},
 		{".claude/hooks/autopus/conditional/worktree-safety.md", "rules"},
+		{".claude/hooks/autopus/conditional/spec-quality.md", "rules"},
+		{".claude/hooks/autopus/conditional/techstack-freshness.md", "rules"},
 		{".claude/hooks/autopus/conditional-rules.json", ""},
 		{".claude/hooks/autopus/task-created-validate.sh", ""},
 		{".claude/rules/autopus/branding.md", "rules"},
@@ -72,6 +75,7 @@ func TestParity_RelocationConservesRuleCount(t *testing.T) {
 			relocated++
 		}
 	}
-	assert.Equal(t, 11, baseline, "eleven rules remain in baseline context")
-	assert.Equal(t, 3, relocated, "three rule bodies move under the conditional body root")
+	assert.Equal(t, 7, baseline, "seven rules remain in baseline context")
+	assert.Equal(t, 7, relocated,
+		"the hook-fired triple plus the skill-scoped four move under the conditional body root")
 }

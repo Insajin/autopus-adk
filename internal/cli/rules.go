@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,8 +15,8 @@ const (
 	// contentRuleDir is the embedded rule source of truth (content/rules).
 	contentRuleDir = "rules"
 	// claudeRuleDir is the claude-code destination for always and paths-scoped
-	// rules. Hook-fired bodies are relocated to rulecond.BodyRootRelPath so they
-	// cost no baseline context.
+	// rules. A relocated body goes to rulecond.BodyRootRelPath instead, so it
+	// costs no baseline context.
 	claudeRuleDir = ".claude/rules/autopus"
 	// defaultHookEvent is the only hook event SPEC-CONDRULE-001 compiles to.
 	defaultHookEvent = "PreToolUse"
@@ -30,6 +31,7 @@ var ruleClassLabels = map[rulecond.Class]string{
 	rulecond.ClassAlways:      "always",
 	rulecond.ClassPathsScoped: "paths-scoped",
 	rulecond.ClassHookFired:   "hook-fired",
+	rulecond.ClassSkillScoped: "skill-scoped",
 }
 
 // newRulesCmd builds the `auto rules` namespace.
@@ -79,6 +81,19 @@ const maxRootSearchDepth = 64
 // checkout whose harness has not been generated yet.
 var projectRootMarkers = []string{".claude", ".git"}
 
+// projectConfigMarker is the harness config file. A directory holding a regular
+// copy is a project root even with neither directory marker present: `auto
+// init` writes autopus.yaml before anything is generated, so a real project can
+// legitimately have no `.claude` yet and need not be a git checkout at all.
+const projectConfigMarker = "autopus.yaml"
+
+// unresolvedConditionalRootLine is the single diagnostic the unresolved-root
+// case of `auto rules fire` writes. It names no path, so a misconfigured
+// working directory is observable without the working directory itself
+// reaching stderr, and it is prefixed to be distinguishable from the sticky
+// dispatcher's line in a shared hook log.
+const unresolvedConditionalRootLine = "conditional-rules project_root_unresolved"
+
 // fireConditionalRules resolves the manifest at its fixed project-relative
 // location and delegates to the dispatcher.
 //
@@ -89,28 +104,45 @@ var projectRootMarkers = []string{".claude", ".git"}
 func fireConditionalRules(event string, stdin io.Reader, stdout, stderr io.Writer) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		// Fail open: an unreadable working directory is benign absence.
+		// An unreadable working directory is the same observable condition as a
+		// missing ancestor: no root could be resolved from it. Reporting it is
+		// what separates "this project has no matching rule" from "this hook
+		// never looked at a project at all" — the silence the reporter of issue
+		// #185 could not tell apart. Exit stays zero either way.
+		reportUnresolvedRoot(stderr, unresolvedConditionalRootLine)
 		return
 	}
 	root, ok := resolveProjectRoot(cwd)
 	if !ok {
-		// Fail open: outside any project there is no manifest to read.
+		reportUnresolvedRoot(stderr, unresolvedConditionalRootLine)
 		return
 	}
 	// REQ-CONDRULE-FIRE-03 and FIRE-09 are enforced inside Fire, which reports
 	// fail-closed suppressions on stderr and keeps every other matched rule
-	// injected. Any residual error stays swallowed to preserve exit zero.
+	// injected. Any residual error stays swallowed to preserve exit zero. A
+	// resolved root with no manifest stays silent: that is benign absence, not
+	// a misconfigured working directory.
 	_ = rulecond.Fire(root, event, stdin, stdout, stderr)
 }
 
+// reportUnresolvedRoot writes the one diagnostic line an unresolved project
+// root produces, and no stdout at all. Both dispatchers share it so their
+// exit-zero-with-one-stderr-line contract cannot drift apart.
+func reportUnresolvedRoot(stderr io.Writer, line string) {
+	if stderr == nil {
+		return
+	}
+	fmt.Fprintln(stderr, line)
+}
+
 // resolveProjectRoot walks up from start to the nearest directory holding a
-// project marker.
+// project marker or a regular harness config file.
 //
 // Trust decision: the working directory is an implicit input the invoking
 // process chooses, so anchoring the manifest at the bare CWD lets any directory
 // containing a crafted `.claude/hooks/autopus/` tree be read as if it were the
-// project. Requiring a marker binds the manifest to a real checkout, and the
-// walk stops at the home directory WITHOUT testing it: `~/.claude` exists on
+// project. Requiring evidence binds the manifest to a real project, and the
+// directory markers are not tested at the home directory: `~/.claude` exists on
 // most Claude Code installs, and treating it as a project root would restore
 // exactly the redirection this check removes. The filesystem root and
 // maxRootSearchDepth bound the walk otherwise.
@@ -118,12 +150,14 @@ func resolveProjectRoot(start string) (string, bool) {
 	return resolveRootWithMarkers(start, projectRootMarkers)
 }
 
-// resolveRootWithMarkers is the shared upward walk. The marker set is a
-// parameter because the two dispatchers do not accept the same evidence:
+// resolveRootWithMarkers is the shared upward walk. The directory-marker set is
+// a parameter because the two dispatchers do not accept the same evidence:
 // SPEC-CONDRULE-001 accepts a bare checkout, while REQ-STICKYRULE-FIRE-12
 // defines the sticky project root as the nearest ancestor holding a `.claude`
 // directory, so that a checkout with no generated harness reports an
-// unresolved root instead of resolving to a root with nothing installed.
+// unresolved root instead of resolving to a root with nothing installed. The
+// harness config fallback is shared by both, because a project that has an
+// autopus.yaml and no generated surface is the same project either way.
 //
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-STICKYRULE-001: the single trust anchor discovery used by both hook dispatchers — resolveProjectRoot and resolveStickyRoot differ only in their marker set.
 // @AX:REASON: The os.Lstat symlink refusal and the home-directory stop below are security decisions; once this walk is shared, weakening either one relocates the containment frame for the conditional dispatcher and the sticky runtime in the same edit.
@@ -132,21 +166,22 @@ func resolveRootWithMarkers(start string, markers []string) (string, bool) {
 	dir := filepath.Clean(start)
 
 	for depth := 0; depth < maxRootSearchDepth; depth++ {
-		if home != "" && dir == filepath.Clean(home) {
-			return "", false
+		atHome := home != "" && dir == filepath.Clean(home)
+		if !atHome && hasDirectoryMarker(dir, markers) {
+			return dir, true
 		}
-		for _, marker := range markers {
-			// os.Lstat, not os.Stat: a symlinked marker is not evidence of a
-			// project root. A cloned repository can ship `.claude` as a symlink
-			// (git mode 120000 survives the clone), and accepting it here would
-			// anchor the whole conditional surface outside the checkout. Falling
-			// through to the next marker keeps a repo whose `.git` is real
-			// resolvable, and rulecond's trusted-root contract then refuses the
-			// symlinked component when the manifest is read.
-			info, err := os.Lstat(filepath.Join(dir, marker))
-			if err == nil && info.Mode()&os.ModeSymlink == 0 {
-				return dir, true
-			}
+		// The config fallback IS tested at the home directory, unlike the
+		// directory markers. `~/.claude` is Claude Code's own user config
+		// directory and exists on most installs, so accepting it would let an
+		// ambient install masquerade as the project; `~/autopus.yaml` is an
+		// operator-authored harness config with nothing ambient about it, and
+		// refusing it is what made the reporter of issue #185 see a dispatcher
+		// that silently did nothing in a directory that plainly was a project.
+		if hasConfigMarker(dir) {
+			return dir, true
+		}
+		if atHome {
+			return "", false
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -155,4 +190,33 @@ func resolveRootWithMarkers(start string, markers []string) (string, bool) {
 		dir = parent
 	}
 	return "", false
+}
+
+// hasDirectoryMarker reports whether dir holds one of the marker entries.
+//
+// os.Lstat, not os.Stat: a symlinked marker is not evidence of a project root.
+// A cloned repository can ship `.claude` as a symlink (git mode 120000 survives
+// the clone), and accepting it here would anchor the whole conditional surface
+// outside the checkout. Falling through to the next marker keeps a repo whose
+// `.git` is real resolvable, and rulecond's trusted-root contract then refuses
+// the symlinked component when the manifest is read.
+func hasDirectoryMarker(dir string, markers []string) bool {
+	for _, marker := range markers {
+		info, err := os.Lstat(filepath.Join(dir, marker))
+		if err == nil && info.Mode()&os.ModeSymlink == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasConfigMarker reports whether dir holds a regular projectConfigMarker file.
+//
+// Regular is a stricter test than the non-symlink one the directory markers
+// use, and deliberately so: this is the one piece of evidence accepted at the
+// home directory, so a directory, a device, or a symlink named autopus.yaml
+// must not pass it.
+func hasConfigMarker(dir string) bool {
+	info, err := os.Lstat(filepath.Join(dir, projectConfigMarker))
+	return err == nil && info.Mode().IsRegular()
 }

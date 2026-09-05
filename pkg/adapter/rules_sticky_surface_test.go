@@ -18,9 +18,19 @@ import (
 	contentfs "github.com/insajin/autopus-adk/content"
 )
 
-// stickyHookFiredRules is the SPEC-CONDRULE-001 hook-fired set that the S7
-// baseline of 11 subtracts from the 14 content rules.
-var stickyHookFiredRules = []string{"lore-commit.md", "shell-portability.md", "worktree-safety.md"}
+// stickyRelocatedRules is the set of rule sources whose bodies leave
+// .claude/rules/autopus: the SPEC-CONDRULE-001 hook-fired triple plus the four
+// rules issue #185 made skill-scoped. Together they are what the S7 baseline
+// subtracts from the 14 content rules.
+var stickyRelocatedRules = []string{
+	"context7-docs.md",
+	"doc-storage.md",
+	"lore-commit.md",
+	"shell-portability.md",
+	"spec-quality.md",
+	"techstack-freshness.md",
+	"worktree-safety.md",
+}
 
 func stickyContentRuleNames(t *testing.T) []string {
 	t.Helper()
@@ -35,30 +45,32 @@ func stickyContentRuleNames(t *testing.T) []string {
 	return names
 }
 
-// stickyHookFiredPresent returns the rule sources that carry SPEC-CONDRULE-001
-// hook-fired metadata, i.e. a `condition:` frontmatter key.
-func stickyHookFiredPresent(t *testing.T) []string {
+// stickyRelocatedPresent returns the rule sources that carry relocation
+// metadata, i.e. a `condition:` or a `skillScoped:` frontmatter key. Reading the
+// sources keeps the expected claude rule set derived rather than restated, so a
+// reclassification moves both sides of the assertion at once.
+func stickyRelocatedPresent(t *testing.T) []string {
 	t.Helper()
-	var fired []string
+	var relocated []string
 	for _, name := range stickyContentRuleNames(t) {
 		frontmatter, ok := stickyFrontmatterOf(stickyContentSource(t, name))
 		if !ok {
 			continue
 		}
 		for _, line := range strings.Split(frontmatter, "\n") {
-			if strings.HasPrefix(line, "condition:") {
-				fired = append(fired, name)
+			if strings.HasPrefix(line, "condition:") || strings.HasPrefix(line, "skillScoped:") {
+				relocated = append(relocated, name)
 				break
 			}
 		}
 	}
-	return fired
+	return relocated
 }
 
 // S7: the sticky flag is orthogonal — it relocates nothing and adds no paths
 // field. The expected claude rule set is derived from the sources' own
-// SPEC-CONDRULE-001 hook-fired metadata, and the pinned baseline of 11 is
-// asserted exactly whenever that relocation metadata is present in the tree.
+// relocation metadata, and the pinned baseline of 7 is asserted exactly
+// whenever that metadata is present in the tree.
 func TestStickyFrontmatter_S7_ClaudeRuleSurfaceIsUnchanged(t *testing.T) {
 	files := stickyGenerate(t, "claude")
 
@@ -70,27 +82,27 @@ func TestStickyFrontmatter_S7_ClaudeRuleSurfaceIsUnchanged(t *testing.T) {
 		}
 	}
 
-	hookFired := stickyHookFiredPresent(t)
-	fired := make(map[string]bool, len(hookFired))
-	for _, name := range hookFired {
-		fired[name] = true
+	relocated := stickyRelocatedPresent(t)
+	moved := make(map[string]bool, len(relocated))
+	for _, name := range relocated {
+		moved[name] = true
 	}
 	var want []string
 	for _, name := range stickyContentRuleNames(t) {
-		if !fired[name] {
+		if !moved[name] {
 			want = append(want, name)
 		}
 	}
 
 	assert.ElementsMatch(t, want, got,
-		".claude/rules/autopus must hold every non-hook-fired content rule")
+		".claude/rules/autopus must hold every content rule the compiler does not relocate")
 	assert.Contains(t, got, "language-policy.md")
 	assert.Contains(t, got, "objective-reasoning.md")
 
-	if len(hookFired) == len(stickyHookFiredRules) {
-		assert.ElementsMatch(t, stickyHookFiredRules, hookFired,
-			"the hook-fired set S7 subtracts must be the SPEC-CONDRULE-001 triple")
-		assert.Len(t, got, 11, "S7 baseline: 14 content rules minus 3 hook-fired")
+	if len(relocated) == len(stickyRelocatedRules) {
+		assert.ElementsMatch(t, stickyRelocatedRules, relocated,
+			"the relocated set S7 subtracts must be the hook-fired triple plus the skill-scoped four")
+		assert.Len(t, got, 7, "S7 baseline: 14 content rules minus 7 relocated")
 	}
 
 	for _, rule := range stickyRules {

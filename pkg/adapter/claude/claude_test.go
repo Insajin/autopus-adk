@@ -266,7 +266,10 @@ func TestClaudeAdapter_Generate_InstallsRules(t *testing.T) {
 	require.NoError(t, err, "shell-portability.md가 존재해야 함")
 	assert.Contains(t, string(shellPortabilityData), "Do NOT prefix commands with GNU `timeout`")
 
-	techstackData, err := os.ReadFile(filepath.Join(rulesDir, "techstack-freshness.md"))
+	// techstack-freshness is skill-scoped (issue #185): it is one of the four
+	// `/auto`-only rules whose body is relocated so it stops loading at session
+	// start, and the `/auto` skills read it from the conditional body root.
+	techstackData, err := os.ReadFile(filepath.Join(bodyDir, "techstack-freshness.md"))
 	require.NoError(t, err, "techstack-freshness.md가 존재해야 함")
 	assert.Contains(t, string(techstackData), "Technology Stack Decision")
 }

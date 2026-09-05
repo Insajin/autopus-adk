@@ -22,16 +22,19 @@ const (
 
 // CompiledClaude is the claude-code compilation output of the triggered rules.
 //
-// Only paths-scoped and hook-fired rules are claimed here. An `always` rule is
-// deliberately absent from every field, because it must keep flowing through
-// the existing verbatim copy path that keeps its emitted bytes unchanged
-// (REQ-CONDRULE-SCHEMA-02).
+// Only paths-scoped, hook-fired, and skill-scoped rules are claimed here. An
+// `always` rule is deliberately absent from every field, because it must keep
+// flowing through the existing verbatim copy path that keeps its emitted bytes
+// unchanged (REQ-CONDRULE-SCHEMA-02).
 type CompiledClaude struct {
 	// RuleFiles are paths-scoped rules that stay in the baseline rule
 	// directory, carrying a native `paths:` frontmatter list.
 	RuleFiles []adapter.FileMapping
-	// Bodies are hook-fired rule bodies relocated into the conditional body
-	// root, so they cost no baseline context.
+	// Bodies are the rule bodies RelocatesBody moves into the conditional body
+	// root, so they cost no baseline context. A hook-fired body is re-attached
+	// by the dispatcher; a skill-scoped body is re-attached only by the skill
+	// that references it, and therefore appears in no Manifest rule and in no
+	// Hooks entry.
 	Bodies []adapter.FileMapping
 	// Manifest is the compiled conditional manifest. It is always produced,
 	// and holds an empty rule list when no rule is hook-fired.
@@ -74,6 +77,19 @@ func CompileClaude(rules []*Rule) (*CompiledClaude, error) {
 					triggers = append(triggers, trigger)
 				}
 			}
+		case ClassSkillScoped:
+			// The same relocation as hook-fired, and deliberately nothing else:
+			// no manifest rule and no dispatcher trigger, so
+			// `conditional-rules.json` keeps the exact bytes it has for a
+			// harness with no skill-scoped rule.
+			//
+			// checkCompiledBody is deliberately not applied. MaxBodyBytes is the
+			// dispatcher's injection budget (REQ-CONDRULE-FIRE-05/FIRE-08): it
+			// bounds what a PreToolUse payload pastes into context on every
+			// matching tool call. A skill-scoped body is never injected — the
+			// referencing skill reads the file when it needs it — so capping it
+			// here would refuse generation over a budget this class never spends.
+			out.Bodies = append(out.Bodies, bodyMapping(rule.Name, []byte(rule.Body)))
 		case ClassAlways:
 		}
 	}
@@ -137,7 +153,7 @@ func dispatcherHooks(triggers []Trigger) []adapter.HookConfig {
 	return hooks
 }
 
-// bodyMapping relocates one hook-fired rule body into the conditional body root.
+// bodyMapping relocates one rule body into the conditional body root.
 func bodyMapping(name string, body []byte) adapter.FileMapping {
 	target := filepath.Join(filepath.FromSlash(BodyRootRelPath), name+mdSuffix)
 	return mapping(target, body)

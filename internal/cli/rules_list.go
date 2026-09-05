@@ -117,9 +117,12 @@ func ruleTriggerSummary(class rulecond.Class, rule *rulecond.Rule) string {
 	return strings.Join(fields, ",")
 }
 
-// ruleDestination reports where the claude-code compiler writes the rule.
+// ruleDestination reports where the claude-code compiler writes the rule. Both
+// relocated classes land under the conditional body root; what re-attaches the
+// body differs (a dispatcher match versus a skill reference), but the operator
+// looking for the file needs the same path.
 func ruleDestination(class rulecond.Class, name string) string {
-	if class == rulecond.ClassHookFired {
+	if rulecond.RelocatesBody(class) {
 		return path.Join(filepath.ToSlash(rulecond.BodyRootRelPath), name+".md")
 	}
 	return path.Join(claudeRuleDir, name+".md")
@@ -176,8 +179,9 @@ func renderRuleListRows(out io.Writer, rows []ruleListRow, cadence int) error {
 		return err
 	}
 
-	if _, err := fmt.Fprintf(out, "\n%d rules: %d always, %d paths-scoped, %d hook-fired\n",
-		len(rows), counts["always"], counts["paths-scoped"], counts["hook-fired"]); err != nil {
+	if _, err := fmt.Fprintf(out, "\n%d rules: %d always, %d paths-scoped, %d hook-fired, %d skill-scoped\n",
+		len(rows), counts["always"], counts["paths-scoped"], counts["hook-fired"],
+		counts["skill-scoped"]); err != nil {
 		return err
 	}
 	_, err := fmt.Fprintf(out, "%d sticky, re-attached on an effective cadence of %d prompts\n",

@@ -14,16 +14,17 @@ import (
 )
 
 // TestClassify_TotalAndMutuallyExclusive covers REQ-CONDRULE-SCHEMA-02 and the
-// INV-002 partition: every rule lands in exactly one of the three classes.
+// INV-002 partition: every rule lands in exactly one class.
 func TestClassify_TotalAndMutuallyExclusive(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name      string
-		condition string
-		scope     string
-		globs     []string
-		want      rulecond.Class
+		name        string
+		condition   string
+		scope       string
+		globs       []string
+		skillScoped bool
+		want        rulecond.Class
 	}{
 		{name: "no trigger field", want: rulecond.ClassAlways},
 		{name: "globs only", globs: []string{"**/*.go"}, want: rulecond.ClassPathsScoped},
@@ -40,12 +41,29 @@ func TestClassify_TotalAndMutuallyExclusive(t *testing.T) {
 			globs:     []string{"**/*.go"},
 			want:      rulecond.ClassHookFired,
 		},
+		{name: "skillScoped only", skillScoped: true, want: rulecond.ClassSkillScoped},
+		{
+			name:        "condition with tool scope wins over skillScoped",
+			condition:   `\bgit\s+commit\b`,
+			scope:       "tool:bash",
+			skillScoped: true,
+			want:        rulecond.ClassHookFired,
+		},
+		{
+			name:        "skillScoped wins over globs",
+			globs:       []string{"**/*.go"},
+			skillScoped: true,
+			want:        rulecond.ClassSkillScoped,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			rule := &rulecond.Rule{Name: "sample", SourceFile: "sample.md", Globs: tt.globs}
+			rule := &rulecond.Rule{
+				Name: "sample", SourceFile: "sample.md",
+				Globs: tt.globs, SkillScoped: tt.skillScoped,
+			}
 			if tt.condition != "" {
 				rule.Conditions = []string{tt.condition}
 			}
@@ -128,16 +146,16 @@ func TestClassify_ShippedRules(t *testing.T) {
 		"lore-commit":         rulecond.ClassHookFired,
 		"worktree-safety":     rulecond.ClassHookFired,
 		"file-size-limit":     rulecond.ClassPathsScoped,
+		"context7-docs":       rulecond.ClassSkillScoped,
+		"doc-storage":         rulecond.ClassSkillScoped,
+		"spec-quality":        rulecond.ClassSkillScoped,
+		"techstack-freshness": rulecond.ClassSkillScoped,
 		"branding":            rulecond.ClassAlways,
-		"context7-docs":       rulecond.ClassAlways,
 		"deferred-tools":      rulecond.ClassAlways,
-		"doc-storage":         rulecond.ClassAlways,
 		"language-policy":     rulecond.ClassAlways,
 		"objective-reasoning": rulecond.ClassAlways,
 		"project-identity":    rulecond.ClassAlways,
-		"spec-quality":        rulecond.ClassAlways,
 		"subagent-delegation": rulecond.ClassAlways,
-		"techstack-freshness": rulecond.ClassAlways,
 	}
 
 	entries, err := fs.ReadDir(contentfs.FS, "rules")
@@ -168,7 +186,8 @@ func TestClassify_ShippedRules(t *testing.T) {
 	assert.Equal(t, want, got)
 	assert.Equal(t, 3, counts[rulecond.ClassHookFired], "hook-fired count")
 	assert.Equal(t, 1, counts[rulecond.ClassPathsScoped], "paths-scoped count")
-	assert.Equal(t, 10, counts[rulecond.ClassAlways], "always count")
+	assert.Equal(t, 4, counts[rulecond.ClassSkillScoped], "skill-scoped count")
+	assert.Equal(t, 6, counts[rulecond.ClassAlways], "always count")
 }
 
 // TestClassify_ShippedHookFiredConditions pins the T7 condition assignment.
