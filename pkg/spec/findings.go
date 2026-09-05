@@ -171,41 +171,6 @@ func DeduplicateFindings(findings []ReviewFinding) []ReviewFinding {
 	return result
 }
 
-// ApplyScopeLock filters findings based on mode and prior scope.
-// In verify mode: new non-critical, non-security findings are tagged out_of_scope.
-// Critical/security findings get EscapeHatch=true.
-// In discover mode: all findings pass through unchanged.
-func ApplyScopeLock(incoming, prior []ReviewFinding, mode ReviewMode) []ReviewFinding {
-	if mode != ReviewModeVerify {
-		return incoming
-	}
-
-	// Build set of known IDs from prior findings.
-	knownIDs := make(map[string]bool, len(prior))
-	for _, f := range prior {
-		if f.ID != "" {
-			knownIDs[f.ID] = true
-		}
-	}
-
-	result := make([]ReviewFinding, 0, len(incoming))
-	for _, f := range incoming {
-		if knownIDs[f.ID] {
-			result = append(result, f)
-			continue
-		}
-		// New finding in verify mode: apply scope lock
-		if f.Severity == "critical" || f.Category == FindingCategorySecurity {
-			f.EscapeHatch = true
-			f.Status = FindingStatusOpen
-		} else {
-			f.Status = FindingStatusOutOfScope
-		}
-		result = append(result, f)
-	}
-	return result
-}
-
 // MergeSupermajority merges findings from multiple providers using a supermajority threshold.
 // totalProviders: total number of providers that participated.
 // threshold: fraction required for consensus (e.g., 0.67 for 2/3).

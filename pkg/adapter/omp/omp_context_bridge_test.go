@@ -182,8 +182,10 @@ func TestOMPContextBridge_NoOptInPreservesExactPreparedFiles(t *testing.T) {
 	// verbatim so the added `skillScoped: true` key reaches
 	// .omp/rules/autopus-*.md — OMP keeps its own rule placement, only
 	// claude-code relocates those bodies out of baseline context — and issue #186
-	// revised the agent-pipeline skill body and its shared OMP template.
-	const priorPreparedFilesFingerprint = "843bbcab34fe647da9c650d29608e44963df3c089c3c26ea0844f7adb033c75f"
+	// revised the agent-pipeline skill body and its shared OMP template, then
+	// again when the gate-applicability receipt, no-capture UX oracles, repeat
+	// discovery, and lead-time telemetry contracts landed on the same surfaces.
+	const priorPreparedFilesFingerprint = "27b5274a1d84bbb1e895b60f57e673ff0d8f96aff4ddea7e5998c46f789593d0"
 	assert.Equal(t, priorPreparedFilesFingerprint, fingerprintOMPFileMappings(t, baselineFiles))
 	assert.Equal(t, fingerprintOMPFileMappings(t, baselineFiles), fingerprintOMPFileMappings(t, catalogFiles))
 	assert.NotContains(t, ompMappingTargets(baselineFiles), ".omp/extensions/autopus-context.ts")

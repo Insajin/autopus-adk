@@ -876,7 +876,7 @@ Agent(
     17. Write `## Reviewer Brief` in research.md with intended scope, explicit non-goals, self-verified evidence, and reviewer focus.
     18. Write `## Risk-First Integration Probe` in plan.md: 1-3 rows of `assumption_id`, `class`, `risk`, `boundary`, `input`, `oracle`, `isolation`, `status`, `reason`, `evidence`. Name the riskiest implementation assumptions — composition-root boot with real restricted permissions, a browser → BFF → API minimal round trip, and in-flight state boundaries such as logout/cancel/account switch are the canonical examples.
     19. Classify every plan statement as `requirement_invariant`, `implementation_assumption`, or `verified_fact`. `status` is `PASS`, `FAIL`, or `not-run`; `PASS` requires an evidence ref from a real execution, `not-run` must carry a reason and is never treated as PASS, and doc-only/low-risk SPECs keep the section with one `not-run` row and the reason `no integration boundary`.
-    20. Record that an implementer-introduced constraint broader than the requirement (a new ACL, compatibility limit, or security limit) is a scope expansion that must be flagged and probed against the existing runtime before fan-out. `Phase 1.9: Risk-First Probe Gate` consumes this table, and each gate reports `required | not_applicable | blocked` with a reason (`reusable` is not a valid value in this release).
+    20. Record that an implementer-introduced constraint broader than the requirement (a new ACL, compatibility limit, or security limit) is a scope expansion that must be flagged and probed against the existing runtime before fan-out. `Phase 1.9: Risk-First Probe Gate` consumes this table, and each gate reports `required | reusable | not_applicable | blocked` with a reason — the value comes only from the `{SPEC_DIR}/gate-applicability.json` receipt written by `auto spec gates`, and `reusable` is granted by the classifier on matching exact-input evidence, never self-assigned.
     21. Apply Q-CORR-04, Q-COMP-05, Q-COMP-06, and Q-COMP-08 from `.claude/rules/autopus/spec-quality.md` during Self-Verify Summary.
     22. For greenfield/new project/scaffold work, apply techstack-freshness and write `## Technology Stack Decision` in research.md or prd.md with concrete stable versions, source refs, checked_at, and rejected alternatives.
     23. For prompt-state work, record the prompt layer manifest contract: stable instructions, frozen snapshot recall, ephemeral request/evidence, and cache invalidation scope.
@@ -1525,7 +1525,16 @@ WHEN Phase 1.8 completes (or is skipped), THE SYSTEM SHALL consume the `## Risk-
 3. **Keep honest not-run**: a row that stays `not-run` keeps its reason and travels into the handoff as an explicit limitation; it is never reported as `PASS`
 4. **Bounded re-plan**: on `FAIL` for a high or critical assumption, return to planning and revise `plan.md`; this is bounded to 1 re-plan, and a second `FAIL` surfaces to the user instead of a third attempt
 
-Gate applicability: `required` whenever the change touches an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep one `not-run` row with the reason `no integration boundary`; `blocked` when the fixture or environment is missing. Mandatory safety gates (`security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`) can never be `not_applicable`, and `reusable` is not a valid value in this release.
+Gate applicability comes from the receipt, not from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
+
+- `risk_first_probe` is `required` whenever the change touches an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep one `not-run` row with the reason `no integration boundary`; `blocked` when the fixture or environment is missing.
+- `reusable` is now a valid value, but only when the receipt grants it: a prior `{SPEC_DIR}/gates/evidence-<gate>.json` whose `input_closure_sha256` still matches the current tree, with `status: pass`, `complete: true`, and `observed_at` inside `--max-age` (default 168h). Its `input_globs` are re-expanded, so an added file invalidates evidence exactly like an edit. Any dependency change, `fail`, `partial`, missing input, or stale receipt returns `required` with the failed condition named. Never self-assign `reusable`.
+- After each real build/test/UX execution, record evidence with `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`, so the next run reuses exact-input evidence instead of repeating the work.
+- Mandatory safety gates (`security`, `validation`, `data_loss`, `deterministic_oracle`) can never be `not_applicable`. `accessibility` and `ux_verification` are `required` when the change set contains UI paths and `not_applicable` with the reason `no UI surface in change set` otherwise — only the classifier decides that.
+- When `autopus.yaml` sets `verify.capture: no-capture`, UX verification takes no screenshots and the oracles `dom_geometry`, `accessibility_tree`, `keyboard_navigation`, and `state_transition` all become required; a UX PASS is forbidden while any is missing (`blocked` naming the kind).
+- Mirror each decision into telemetry: `auto telemetry record --spec-id {SPEC_ID} --action gate --gate <id> --applicability <value> [--resolved]`.
+
+At the first probe row that returns `PASS` — or at the first real integration execution when every row stays `not-run` — record `auto telemetry record --spec-id {SPEC_ID} --action milestone --name first_vertical_slice`. Recording it after the fact makes `time_to_first_slice` unmeasurable.
 
 An implementer-introduced constraint broader than the requirement (new ACL, compatibility limit, security limit) is a scope expansion: probe it against the existing runtime here, before fan-out multiplies the assumption across workers.
 
@@ -1752,6 +1761,8 @@ Both must return APPROVE/PASS for the gate to pass. If results conflict, Lead co
 - **Both APPROVE/PASS** → pipeline complete
 - **Either REQUEST_CHANGES/FAIL** → spawn executor to fix consolidated issues, then re-review (up to 2 retries)
 
+Re-review is verify mode over the frozen checklist of open findings, not a second discovery pass. Read `discovery_repeat_detected`, `repeat_discovery_count`, and `same_input_rereview` from `{SPEC_DIR}/review-receipt.json`: a finding absent from the prior checklist but matching a prior finding by normalized title or by the same file and line is a `repeat`, not new. WHEN `discovery_repeat_detected` is true, THE SYSTEM SHALL NOT re-run discovery on the same input — resolve the open findings or defer them explicitly with a reason, then re-verify only the touched scope. Record every re-read or re-run of already-verified input with `auto telemetry record --spec-id {SPEC_ID} --action action --kind reread|rerun --target <path|cmd> --reason <text>`.
+
 WHEN `LOOP_MODE = true`: extend review retry limit to 3. Display RALF iteration status after each retry. Apply circuit breaker if 3 consecutive identical issues.
 
 **Review failure recovery (retries exceeded):**
@@ -1857,7 +1868,7 @@ Before displaying completion output, verify ALL phases were evaluated:
 - [ ] Phase 1.5: Test Scaffold — completed OR skipped (--skip-scaffold)
 - [ ] Gate 1: Approval — completed OR skipped (AUTO_MODE)
 - [ ] Phase 1.8: Doc Fetch — completed OR skipped (no external libs)
-- [ ] Phase 1.9: Risk-First Probe Gate — probe rows executed, or carried as explicit `not-run` with reason
+- [ ] Phase 1.9: Risk-First Probe Gate — probe rows executed, or carried as explicit `not-run` with reason; `{SPEC_DIR}/gate-applicability.json` written by `auto spec gates`
 - [ ] Phase 2: Implementation — all tasks completed
 - [ ] Phase 2.1: Worktree Merge — completed (if parallel tasks existed) OR N/A
 - [ ] Gate 2: Validation — PASS
@@ -1866,6 +1877,7 @@ Before displaying completion output, verify ALL phases were evaluated:
 - [ ] Gate 3: Coverage — 85%+ verified (or N/A for harness-only)
 - [ ] Phase 4: Review — APPROVE
 - [ ] Sync Readiness Gate — `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `spec_status_after_go`, and `sync_evidence_refs` recorded
+- [ ] Lead-Time Telemetry — `auto telemetry leadtime [--run {SPEC_ID}] [--baseline <SPEC-ID|dir>]` reported first-slice/completion lead time and `critical_path`, with no increase in `escaped_defects` or `unresolved_safety_gates`
 
 IF any item is unchecked → return to that phase/gate. Do NOT display Completion Guidance.
 
@@ -1901,6 +1913,8 @@ sync_ready: yes
 sync_blockers: none
 spec_status_after_go: implemented
 sync_evidence_refs: {changed_files, verification_commands, review_verdict, ax_result}
+lead_time: first_slice {dur}, completion {dur}, critical_path {phase → phase → phase}
+telemetry_regression: no (escaped_defects {N}, unresolved_safety_gates {N} vs baseline)
 다음 단계: /auto sync {SPEC-ID}
 ```
 

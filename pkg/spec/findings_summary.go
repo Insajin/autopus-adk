@@ -69,3 +69,18 @@ func (s FindingsSummary) Format() string {
 	}
 	return fmt.Sprintf("%d unique (%s)", s.Total, strings.Join(parts, ", "))
 }
+
+// RepeatDiscoverySummary renders the review-convergence line operators need
+// when the loop rediscovers known ground: "repeat discoveries: 2 (same input:
+// yes)". It returns "" when neither signal fired, so callers print nothing on a
+// healthy run instead of a reassuring zero.
+func RepeatDiscoverySummary(count int, sameInput bool) string {
+	if count == 0 && !sameInput {
+		return ""
+	}
+	answer := "no"
+	if sameInput {
+		answer = "yes"
+	}
+	return fmt.Sprintf("repeat discoveries: %d (same input: %s)", count, answer)
+}

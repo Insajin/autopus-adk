@@ -88,7 +88,14 @@ Phase 1.8 이후, Phase 2 fan-out 전에 메인 세션에서 실행합니다. �
 - high/critical 가정이 `FAIL`이면 planning으로 돌아가 `plan.md`를 수정합니다. re-plan은 최대 1회이며, 두 번째 `FAIL`은 세 번째 시도 대신 사용자에게 surface합니다.
 - 구현자가 요구사항보다 넓은 제약(신규 ACL, 호환성 제한, 보안 제한)을 도입하면 scope expansion이므로 fan-out 전에 기존 런타임에서 probe합니다.
 
-Gate applicability: 통합 경계가 있으면 `required`, doc-only 또는 low-risk면 `not_applicable`(단, `not-run` 한 행과 `no integration boundary` 이유 유지), fixture/환경이 없으면 `blocked`입니다. `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle`은 `not_applicable`이 될 수 없고, `reusable`은 이 릴리스에서 유효한 값이 아닙니다.
+Gate applicability는 에이전트 판단이 아니라 receipt에서 옵니다. Phase 2 fan-out 전에 `auto spec gates {SPEC_ID} --base <ref>`(또는 `--changed p1,p2,...`)를 실행하면 `{SPEC_DIR}/gate-applicability.json`이 `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync` 전체에 대해 작성되고, 모든 worker 프롬프트가 그 결정을 `gate: applicability — reason`으로 전달합니다.
+
+- `risk_first_probe`: 통합 경계가 있으면 `required`, doc-only 또는 low-risk면 `not_applicable`(단, `not-run` 한 행과 `no integration boundary` 이유 유지), fixture/환경이 없으면 `blocked`.
+- `reusable`은 receipt가 부여할 때만 유효합니다. 직전 `{SPEC_DIR}/gates/evidence-<gate>.json`의 `input_closure_sha256`이 현재 트리와 일치하고 `status: pass`, `complete: true`, `observed_at`이 `--max-age`(기본 168h) 안일 때만입니다. `input_globs`를 재확장하므로 파일 추가도 수정과 동일하게 evidence를 무효화하며, 의존성 변경·`fail`·`partial`·누락 입력·만료 receipt는 실패 조건을 명시한 `required`가 됩니다. 에이전트가 `reusable`을 자체 부여하지 않습니다.
+- 실제 build/test/UX 실행 직후 `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`로 evidence를 기록합니다.
+- `security`, `validation`, `data_loss`, `deterministic_oracle`은 `not_applicable`이 될 수 없습니다. `accessibility`와 `ux_verification`은 변경 집합에 UI 경로가 있으면 `required`, 없으면 `no UI surface in change set` 이유의 `not_applicable`이며 classifier만 판단합니다.
+- `autopus.yaml`에 `verify.capture: no-capture`가 설정되면 스크린샷 없이 검증하고 `dom_geometry`, `accessibility_tree`, `keyboard_navigation`, `state_transition` 네 oracle이 모두 필수가 됩니다. 하나라도 없으면 UX PASS는 금지이며 kind를 명시한 `blocked`로 보고합니다.
+- 각 결정은 `auto telemetry record --spec-id {SPEC_ID} --action gate --gate <id> --applicability <value> [--resolved]`로 기록하고, 첫 probe `PASS`(모든 행이 `not-run`이면 첫 실제 통합 실행) 시점에 `auto telemetry record --spec-id {SPEC_ID} --action milestone --name first_vertical_slice`를 기록합니다.
 
 ## Frontend Design Preflight
 
@@ -235,7 +242,7 @@ approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 curre
 - [ ] Phase 1.5: Test Scaffold 완료 또는 `--skip-scaffold`
 - [ ] Gate 1: Approval 완료 또는 `--auto`
 - [ ] Phase 1.8: Doc Fetch 완료 또는 skip
-- [ ] Phase 1.9: Risk-First Probe Gate 완료 (executed 또는 이유가 있는 `not-run`)
+- [ ] Phase 1.9: Risk-First Probe Gate 완료 (executed 또는 이유가 있는 `not-run`)이며 `auto spec gates`가 `{SPEC_DIR}/gate-applicability.json`을 작성
 - [ ] Phase 2: Implementation 완료
 - [ ] Gate 2: Validation PASS
 - [ ] Phase 2.5: Annotation 완료
@@ -244,6 +251,7 @@ approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 curre
 - [ ] Phase 4: Review APPROVE
 - [ ] Sync Readiness Gate PASS (`completion_verdict_preview`, `sync_ready`, `sync_blockers`, `spec_status_after_go`, `sync_evidence_refs` 기록)
 - [ ] subagent_dispatch_count 기록, role 목록, degraded-mode 상태 확인
+- [ ] `auto telemetry leadtime [--run {SPEC_ID}] [--baseline <SPEC-ID|dir>]`로 first-slice/completion lead time과 `critical_path`를 보고하고 `escaped_defects`·`unresolved_safety_gates` 증가 없음 확인
 
 하나라도 비어 있으면 sync 단계 안내로 넘어가지 않습니다.
 
@@ -298,6 +306,8 @@ approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 curre
 - 수동 개입은 요구사항 충돌, 외부 credential/승인 필요, retry budget 소진, circuit break 같은 실제 blocker일 때만 허용합니다.
 - `Completion Handoff Gates`와 `Final Output Contract`는 terminal state에서만 사용합니다. review finding이 아직 fixable한데 `@auto go --continue` 또는 수동 review를 next step으로 제시하면 안 됩니다.
 - `go` 성공의 terminal handoff는 `@auto sync {SPEC-ID}` 까지입니다. `go`가 `sync`를 자동 호출하지는 않지만, review 수렴 전에는 sync handoff도 출력하지 않습니다.
+- 재리뷰는 frozen open-finding checklist에 대한 verify mode입니다. `{SPEC_DIR}/review-receipt.json`의 `discovery_repeat_detected`, `repeat_discovery_count`, `same_input_rereview`를 읽고, 이전 checklist에 없지만 정규화된 title 또는 같은 file+line으로 이전 finding과 매칭되면 신규가 아니라 repeat으로 분류합니다. repeat이 감지되면 같은 입력으로 discovery를 다시 돌리지 않고 open finding을 해결하거나 이유를 명시해 defer합니다.
+- 이미 검증된 입력을 다시 읽거나 통과한 검사를 다시 실행하면 `auto telemetry record --spec-id {SPEC_ID} --action action --kind reread|rerun --target <path|cmd> --reason <text>`를 기록합니다.
 
 ## 품질 기준
 

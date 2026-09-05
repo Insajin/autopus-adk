@@ -32,6 +32,7 @@ type specReviewLoopParams struct {
 
 func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFindings []spec.ReviewFinding) (*spec.ReviewResult, error) {
 	var finalResult *spec.ReviewResult
+	repeats := &specReviewRepeatTracker{specDir: p.specDir}
 
 	for revision := 0; revision <= p.maxRevisions; revision++ {
 		// REQ-02: reload spec on each revision so external edits are picked up.
@@ -42,6 +43,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			}
 			doc = reloaded
 		}
+		repeats.beginRevision()
 
 		prompt, staticFindings, err := buildSpecReviewProviderPrompt(p, doc, priorFindings, revision)
 		if err != nil {
@@ -126,8 +128,9 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			providerFindings = append(providerFindings, r.Findings)
 		}
 
+		var mergeRepeats []spec.RepeatDiscovery
 		if len(priorFindings) > 0 {
-			allFindings = mergeVerifyFindings(providerFindings, priorFindings, len(reviews), p.threshold)
+			allFindings, mergeRepeats = mergeVerifyFindings(providerFindings, priorFindings, len(reviews), p.threshold, revision)
 		} else {
 			allFindings = mergeDiscoverFindings(allFindings, len(reviews), p.threshold, finalVerdict)
 		}
@@ -152,6 +155,10 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		if merged.Judge != nil && merged.Judge.Status == "ok" {
 			merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
 		}
+
+		// Repeat discovery runs before scope lock: a restatement of a known
+		// finding must be classified as such, not as a brand-new observation.
+		repeats.apply(merged, priorFindings, revision, mergeRepeats)
 
 		// Apply scope lock in verify mode
 		if revision > 0 {
@@ -224,6 +231,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		priorFindings = merged.Findings
 	}
 
+	printSpecReviewRepeatSummary(os.Stdout, finalResult)
 	return finalResult, nil
 }
 

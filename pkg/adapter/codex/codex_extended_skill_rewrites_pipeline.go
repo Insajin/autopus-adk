@@ -190,7 +190,7 @@ Doc-fetch rules:
 - if Context7 fails, use web search with official docs, release notes, and API references first
 - cache only the minimum relevant excerpts under a ` + "`## Reference Documentation`" + ` section
 - do not block implementation when both Context7 and web fallback fail
-` + codexRiskFirstProbeGate() + `
+` + codexGateApplicabilityContract() + codexRiskFirstProbeGate() + `
 ### Phase 2: Implementation
 
 Parallel implementation is valid only with disjoint ownership. Prefer narrow workers over broad ones.
@@ -244,6 +244,8 @@ Run annotator after validation PASS. Harness-only markdown changes may skip this
 
 - Tester raises coverage and adds edge-case tests
 - Frontend-specialist runs only when changed files include frontend UI
+- When ` + "`autopus.yaml`" + ` sets ` + "`verify.capture: no-capture`" + `, screenshots are not taken and screenshot analysis is not evidence. The oracles ` + "`dom_geometry`" + `, ` + "`accessibility_tree`" + `, ` + "`keyboard_navigation`" + `, and ` + "`state_transition`" + ` all become required, and a UX PASS is forbidden while any is missing: report ` + "`blocked`" + ` naming the kind (` + "`missing_no_capture_oracle:<kind>`" + `). The default ` + "`screenshot`" + ` capture keeps the normal pipeline. See the frontend-specialist ` + "`No-Capture Contract`" + ` for the oracle definitions
+- ` + "`accessibility`" + ` and ` + "`ux_verification`" + ` applicability comes from the ` + "`auto spec gates`" + ` receipt; this phase never self-declares ` + "`not_applicable`" + `
 
 ### Gate 3: Acceptance Coverage
 
@@ -280,5 +282,7 @@ After fixes land, do a diff-only verification pass against the frozen checklist.
 - Stop review retries when the same unresolved finding repeats without material code change.
 - If findings remain actionable and retry budget remains, loop back to a focused fixer, then re-run validation/testing only for the touched scope before returning here.
 - Under ` + "`--auto --loop`" + `, keep this repair -> validate -> verify cycle inside the same session. Only stop for a real blocker, exhausted retry budget, or circuit break.
-` + codexAgentPipelineSkillBodyCompletion()
+
+Re-review is verify mode over the frozen checklist, not a second discovery pass. Read ` + "`discovery_repeat_detected`" + `, ` + "`repeat_discovery_count`" + `, and ` + "`same_input_rereview`" + ` from ` + "`{SPEC_DIR}/review-receipt.json`" + `: a finding absent from the prior checklist but matching a prior finding by normalized title or by the same file and line is a repeat, not new. When a repeat is detected, do not re-run discovery on the same input — resolve the open findings or defer them explicitly with a reason.
+` + codexLeadTimeTelemetryContract() + codexAgentPipelineSkillBodyCompletion()
 }

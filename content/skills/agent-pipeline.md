@@ -131,13 +131,20 @@ The terminal handoff must include a concise receipt of important choices, for ex
 
 ## Gate Applicability
 
-Every phase gate records its applicability in the handoff as `required | not_applicable | blocked` plus a reason. `reusable` is intentionally not a valid value in this release: no exact-input evidence engine exists, so claiming a gate was satisfied by earlier evidence would be unverifiable.
+Every phase gate records its applicability in the handoff as `gate: applicability — reason`, drawn from `required | reusable | not_applicable | blocked`. Applicability is a deterministic classifier decision, never an agent judgement: `auto spec gates <SPEC-ID> --base <ref>` (or `--changed p1,p2,...`) writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`.
 
 - `required`: the gate applies and must return a verdict from a real execution.
-- `not_applicable`: the gate has no surface in this change. Mandatory safety gates — `security`, `validation`, `accessibility`, `data-loss`, `deterministic-oracle` — can never be `not_applicable`.
+- `reusable`: valid only when `gate-applicability.json` says so. The classifier grants it when a prior `{SPEC_DIR}/gates/evidence-<gate>.json` receipt carries the same `input_closure_sha256` recomputed from the current tree, `status: pass`, `complete: true`, and an `observed_at` inside `--max-age` (default 168h). The receipt's `input_globs` are re-expanded against the current tree, so an added file invalidates evidence just like an edit or a deletion. Any dependency change, `fail`, `partial`, missing input, or stale receipt yields `required` whose reason names the failed condition — `no prior evidence`, `input closure changed`, `prior status fail`, `prior evidence partial`, `evidence older than max-age`, or `missing input <path>`. Agents never self-assign `reusable`.
+- `not_applicable`: the gate has no surface in this change. The mandatory safety gates `security`, `validation`, `data_loss`, and `deterministic_oracle` are never `not_applicable`; they may only be `required`, `reusable`, or `blocked`. `accessibility` and `ux_verification` are `required` when the change set contains UI paths, and `not_applicable` with the reason `no UI surface in change set` otherwise — only the classifier may decide that.
 - `blocked`: the gate applies but its input is unavailable. Auxiliary steps report `blocked` with a named fallback instead of stalling the pipeline; for example @AX annotation whose reference source or annotator surface is missing reports `blocked` with the fallback "record modified files, defer tagging" rather than looping.
 
 An auxiliary step that is genuinely a no-op (nothing to annotate) is `not_applicable`; one whose reference source is missing is `blocked`. Collapsing the two hides a setup gap behind a green gate.
+
+Supervisor duties around the receipt:
+
+1. Run `auto spec gates <SPEC-ID> --base <ref>` before the Phase 2 fan-out and carry the resulting decisions into every worker prompt.
+2. After each real build/test/UX execution, record its evidence with `auto spec gates record <SPEC-ID> --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`, so the next run can reuse exact-input evidence instead of repeating the work.
+3. Mirror every decision into telemetry with `auto telemetry record --spec-id <SPEC-ID> --action gate --gate <id> --applicability <value> [--resolved]`.
 
 ## Pipeline Overview
 
@@ -372,7 +379,9 @@ Step 4: On FAIL for a high or critical assumption, return to planning and
 Step 5: Only then dispatch Phase 2
 ```
 
-Gate applicability: `required` for any change with an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep the section with one `not-run` row and the reason `no integration boundary`. A probe that cannot run because its fixture or environment is missing is `blocked` with the reason recorded, not `not_applicable`.
+Gate applicability: `required` for any change with an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep the section with one `not-run` row and the reason `no integration boundary`. A probe that cannot run because its fixture or environment is missing is `blocked` with the reason recorded, not `not_applicable`. The verdict comes from `auto spec gates`, which the supervisor runs here — before the Phase 2 fan-out — so the `risk_first_probe` decision and every other gate decision in `{SPEC_DIR}/gate-applicability.json` can ride along in each worker prompt.
+
+At the first probe row that returns `PASS` — or, when every row is honestly `not-run`, at the first real integration execution later in the pipeline — record `auto telemetry record --spec-id <SPEC-ID> --action milestone --name first_vertical_slice`. That milestone is the lead-time anchor; recording it after the fact makes `time_to_first_slice` unmeasurable.
 
 An implementer-introduced constraint broader than the requirement (a new ACL, compatibility limit, or security limit) is a scope expansion: add it as a probe row against the existing runtime and resolve it here, before fan-out multiplies the assumption across workers.
 
@@ -562,6 +571,10 @@ Activation conditions:
 - Skip if all changes are backend-only (.go, .md)
 - Missing design context is a skip, not an error; it must not block frontend verification.
 
+No-capture mode: when `autopus.yaml` sets `verify.capture: no-capture`, screenshots are not taken and screenshot analysis is not evidence. The four oracles `dom_geometry`, `accessibility_tree`, `keyboard_navigation`, and `state_transition` are then REQUIRED, and a UX PASS is forbidden while any of them is missing — report `blocked` naming the missing kind (`missing_no_capture_oracle:<kind>`) instead. `verify.capture: screenshot` (the default when the key is absent) keeps the screenshot pipeline above. See the frontend-specialist `No-Capture Contract` section for the oracle definitions.
+
+Both `accessibility` and `ux_verification` applicability come from `auto spec gates`; this phase never self-declares `not_applicable`.
+
 Phase 3.5 does NOT renumber existing phases. Testing remains Phase 3, Review remains Phase 4.
 
 ### Phase 3: Testing
@@ -619,6 +632,10 @@ Freeze the review output into a checklist of open findings.
 - If the checklist still contains actionable findings and the retry budget remains, immediately delegate a focused fixer/executor task inside the same invocation.
 - Keep the checklist stable across retries unless the patch meaningfully changes scope.
 - Do not ask the user to manually fix, rerun, or confirm while the next repair step is still actionable within the current `/auto go` invocation.
+
+Re-review is verify mode over that frozen checklist, not a second discovery pass. The supervisor reads `discovery_repeat_detected`, `repeat_discovery_count`, and `same_input_rereview` from `{SPEC_DIR}/review-receipt.json`: a finding that is absent from the prior checklist but matches a prior finding by normalized title or by the same file and line is a `repeat`, not a new finding. WHEN `discovery_repeat_detected` is true, THE SYSTEM SHALL NOT re-run discovery on the same input — resolve the open findings or defer them explicitly with a reason, then re-verify only the touched scope.
+
+> **⏭ POST-PHASE**: Review converged (APPROVE, or open findings explicitly deferred). NEXT REQUIRED STEP: Completion telemetry and the sync-readiness handoff.
 
 ## Parallel vs Sequential Decision Criteria
 
@@ -746,6 +763,23 @@ Required fields:
 
 If `sync_ready` is not `yes`, stop before the workflow lifecycle bar and report the blocker. Do not hand off to `/auto sync` until the implementation scope is closed.
 
+## Lead-Time Telemetry
+
+Lead time is only measurable if the pipeline records it while it runs. Every `auto telemetry record --spec-id <SPEC-ID> --action <kind>` subrecord below is written at the moment the event happens, never reconstructed at the end:
+
+| Event | `--action` and flags |
+|---|---|
+| planning produces an estimate | `--action estimate --min 30m --max 2h` |
+| first probe PASS or first real integration execution | `--action milestone --name first_vertical_slice` |
+| an already-verified input is re-read or a passing check is re-run | `--action action --kind reread\|rerun --target <path\|cmd> --reason <text>` |
+| a defect is found | `--action defect --id <id> --discovered-phase <phase> [--fixed-phase <phase>] [--files N] [--escaped] [--repeat]` |
+| any gate decision from `auto spec gates` | `--action gate --gate <id> --applicability required\|reusable\|not_applicable\|blocked [--resolved]` |
+| a phase starts with known predecessors | `--action start --phase <phase> --depends-on <phase,...>` |
+
+`--depends-on` (valid on `--action start` and `--action agent`, alongside `--phase`) is what makes the phase DAG real: the critical path is the longest wall-clock path through that DAG, not the sum of phase durations, so a parallel fan-out must not be reported as serial cost.
+
+The completion summary runs `auto telemetry leadtime [--run <SPEC-ID>] [--baseline <SPEC-ID|dir>] [--json]` — with `--baseline` whenever a prior run exists — and reports `time_to_first_slice`, completion lead time, `critical_path`, `reread_count`/`rerun_count` by reason, `defects_by_discovery_phase`, `repeat_finding_rate`, `estimate_vs_actual`, and explicitly that `escaped_defects` and `unresolved_safety_gates` did not increase against the baseline. `regression: true` with a non-zero exit means one of those two went up; that is a completion blocker, not a note.
+
 ## Result Integration and Completion
 
 Once all Phases are complete:
@@ -773,6 +807,8 @@ sync_ready: yes
 sync_blockers: none
 spec_status_after_go: implemented
 decision_receipt: reused existing code/helper/pattern; skipped unjustified dependency or abstraction; minimum sufficient verification selected
+lead_time: first_slice <dur>, completion <dur>, critical_path <phase → phase → phase>
+telemetry_regression: no (escaped_defects <N>, unresolved_safety_gates <N> vs baseline)
 
 Completed Files:
 - <file path 1>
@@ -783,7 +819,8 @@ Completed Files:
 
 - [ ] All Phases executed in order
 - [ ] PASS verdict received at each Gate
-- [ ] Phase 1.9 probe gate closed: every row executed, or carried as an explicit `not-run` with a reason and a `required | not_applicable | blocked` applicability verdict
+- [ ] Phase 1.9 probe gate closed: every row executed, or carried as an explicit `not-run` with a reason and a `required | reusable | not_applicable | blocked` applicability verdict from `gate-applicability.json`
+- [ ] `auto telemetry leadtime` reported first-slice/completion lead time and critical path, with no increase in `escaped_defects` or `unresolved_safety_gates`
 - [ ] Coverage 85%+ confirmed
 - [ ] subagent_dispatch_count recorded, roles listed, degraded-mode state explicit
 - [ ] Sync Readiness Gate passed with `completion_verdict_preview` recorded

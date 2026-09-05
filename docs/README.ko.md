@@ -1186,12 +1186,12 @@ auto sync verify --spec SPEC-HOOK-001 --strict
 | `auto doctor` | 상태 진단 |
 | `auto platform` | 플랫폼 관리 (list / add / remove) |
 | `auto arch` | 아키텍처 분석 (generate / enforce) |
-| `auto spec` | SPEC 관리 (new / validate / review) |
+| `auto spec` | SPEC 관리 (new / validate / review / gates — exact-input 증거 재사용을 포함한 gate applicability receipt) |
 | `auto lore` | 의사결정 추적 (context / commit / validate / stale) |
 | `auto orchestra` | 멀티 모델 오케스트레이션 (review / plan / secure / brainstorm / job-status / job-wait / job-result) |
 | `auto setup` | 프로젝트 컨텍스트 문서 (generate / update / validate / status) |
 | `auto status` | SPEC 대시보드 (done / in-progress / draft) |
-| `auto telemetry` | 파이프라인 텔레메트리 (record / summary / cost / compare) |
+| `auto telemetry` | 파이프라인 텔레메트리 (record / summary / cost / compare / leadtime — first-slice·critical-path 리드타임과 baseline 회귀 게이트) |
 | `auto skill` | 스킬 관리 (list / info / create) |
 | `auto search` | 지식 검색 (Exa) |
 | `auto docs` | 라이브러리 문서 조회 (Context7) |

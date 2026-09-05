@@ -3,6 +3,10 @@ package spec
 // MergeFindingStatuses applies supermajority merge across providers.
 // threshold: fraction of providers that must agree (e.g., 0.67 for 2/3).
 // resolved requires >= threshold agreement; regressed > open in priority.
+// A finding no provider voted on keeps a terminal non-blocking status: an
+// out_of_scope or deferred finding carried into the next revision must not
+// silently return as open, which would make the review loop rediscover its own
+// scope-lock and repeat-discovery verdicts forever.
 func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) []ReviewFinding {
 	if len(providerResults) == 0 {
 		return nil
@@ -32,20 +36,28 @@ func MergeFindingStatuses(providerResults [][]ReviewFinding, threshold float64) 
 
 		resolvedCount := 0
 		regressedCount := 0
+		openCount := 0
 		for _, f := range group {
-			if f.Status == FindingStatusResolved {
+			switch f.Status {
+			case FindingStatusResolved:
 				resolvedCount++
-			}
-			if f.Status == FindingStatusRegressed {
+			case FindingStatusRegressed:
 				regressedCount++
+			case FindingStatusOpen:
+				openCount++
 			}
 		}
 
-		if float64(resolvedCount)/total+supermajorityTolerance >= threshold {
+		switch {
+		case float64(resolvedCount)/total+supermajorityTolerance >= threshold:
 			base.Status = FindingStatusResolved
-		} else if regressedCount > 0 {
+		case regressedCount > 0:
 			base.Status = FindingStatusRegressed
-		} else {
+		case openCount > 0:
+			base.Status = FindingStatusOpen
+		case base.Status == FindingStatusOutOfScope || base.Status == FindingStatusDeferred:
+			// No provider reported on it; keep the non-blocking verdict.
+		default:
 			base.Status = FindingStatusOpen
 		}
 

@@ -273,6 +273,9 @@ func (c *HarnessConfig) Validate() error {
 	if err := c.Workflow.Validate(); err != nil {
 		return err
 	}
+	if err := c.Verify.Validate(); err != nil {
+		return err
+	}
 	return nil
 }
 

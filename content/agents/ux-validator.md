@@ -102,6 +102,21 @@ UX 인텔리전스:
 - FAIL 항목: 수동 개입 필요
 ```
 
+## No-Capture Contract
+
+When `verify.capture: no-capture` is set, no screenshot exists to look at. Analyze the four semantic oracle reports instead of images, and never ask for a screenshot to be taken.
+
+| Oracle | Evidence kind | What to check in the report |
+|--------|---------------|-----------------------------|
+| DOM geometry | `dom_geometry` | Bounding boxes overlap, overflow, or leave the viewport; touch targets below the declared minimum |
+| Accessibility tree | `accessibility_tree` | Changed controls missing a role, an accessible name, or a state the flow exposes |
+| Keyboard navigation | `keyboard_navigation` | Tab order skips or traps a control, or focus-visible is absent |
+| State transition | `state_transition` | A declared transition such as loading->ready or logout->cleared has no asserted post-state |
+
+Report `Capture: no-capture` and `oracles_collected:[...]` in the result, and apply the same PASS / WARN / FAIL judgement to oracle findings that would be applied to a screenshot finding.
+
+A PASS is forbidden while any of the four oracles is missing from the report: return `missing_no_capture_oracle:<kind>` for the first missing kind in the order above and treat the run as blocked rather than passing on partial evidence.
+
 ## 제약
 
 - 스크린샷 분석만 수행 (코드 수정 불가)

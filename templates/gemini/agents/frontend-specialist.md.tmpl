@@ -216,6 +216,21 @@ Auto-fix strategies by category:
 - **State visibility gap**: Add explicit state styles using existing primitives/tokens
 - **Pattern/style mismatch**: Align with existing design tokens or reduce mismatched ornamentation
 
+## No-Capture Contract
+
+When `verify.capture: no-capture` is set in `autopus.yaml`, this agent runs without pixels: do NOT call `page.screenshot`, `toHaveScreenshot`, or any trace/video capture. Steps 3 and 4 are replaced by the four semantic oracles below, and every one of them is required.
+
+| Oracle | Evidence kind | What it replaces the screenshot with |
+|--------|---------------|--------------------------------------|
+| DOM geometry | `dom_geometry` | Bounding boxes from `boundingBox()` / `getBoundingClientRect`, with overlap, overflow, and viewport-escape assertions |
+| Accessibility tree | `accessibility_tree` | `page.accessibility.snapshot()` or ARIA snapshot, with role and accessible-name assertions on every changed control |
+| Keyboard navigation | `keyboard_navigation` | Tab-order traversal with focus-visible assertions on each reachable control |
+| State transition | `state_transition` | Observable transitions such as loading->ready, error->recovered, or logout->cleared, each asserting the post-state |
+
+Report the collected set as `oracles_collected:[dom_geometry, accessibility_tree, keyboard_navigation, state_transition]` and record `Capture: no-capture` in the result block.
+
+A UX PASS is forbidden while any of the four is missing. Report `Status: BLOCKED` with `missing_no_capture_oracle:<kind>` naming the first missing kind in the order above, and never report `Verdict: PASS` from an incomplete oracle set — a missing oracle is a collection gap, not a pass with less evidence.
+
 ## Output Format
 
 ```
@@ -223,6 +238,8 @@ Auto-fix strategies by category:
 - Verdict: PASS / WARN / FAIL
 - Status: DONE / PARTIAL / BLOCKED
 - Screenshots Analyzed: N
+- Capture: screenshot / no-capture
+- Oracles Collected: [oracles_collected list, or n/a in screenshot mode]
 - Design Context: [source path or skipped reason]
 - UX Intelligence: [source/inferred/skipped + surface type + pattern]
 - Design Pack: [available / setup gaps]

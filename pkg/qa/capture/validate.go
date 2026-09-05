@@ -61,6 +61,9 @@ func Validate(index Index) error {
 	if err := validateMedia(index.Media); err != nil {
 		return err
 	}
+	if err := validateOracles(index.Oracles); err != nil {
+		return err
+	}
 	if err := validateReplay(index.Replay); err != nil {
 		return err
 	}

@@ -125,13 +125,27 @@ Required return fields:
 
 ## Gate Applicability
 
-Every phase gate records `required | not_applicable | blocked` plus a reason in its handoff.
-`reusable` is intentionally not valid in this release: no exact-input evidence engine exists, so
-reusing an earlier verdict would be unverifiable. The mandatory safety gates `security`,
-`validation`, `accessibility`, `data-loss`, and `deterministic-oracle` can never be
-`not_applicable`. An auxiliary step reports `blocked` with a named fallback instead of stalling:
-@AX annotation with a missing reference source is `blocked`, while having nothing to annotate is
+Every phase gate records `gate: applicability — reason` from `required | reusable | not_applicable |
+blocked`. The value is a deterministic classifier decision, never a worker judgement: before the
+Phase 2 fan-out the main session runs `auto spec gates <SPEC-ID> --base <ref>` (or `--changed
+p1,p2,...`), which writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set
+`risk_first_probe, build, unit_tests, integration, security, validation, data_loss,
+deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and
+carries those decisions into every worker prompt. `security`, `validation`, `data_loss`, and
+`deterministic_oracle` are never `not_applicable`; `accessibility` and `ux_verification` are
+`required` when the change set has UI paths and `not_applicable` reasoned `no UI surface in change
+set` otherwise. An auxiliary step reports `blocked` with a named fallback rather than stalling: @AX
+annotation with a missing reference source is `blocked`, having nothing to annotate is
 `not_applicable`.
+
+`reusable` comes only from that receipt: a prior `{SPEC_DIR}/gates/evidence-<gate>.json` whose
+`input_closure_sha256` still matches the current tree, with `status: pass`, `complete: true`, and
+`observed_at` inside `--max-age` (default 168h). Its `input_globs` are re-expanded, so an added file
+invalidates evidence like an edit; any dependency change, `fail`, `partial`, missing input, or stale
+receipt returns `required` naming the failed condition, and workers never self-assign `reusable`.
+After each real build/test/UX execution, record evidence with `auto spec gates record <SPEC-ID>
+--gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command
+"<text>"]` so the next run reuses exact-input evidence instead of repeating it.
 
 ## Model and Thinking Policy
 
@@ -199,9 +213,12 @@ into the handoff as an explicit limitation, never as `PASS`. On `FAIL` for a hig
 assumption, revise `plan.md` once; a second `FAIL` surfaces to the user. An implementer-introduced
 constraint broader than the requirement is a scope expansion: probe it here, before fan-out. This
 gate belongs to the default prompt-driven pipeline; the deterministic Route A / Route Team
-contracts are unchanged. Applicability is `required` at an integration boundary,
-`not_applicable` only for a doc-only or low-risk SPEC that keeps one `not-run` row reasoned
-`no integration boundary`, and `blocked` when the fixture or environment is missing.
+contracts are unchanged. `auto spec gates`, run here so the whole receipt rides into the fan-out,
+decides `risk_first_probe`: `required` at an integration boundary, `not_applicable` only for a
+doc-only or low-risk SPEC that keeps one `not-run` row reasoned `no integration boundary`, and
+`blocked` when the fixture or environment is missing. At the first probe row that returns `PASS` —
+or the first real integration execution when every row is honestly `not-run` — record
+`auto telemetry record --spec-id <SPEC-ID> --action milestone --name first_vertical_slice`.
 
 ## Phase 2: Implementation
 
@@ -247,6 +264,12 @@ For UI changes, dispatch the discovered UX/design role and exercise the rendered
 available browser or application surface. Accessibility, responsive layout, interaction states,
 and visual regressions are blocking when required by acceptance.
 
+When `autopus.yaml` sets `verify.capture: no-capture`, screenshots are not taken and screenshot
+analysis is not evidence: the oracles `dom_geometry`, `accessibility_tree`, `keyboard_navigation`,
+and `state_transition` all become required, and a UX PASS is forbidden while any is missing —
+report `blocked` naming the kind (`missing_no_capture_oracle:<kind>`). Default `screenshot` capture
+keeps the pipeline above. See the frontend-specialist `No-Capture Contract` for oracle definitions.
+
 ## Phase 4: Review
 
 Dispatch `reviewer` and `security-auditor` in one parallel batch with disjoint read-only scopes.
@@ -256,6 +279,12 @@ original executor through `hub`, followed by validator and reviewer rechecks.
 
 Risk-tiered external provider review is advisory evidence. It never overrides deterministic gates,
 security findings, or failed tests. Preserve dissent and report degraded provider coverage.
+
+Re-review is verify mode over the frozen open-finding checklist, not a second discovery pass. The
+main session reads `discovery_repeat_detected`, `repeat_discovery_count`, and `same_input_rereview`
+from `{SPEC_DIR}/review-receipt.json`; a finding absent from the prior checklist but matching a
+prior one by normalized title or same file and line is a repeat, not new. When detected, do not
+re-run discovery on the same input — resolve the open findings or defer them with a reason.
 
 ## Failure and Retry Policy
 
@@ -282,6 +311,22 @@ the current workspace execution-owner receipt and current-session OMP-native `hu
 Combine those sources to detect a competing DAG. The external CLI cannot inspect OMP user-session
 roots and must never pretend to replace native `hub` evidence.
 
+## Lead-Time Telemetry
+
+Record each event with `auto telemetry record --spec-id <SPEC-ID> --action <kind>` as it happens,
+never reconstructed at the end: `--action estimate --min 30m --max 2h` at planning; `--action
+milestone --name first_vertical_slice`; `--action action --kind reread|rerun --target <path|cmd>
+--reason <text>` whenever an already-verified input is re-read or a passing check re-run; `--action
+defect --id <id> --discovered-phase <phase> [--fixed-phase <phase>] [--files N] [--escaped]
+[--repeat]`; `--action gate --gate <id> --applicability <value> [--resolved]` per gate decision; and
+`--depends-on <phase,...>` with `--action start|agent --phase <phase>` so the DAG is real — the
+critical path is its longest wall-clock path, not the sum of phase durations. The completion summary
+runs `auto telemetry leadtime [--run <SPEC-ID>] [--baseline <SPEC-ID|dir>] [--json]`, using
+`--baseline` when a prior run exists, and reports `time_to_first_slice`, completion lead time,
+`critical_path`, reread/rerun counts by reason, `defects_by_discovery_phase`, `repeat_finding_rate`,
+`estimate_vs_actual`, and that `escaped_defects` and `unresolved_safety_gates` did not increase.
+`regression: true` with a non-zero exit is a completion blocker, not a note.
+
 ## Completion Gate
 
 Before returning success, the main session must:
@@ -292,7 +337,9 @@ Before returning success, the main session must:
 4. record changed files, exact verification commands, observed results, and every probe row that
    stayed `not-run` with its reason and applicability verdict;
 5. set `spec_status_after_go = implemented` only when the sync-readiness contract is satisfied;
-6. provide `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `decision_receipt`,
+6. report first-slice/completion lead time, critical path, and no increase in `escaped_defects` or
+   `unresolved_safety_gates`;
+7. provide `completion_verdict_preview`, `sync_ready`, `sync_blockers`, `decision_receipt`,
    `next_required_step`, and the surface-native `/auto sync <SPEC-ID>` handoff.
 
 No phase boundary, partial worker receipt, or degraded provider response is a completion point.

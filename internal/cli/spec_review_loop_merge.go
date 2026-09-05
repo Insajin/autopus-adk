@@ -9,14 +9,19 @@ import (
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
+// mergeVerifyFindings folds provider verify output into the prior checklist and
+// returns the restatements it absorbed. A finding whose content already exists
+// in the prior checklist is not added again, but it is reported as a repeat
+// discovery so the receipt can show the review re-found known ground.
 func mergeVerifyFindings(
 	providerFindings [][]spec.ReviewFinding,
 	priorFindings []spec.ReviewFinding,
 	totalProviders int,
 	threshold float64,
-) []spec.ReviewFinding {
+	revision int,
+) ([]spec.ReviewFinding, []spec.RepeatDiscovery) {
 	if len(providerFindings) == 0 {
-		return append([]spec.ReviewFinding(nil), priorFindings...)
+		return append([]spec.ReviewFinding(nil), priorFindings...), nil
 	}
 
 	priorIDs := make(map[string]struct{}, len(priorFindings))
@@ -28,6 +33,7 @@ func mergeVerifyFindings(
 
 	priorStatusInputs := make([][]spec.ReviewFinding, 0, len(providerFindings))
 	var newFindings []spec.ReviewFinding
+	var repeats []spec.RepeatDiscovery
 	for _, findings := range providerFindings {
 		var priorStatuses []spec.ReviewFinding
 		for _, f := range findings {
@@ -35,7 +41,10 @@ func mergeVerifyFindings(
 				priorStatuses = append(priorStatuses, f)
 				continue
 			}
-			if matchesPriorFindingContent(f, priorFindings) {
+			if matched, ok := priorFindingContentMatch(f, priorFindings); ok {
+				repeats = append(repeats, spec.RepeatDiscovery{
+					FindingID: f.ID, MatchedPriorID: matched.ID, Revision: revision,
+				})
 				continue
 			}
 			newFindings = append(newFindings, f)
@@ -47,7 +56,7 @@ func mergeVerifyFindings(
 	mergedNew := spec.MergeSupermajority(newFindings, totalProviders, threshold)
 	mergedNew = spec.DeduplicateFindings(mergedNew)
 	assignNewFindingIDs(mergedNew, maxFindingNumber(priorFindings)+1)
-	return append(merged, mergedNew...)
+	return append(merged, mergedNew...), spec.MergeRepeatDiscoveries(repeats)
 }
 
 type findingContentKey struct {
@@ -56,14 +65,16 @@ type findingContentKey struct {
 	description string
 }
 
-func matchesPriorFindingContent(f spec.ReviewFinding, priorFindings []spec.ReviewFinding) bool {
+// priorFindingContentMatch returns the prior finding an incoming finding
+// duplicates verbatim (same scope, category and normalized description).
+func priorFindingContentMatch(f spec.ReviewFinding, priorFindings []spec.ReviewFinding) (spec.ReviewFinding, bool) {
 	k := findingKey(f)
 	for _, prior := range priorFindings {
 		if findingKey(prior) == k {
-			return true
+			return prior, true
 		}
 	}
-	return false
+	return spec.ReviewFinding{}, false
 }
 
 func findingKey(f spec.ReviewFinding) findingContentKey {

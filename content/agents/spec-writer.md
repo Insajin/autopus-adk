@@ -166,7 +166,7 @@ Required ladder rows:
 - `status`는 `PASS`, `FAIL`, `not-run` 중 하나입니다. `PASS`는 실제 실행 evidence ref가 있을 때만 기록하고, `not-run`은 반드시 reason을 남기며 PASS로 승격되지 않습니다.
 - doc-only 또는 low-risk SPEC도 섹션을 유지하고 `not-run` 한 행과 `no integration boundary` 이유를 남깁니다.
 - 구현자가 요구사항보다 넓은 제약(신규 ACL, 호환성 제한, 보안 제한)을 도입하면 그것은 scope expansion입니다. 요구사항으로 승격하지 말고 scope expansion으로 표시한 뒤 fan-out 전에 기존 런타임에서 probe하도록 행을 추가합니다.
-- 각 phase gate는 handoff에 `required | not_applicable | blocked` 적용 여부와 이유를 기록합니다. 이 릴리스에서는 exact-input evidence engine이 없으므로 `reusable`은 유효한 값이 아닙니다. security, validation, accessibility, data-loss, deterministic-oracle gate는 `not_applicable`이 될 수 없습니다.
+- 각 phase gate는 handoff에 `required | reusable | not_applicable | blocked` 적용 여부와 이유를 기록합니다. 이 값은 `auto spec gates`가 쓴 `{SPEC_DIR}/gate-applicability.json`에서만 나오며, `reusable`은 exact-input evidence receipt가 일치할 때 classifier가 부여하는 값이라 에이전트가 스스로 선언하지 않습니다. security, validation, data_loss, deterministic_oracle gate는 `not_applicable`이 될 수 없고, accessibility와 ux_verification은 변경 집합에 UI 경로가 없을 때만 classifier 판단으로 `not_applicable`이 됩니다.
 
 `auto spec validate <SPEC_DIR> --strict`는 이 섹션의 행 수(1-3), status enum, non-empty reason, 그리고 `PASS` 행의 evidence를 결정적으로 검증합니다.
 

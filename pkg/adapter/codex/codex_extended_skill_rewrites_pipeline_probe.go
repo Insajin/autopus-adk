@@ -45,6 +45,8 @@ Probe gate rules:
 - on ` + "`FAIL`" + ` for a high or critical assumption, return to planning and revise ` + "`plan.md`" + `; this is bounded to one re-plan, and a second ` + "`FAIL`" + ` surfaces to the user
 - treat an implementer-introduced constraint broader than the requirement (new ACL, compatibility limit, security limit) as a scope expansion and probe it against the existing runtime here
 
-Gate applicability: ` + "`required`" + ` whenever the change touches an integration boundary; ` + "`not_applicable`" + ` only for doc-only or low-risk SPECs, which still keep one ` + "`not-run`" + ` row with the reason ` + "`no integration boundary`" + `; ` + "`blocked`" + ` when the fixture or environment is missing. The mandatory safety gates ` + "`security`" + `, ` + "`validation`" + `, ` + "`accessibility`" + `, ` + "`data-loss`" + `, and ` + "`deterministic-oracle`" + ` can never be ` + "`not_applicable`" + `, and ` + "`reusable`" + ` is not a valid value in this release.
+Gate applicability comes from ` + "`auto spec gates`" + `, run here so the whole ` + "`gate-applicability.json`" + ` receipt rides into the fan-out. For ` + "`risk_first_probe`" + ` it is ` + "`required`" + ` whenever the change touches an integration boundary; ` + "`not_applicable`" + ` only for doc-only or low-risk SPECs, which still keep one ` + "`not-run`" + ` row with the reason ` + "`no integration boundary`" + `; ` + "`blocked`" + ` when the fixture or environment is missing.
+
+At the first row that returns ` + "`PASS`" + ` — or at the first real integration execution when every row stays ` + "`not-run`" + ` — record ` + "`auto telemetry record --spec-id <SPEC-ID> --action milestone --name first_vertical_slice`" + `. Recording it after the fact makes ` + "`time_to_first_slice`" + ` unmeasurable.
 `
 }

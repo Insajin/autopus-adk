@@ -68,7 +68,13 @@ Run in the main session after Phase 1.8 and before the Phase 2 fan-out. This gat
 - A row that stays `not-run` keeps its reason and travels into the handoff as an explicit limitation; never report it as `PASS`.
 - On `FAIL` for a high or critical assumption, return to planning and revise `plan.md`. Bounded to 1 re-plan; a second `FAIL` surfaces to the user.
 - An implementer-introduced constraint broader than the requirement (new ACL, compatibility limit, security limit) is a scope expansion: probe it against the existing runtime before fan-out.
-- Record gate applicability as `required | not_applicable | blocked` plus a reason. `security`, `validation`, `accessibility`, `data-loss`, and `deterministic-oracle` can never be `not_applicable`, and `reusable` is not a valid value in this release.
+- Gate applicability comes from the receipt, never from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
+- `risk_first_probe` is `required` at an integration boundary, `not_applicable` only for a doc-only or low-risk SPEC that keeps one `not-run` row reasoned `no integration boundary`, and `blocked` when the fixture or environment is missing.
+- `reusable` is valid only when the receipt grants it: a prior `{SPEC_DIR}/gates/evidence-<gate>.json` whose `input_closure_sha256` still matches the current tree, with `status: pass`, `complete: true`, and `observed_at` inside `--max-age` (default 168h). Its `input_globs` are re-expanded, so an added file invalidates evidence exactly like an edit. Any dependency change, `fail`, `partial`, missing input, or stale receipt returns `required` with the failed condition named. Never self-assign `reusable`.
+- After each real build/test/UX execution, record evidence with `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]` so the next run reuses exact-input evidence.
+- `security`, `validation`, `data_loss`, and `deterministic_oracle` can never be `not_applicable`. `accessibility` and `ux_verification` are `required` when the change set has UI paths and `not_applicable` reasoned `no UI surface in change set` otherwise; only the classifier decides that.
+- When `autopus.yaml` sets `verify.capture: no-capture`, no screenshots are taken and the oracles `dom_geometry`, `accessibility_tree`, `keyboard_navigation`, and `state_transition` all become required; a UX PASS is forbidden while any is missing (`blocked` naming the kind).
+- Record every decision with `auto telemetry record --spec-id {SPEC_ID} --action gate --gate <id> --applicability <value> [--resolved]`, and record `auto telemetry record --spec-id {SPEC_ID} --action milestone --name first_vertical_slice` at the first probe `PASS` or the first real integration execution.
 
 ## Frontend Design Preflight
 
@@ -129,6 +135,8 @@ When a task modifies 3+ files, exceeds 200 lines, or spans multiple domains, del
   Contract: review the complete diff in one pass; report all actionable issues; keep optional suggestions non-blocking
 ```
 
+Re-review is verify mode over the frozen open-finding checklist, not a second discovery pass. Read `discovery_repeat_detected`, `repeat_discovery_count`, and `same_input_rereview` from `{SPEC_DIR}/review-receipt.json`: a finding absent from the prior checklist but matching a prior finding by normalized title or by the same file and line is a repeat, not new. When a repeat is detected, do not re-run discovery on the same input — resolve the open findings or defer them explicitly with a reason. Record every re-read or re-run of already-verified input with `auto telemetry record --spec-id {SPEC_ID} --action action --kind reread|rerun --target <path|cmd> --reason <text>`.
+
 ### Delegation Rules
 
 - Define clear scope with expected output for each agent
@@ -152,6 +160,7 @@ Before showing the successful `go` workflow lifecycle or handing off to `/auto s
 - `spec_status_after_go`: `implemented` on success. Do not use `done` or `completed`; `completed` is reserved for `/auto sync`.
 - `sync_evidence_refs`: changed files, verification commands, Phase 4 verdict, @AX annotation result or `@AX: no-op`.
 - `decision_receipt`: reused existing code/helper/pattern, skipped dependency or abstraction, accepted expansion with evidence, and minimum sufficient verification summary.
+- `lead_time_report`: `auto telemetry leadtime [--run {SPEC_ID}] [--baseline <SPEC-ID|dir>]` output — first-slice/completion lead time, `critical_path`, and confirmation that `escaped_defects` and `unresolved_safety_gates` did not increase.
 
 If `sync_ready` is not `yes`, do not print the sync handoff. Fix or report the blocker first.
 

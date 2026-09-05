@@ -42,11 +42,32 @@ type specReviewPromotionReceipt struct {
 	OverrideApplied bool                    `json:"override_applied"`
 	Providers       []spec.ProviderStatus   `json:"providers,omitempty"`
 	Judge           *specReviewJudgeReceipt `json:"judge,omitempty"`
+
+	// Review-convergence evidence (issue #186). All omitempty so receipts from
+	// converging runs keep their existing bytes.
+	RepeatDiscoveries       []spec.RepeatDiscovery `json:"repeat_discoveries,omitempty"`
+	RepeatDiscoveryCount    int                    `json:"repeat_discovery_count,omitempty"`
+	SameInputReReview       bool                   `json:"same_input_rereview,omitempty"`
+	DiscoveryRepeatDetected bool                   `json:"discovery_repeat_detected,omitempty"`
 }
 
 type specReviewRuntimeEvidence struct {
 	RunID      string
 	FinishedAt time.Time
+}
+
+// applySpecReviewRepeatDiscovery projects the loop's repeat-discovery evidence
+// onto the promotion receipt. DiscoveryRepeatDetected is the operator-facing
+// verdict: the review either re-found known ground or re-reviewed unchanged
+// input, and either way the loop is not converging on new information.
+func applySpecReviewRepeatDiscovery(receipt *specReviewPromotionReceipt, result *spec.ReviewResult) {
+	if receipt == nil || result == nil {
+		return
+	}
+	receipt.RepeatDiscoveries = append([]spec.RepeatDiscovery(nil), result.RepeatDiscoveries...)
+	receipt.RepeatDiscoveryCount = len(result.RepeatDiscoveries)
+	receipt.SameInputReReview = result.SameInputReReview
+	receipt.DiscoveryRepeatDetected = receipt.RepeatDiscoveryCount > 0 || receipt.SameInputReReview
 }
 
 func persistSpecReviewPromotionReceipt(specDir string, receipt specReviewPromotionReceipt) (string, error) {

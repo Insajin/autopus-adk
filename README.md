@@ -1288,12 +1288,12 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `auto doctor` | Health diagnostics |
 | `auto platform` | Manage platforms (list / add / remove) |
 | `auto arch` | Architecture analysis (generate / enforce) |
-| `auto spec` | SPEC management (new / validate / review) |
+| `auto spec` | SPEC management (new / validate / review / gates — gate applicability receipt with exact-input evidence reuse) |
 | `auto lore` | Decision tracking (context / commit / validate / stale) |
 | `auto orchestra` | Multi-model orchestration (review / plan / secure / brainstorm / job-status / job-wait / job-result) |
 | `auto setup` | Project context documents (generate / update / validate / status) |
 | `auto status` | SPEC dashboard (done / in-progress / draft) |
-| `auto telemetry` | Pipeline telemetry (record / summary / cost / compare) |
+| `auto telemetry` | Pipeline telemetry (record / summary / cost / compare / leadtime — first-slice and critical-path lead time with baseline regression gate) |
 | `auto skill` | Skill management (list / info / create) |
 | `auto search` | Knowledge search (Exa) |
 | `auto docs` | Library documentation lookup (Context7) |

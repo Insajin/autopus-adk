@@ -139,6 +139,7 @@ func Conform(index Index, policy Policy) []string {
 	}
 	findings = append(findings, conformStreams(index, policy)...)
 	findings = append(findings, conformSteps(index, policy)...)
+	findings = append(findings, conformNoCaptureOracles(index, policy)...)
 	if policy.ReplayScript == ReplayRequired && index.Replay == nil {
 		findings = append(findings, "policy requires a replay reference but none was captured")
 	}

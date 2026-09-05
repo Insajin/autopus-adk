@@ -148,6 +148,7 @@ type ReviewFinding struct {
 	FirstSeenRev int             // revision when first discovered
 	LastSeenRev  int             // most recent revision evaluated
 	EscapeHatch  bool            // true if added via critical/security escape hatch in verify mode
+	RepeatOf     string          `json:"RepeatOf,omitempty"` // prior finding ID this finding restates (verify-mode repeat discovery)
 }
 
 // ProviderStatus captures one reviewer provider's outcome for the Provider
@@ -177,4 +178,10 @@ type ReviewResult struct {
 	DocCoverages      []DocCoverage `json:"doc_coverages,omitempty"`      // per-aux-doc injection coverage (REQ-RINT-COV-01)
 	DegradedReasons   []string      `json:"degraded_reasons,omitempty"`   // e.g. partial_doc_context, provider_quorum (REQ-RINT-TRUNC-04/QUORUM-05)
 	OverridePromotion bool          `json:"override_promotion,omitempty"` // true when --allow-degraded promoted a degraded PASS (REQ-RINT-OVERRIDE-07)
+
+	// Review-convergence fields (issue #186). RepeatDiscoveries lists verify-mode
+	// findings that restate an earlier finding; SameInputReReview marks a revision
+	// whose SPEC inputs are byte-identical to the previous one.
+	RepeatDiscoveries []RepeatDiscovery `json:"repeat_discoveries,omitempty"`
+	SameInputReReview bool              `json:"same_input_rereview,omitempty"`
 }

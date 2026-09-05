@@ -59,6 +59,7 @@ func syncReviewedSpecStatusWithReceipt(
 	receipt.DegradedReasons = append([]string(nil), result.DegradedReasons...)
 	receipt.Providers = append([]spec.ProviderStatus(nil), result.ProviderStatuses...)
 	receipt.CriticalVeto = hasCriticalSpecReviewVeto(result.Findings)
+	applySpecReviewRepeatDiscovery(&receipt, result)
 	if result.Judge != nil {
 		receipt.Judge = &specReviewJudgeReceipt{
 			Provider:    result.Judge.Provider,

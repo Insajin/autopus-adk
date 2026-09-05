@@ -132,8 +132,11 @@ func decodePipelineRuns(events []Event) ([]PipelineRun, error) {
 		if err := json.Unmarshal(event.Data, &run); err != nil {
 			return nil, err
 		}
-		if len(run.Phases) == 0 {
-			hydratePipelineRun(events, i, event.Timestamp, &run)
+		if startIndex := latestPipelineStart(events, i, run.SpecID); startIndex >= 0 {
+			if len(run.Phases) == 0 {
+				hydratePipelineRun(events, startIndex, i, event.Timestamp, &run)
+			}
+			hydrateLeadTime(events, startIndex, &run)
 		}
 		fallback = append(fallback, run)
 		if run.FinalStatus != "" {
@@ -146,11 +149,7 @@ func decodePipelineRuns(events []Event) ([]PipelineRun, error) {
 	return fallback, nil
 }
 
-func hydratePipelineRun(events []Event, endIndex int, endTime time.Time, run *PipelineRun) {
-	startIndex := latestPipelineStart(events, endIndex, run.SpecID)
-	if startIndex < 0 {
-		return
-	}
+func hydratePipelineRun(events []Event, startIndex, endIndex int, endTime time.Time, run *PipelineRun) {
 	run.StartTime = events[startIndex].Timestamp
 	run.EndTime = endTime
 	run.TotalDuration = endTime.Sub(run.StartTime)

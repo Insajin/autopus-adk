@@ -23,59 +23,7 @@ func newTelemetryCmd() *cobra.Command {
 	cmd.AddCommand(newTelemetryCostCmd())
 	cmd.AddCommand(newTelemetryCompareCmd())
 	cmd.AddCommand(newTelemetryEfficiencyCmd())
-
-	return cmd
-}
-
-// newTelemetryRecordCmd creates `auto telemetry record` — an internal command
-// used by agents to record pipeline, phase, and agent-run telemetry events.
-func newTelemetryRecordCmd() *cobra.Command {
-	var (
-		specID           string
-		agent            string
-		phase            string
-		action           string
-		status           string
-		files            int
-		tokens           int
-		qualityMode      string
-		usageJSON        string
-		acceptanceStatus string
-	)
-
-	cmd := &cobra.Command{
-		Use:   "record",
-		Short: "Record a telemetry event (internal agent use)",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			baseDir, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("telemetry record: get cwd: %w", err)
-			}
-			return runTelemetryRecord(baseDir, recordParams{
-				specID:           specID,
-				agent:            agent,
-				phase:            phase,
-				action:           action,
-				status:           status,
-				files:            files,
-				tokens:           tokens,
-				qualityMode:      qualityMode,
-				usageJSON:        usageJSON,
-				acceptanceStatus: acceptanceStatus,
-			})
-		},
-	}
-
-	cmd.Flags().StringVar(&specID, "spec-id", "", "SPEC identifier")
-	cmd.Flags().StringVar(&agent, "agent", "", "Agent name")
-	cmd.Flags().StringVar(&phase, "phase", "", "Phase name")
-	cmd.Flags().StringVar(&action, "action", "", "Action: start | agent | end")
-	cmd.Flags().StringVar(&status, "status", "PASS", "Status: PASS or FAIL")
-	cmd.Flags().IntVar(&files, "files", 0, "Number of files modified")
-	cmd.Flags().IntVar(&tokens, "tokens", 0, "Estimated token count")
-	cmd.Flags().StringVar(&qualityMode, "quality-mode", "balanced", "Quality mode (ultra|balanced)")
-	cmd.Flags().StringVar(&usageJSON, "usage-json", "", "Path to a normalized usage envelope JSON file")
-	cmd.Flags().StringVar(&acceptanceStatus, "acceptance-status", "", "Objective acceptance status: PASS or FAIL")
+	cmd.AddCommand(newTelemetryLeadTimeCmd())
 
 	return cmd
 }

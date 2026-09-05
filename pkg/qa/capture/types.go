@@ -62,6 +62,7 @@ type Index struct {
 	EndedAt       string   `json:"ended_at"`
 	Steps         []Step   `json:"steps"`
 	Media         []Media  `json:"media,omitempty"`
+	Oracles       []Oracle `json:"oracles,omitempty"`
 	Replay        *Replay  `json:"replay,omitempty"`
 	Totals        Totals   `json:"totals"`
 }

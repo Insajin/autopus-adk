@@ -2,9 +2,24 @@ package cli
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
+
+// printSpecReviewRepeatSummary surfaces review-convergence trouble: findings the
+// review rediscovered, and whether the revision re-reviewed unchanged input.
+// Nothing is printed on a healthy run so the line always means something.
+func printSpecReviewRepeatSummary(w io.Writer, result *spec.ReviewResult) {
+	if result == nil {
+		return
+	}
+	line := spec.RepeatDiscoverySummary(len(result.RepeatDiscoveries), result.SameInputReReview)
+	if line == "" {
+		return
+	}
+	fmt.Fprintln(w, line)
+}
 
 func printChecklistSummary(outcomes []spec.ChecklistOutcome) {
 	if len(outcomes) == 0 {

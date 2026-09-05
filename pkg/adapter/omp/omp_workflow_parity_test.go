@@ -78,12 +78,12 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 				}
 				if name == "agent-pipeline" || name == "worktree-isolation" {
 					// A no-growth ratchet on the OMP-native core coordination skills:
-					// they are injected into every OMP session, so the bound is set to
-					// the current emitted size and only moves when a phase is genuinely
-					// added. Raised from 320 for Phase 1.9 (Risk-First Probe Gate) and
-					// the Gate Applicability contract; additions were compressed to 27
-					// template lines before the bound moved.
-					assert.LessOrEqual(t, strings.Count(body, "\n"), 345,
+					// injected into every OMP session, so the bound equals the current
+					// emitted size and moves only when a runtime contract is genuinely
+					// added. Raised from 345 for the `auto spec gates` receipts (which
+					// re-introduce `reusable`), no-capture oracles, repeat-discovery
+					// re-review, and `auto telemetry` records, compressed 54 -> 47 first.
+					assert.LessOrEqual(t, strings.Count(body, "\n"), 392,
 						"OMP-native core coordination skills must stay bounded")
 					for _, token := range []string{
 						"sonnet", "haiku", `model: "opus"`, "Opus-tier",

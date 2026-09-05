@@ -143,6 +143,10 @@ In Phase 4, reviewer and security-auditor run in **parallel**.
   - Priority: security issues from security-auditor > code quality from reviewer
   - Consolidated issue list is sent to executor for remediation
 
+### 재리뷰: Verify Mode
+
+Re-review is verify mode over the frozen checklist of open findings, not a second discovery pass. The supervisor reads `discovery_repeat_detected`, `repeat_discovery_count`, and `same_input_rereview` from `{SPEC_DIR}/review-receipt.json`. A finding that is absent from the prior checklist but matches a prior finding — by normalized title, or by the same file and line — is classified `repeat`, not new. WHEN a repeat is detected, do not re-run discovery on the same input: resolve the open findings, or defer them explicitly with a reason. Re-discovering an unchanged diff produces restated findings that read as progress while nothing was closed.
+
 ### Lead Consolidator Flow (persistent-team mode)
 
 ```

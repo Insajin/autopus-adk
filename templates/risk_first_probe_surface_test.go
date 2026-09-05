@@ -110,12 +110,10 @@ func TestRiskFirstProbeSurfaceParity(t *testing.T) {
 			for _, token := range tokens {
 				assert.Contains(t, text, token, "%s should contain %q", tc.path, token)
 			}
-			// `reusable` must never appear as a member of the applicability
-			// vocabulary; the surfaces may only mention it to disclaim it.
-			assert.NotContains(t, text, "| reusable",
-				"%s must not offer `reusable` applicability: no exact-input evidence engine exists", tc.path)
-			assert.NotContains(t, text, "reusable |",
-				"%s must not offer `reusable` applicability: no exact-input evidence engine exists", tc.path)
+			// `reusable` is no longer disclaimed here: the applicability
+			// vocabulary is asserted by TestPipelineRuntimeSurfaceParity, which
+			// requires every go/pipeline surface to describe the receipt that
+			// grants it.
 		})
 	}
 }

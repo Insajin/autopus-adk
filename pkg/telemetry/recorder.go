@@ -21,6 +21,19 @@ type Recorder struct {
 	qualityMode   string
 	phases        []PhaseRecord
 	currentPhase  *PhaseRecord
+	milestones    []Milestone
+	actions       []ActionRecord
+	defects       []DefectRecord
+	gates         []GateRecord
+	estimate      *EstimateRecord
+}
+
+// phaseStartEvent is the phase_start payload. SpecID and DependsOn are
+// additive so records written before them still decode.
+type phaseStartEvent struct {
+	Name      string   `json:"name"`
+	SpecID    string   `json:"spec_id,omitempty"`
+	DependsOn []string `json:"depends_on,omitempty"`
 }
 
 // NewRecorder creates a Recorder that appends events to
@@ -72,15 +85,20 @@ func (r *Recorder) StartPipeline(specID, qualityMode string) {
 }
 
 // StartPhase records a phase_start event and begins tracking a new phase.
-func (r *Recorder) StartPhase(name string) {
+// dependsOn names the phases this one waits for; it is recorded on the phase
+// and in the event so cross-process readers can rebuild the DAG.
+func (r *Recorder) StartPhase(name string, dependsOn ...string) {
+	deps := cloneDependencies(dependsOn)
 	r.mu.Lock()
 	r.currentPhase = &PhaseRecord{
 		Name:      name,
 		StartTime: time.Now(),
+		DependsOn: deps,
 	}
+	specID := r.specID
 	r.mu.Unlock()
 
-	_ = r.writeEvent(EventTypePhaseStart, map[string]string{"name": name})
+	_ = r.writeEvent(EventTypePhaseStart, phaseStartEvent{Name: name, SpecID: specID, DependsOn: deps})
 }
 
 // RecordAgent records an agent_run event and appends it to the current phase.
@@ -124,6 +142,11 @@ func (r *Recorder) Finalize(finalStatus string) PipelineRun {
 		Phases:        r.phases,
 		FinalStatus:   finalStatus,
 		QualityMode:   r.qualityMode,
+		Milestones:    r.milestones,
+		Actions:       r.actions,
+		Defects:       r.defects,
+		Gates:         r.gates,
+		Estimate:      r.estimate,
 	}
 	r.mu.Unlock()
 

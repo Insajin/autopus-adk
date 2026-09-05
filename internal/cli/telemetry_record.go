@@ -16,6 +16,7 @@ type recordParams struct {
 	specID           string
 	agent            string
 	phase            string
+	dependsOn        []string
 	action           string
 	status           string
 	files            int
@@ -23,11 +24,30 @@ type recordParams struct {
 	qualityMode      string
 	usageJSON        string
 	acceptanceStatus string
+
+	// Lead-time subrecords.
+	name            string
+	kind            string
+	target          string
+	reason          string
+	defectID        string
+	discoveredPhase string
+	fixedPhase      string
+	escaped         bool
+	repeat          bool
+	gate            string
+	applicability   string
+	resolved        bool
+	estimateMin     time.Duration
+	estimateMax     time.Duration
 }
 
-// runTelemetryRecord dispatches a telemetry record action (start|agent|end).
+// runTelemetryRecord dispatches a telemetry record action.
 // It is extracted from the command RunE for testability.
 func runTelemetryRecord(baseDir string, p recordParams) error {
+	if len(p.dependsOn) > 0 && (p.phase == "" || (p.action != "start" && p.action != "agent")) {
+		return fmt.Errorf("telemetry record: --depends-on requires --phase with --action start|agent")
+	}
 	switch p.action {
 	case "start":
 		return recordStart(baseDir, p)
@@ -35,8 +55,18 @@ func runTelemetryRecord(baseDir string, p recordParams) error {
 		return recordAgent(baseDir, p)
 	case "end":
 		return recordEnd(baseDir, p)
+	case "milestone":
+		return recordMilestone(baseDir, p)
+	case "action":
+		return recordAction(baseDir, p)
+	case "defect":
+		return recordDefect(baseDir, p)
+	case "gate":
+		return recordGate(baseDir, p)
+	case "estimate":
+		return recordEstimate(baseDir, p)
 	default:
-		return fmt.Errorf("telemetry record: unknown action %q (want: start|agent|end)", p.action)
+		return fmt.Errorf("telemetry record: unknown action %q (want: start|agent|end|milestone|action|defect|gate|estimate)", p.action)
 	}
 }
 
@@ -55,7 +85,7 @@ func recordStart(baseDir string, p recordParams) error {
 
 	rec.StartPipeline(p.specID, p.qualityMode)
 	if p.phase != "" {
-		rec.StartPhase(p.phase)
+		rec.StartPhase(p.phase, p.dependsOn...)
 	}
 	// Flush: finalize without ending the pipeline (status empty signals in-progress).
 	_ = rec.Finalize("")
@@ -111,7 +141,7 @@ func recordAgent(baseDir string, p recordParams) error {
 	}
 
 	if p.phase != "" {
-		rec.StartPhase(p.phase)
+		rec.StartPhase(p.phase, p.dependsOn...)
 	}
 	rec.RecordAgent(run)
 	if p.phase != "" {
