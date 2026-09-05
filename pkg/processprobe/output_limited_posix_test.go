@@ -46,7 +46,14 @@ fi
 			// 구별할 수 있을 만큼만 멀리 둔다. 유예의 4배.
 			ctx, cancel := context.WithTimeout(context.Background(), 4*DefaultWaitDelay)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, script, stream)
+			// 스크립트를 직접 exec하지 않고 /bin/sh에 인자로 넘긴다. macOS는
+			// 처음 실행되는 실행 파일마다 최초 실행 평가(syspolicyd/XProtect)를
+			// 시스템 전역으로 직렬화해 파일당 약 190ms를 물리는데, `go test ./...`
+			// 아래에서는 다른 패키지의 새 fixture와 같은 큐에 서서 그 대기가
+			// `started` 이후 측정창에 들어가 아래 2배 상한을 넘겼다(K=24 동시
+			// 실행에서 라운드 4/4 red). 이미 평가된 /bin/sh를 exec하면 그 비용이
+			// 사라지고 프로세스 그룹·상속 파이프 계약은 그대로 검증된다.
+			cmd := exec.CommandContext(ctx, "/bin/sh", script, stream)
 			cmd.Env = append(os.Environ(), "AUTOPUS_OUTPUT_LIMIT_PID_FILE="+pidFile)
 			started := time.Now()
 

@@ -37,7 +37,16 @@ ISOLATED_TIMEOUT    ?= 10m
 # integration clock"). 같은 패키지의 GUI capture 테스트가 npm/node 프로세스를
 # 띄우기 시작하면서 공유 스케줄러에서는 그 2초가 예산이 아니라 부하 측정이
 # 된다. 억제가 아니라 격리다 - 같은 테스트를 -p 1 로 그대로 돌린다.
-PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestOutputLimited_|TestOutputSuccessDoesNotTerminateProcessGroup|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
+#
+# 실측한 근본 원인(2026-09-05, pkg/processprobe 를 K=24 동시 실행으로 재현):
+# macOS 는 처음 실행되는 실행 파일마다 최초 실행 평가(syspolicyd/XProtect)를
+# 시스템 전역으로 직렬화해 파일당 약 190ms 를 물린다. 테스트마다 t.TempDir()
+# 에 새 #!/bin/sh fixture 를 쓰고 그대로 exec 하면 그 큐 대기가 시계에
+# 들어간다. 스크립트를 `/bin/sh <script>` 로 넘겨 이미 평가된 바이너리만
+# exec 하면 비용이 사라진다 - pkg/processprobe 는 그렇게 고쳐 이 목록에서
+# 뺐다. 코드가 fixture 경로를 직접 exec 해야 하는 나머지(가짜 omp/claude
+# 바이너리 프로브)는 아직 격리한다.
+PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
 
 test:
 	go test -race -count=1 -timeout=$(INTEGRATION_TIMEOUT) -tags integration -skip '$(PROCESS_HEAVY_TESTS)' ./...

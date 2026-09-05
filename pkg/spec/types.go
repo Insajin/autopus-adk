@@ -150,8 +150,9 @@ type ReviewFinding struct {
 	EscapeHatch  bool            // true if added via critical/security escape hatch in verify mode
 }
 
-// ProviderStatus captures one provider's outcome for the Provider Health
-// section rendered in review.md (SPEC-SPECREV-001 REQ-VERD-1).
+// ProviderStatus captures one reviewer provider's outcome for the Provider
+// Health section rendered in review.md (SPEC-SPECREV-001 REQ-VERD-1). The
+// judge is not a row here; its outcome lives in ReviewResult.Judge.
 type ProviderStatus struct {
 	Provider string `json:"provider"`                   // provider name (e.g., "claude")
 	Status   string `json:"status"`                     // "success" | "timeout" | "error"

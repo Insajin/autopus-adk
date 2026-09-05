@@ -29,7 +29,8 @@ func TestFormatReviewMd_RendersJudgeSummary(t *testing.T) {
 	assert.Contains(t, body, "**Provider**: claude\n")
 	assert.Contains(t, body, "**Family**: anthropic\n")
 	assert.Contains(t, body, "**Status**: ok\n")
-	assert.Contains(t, body, "**Verdict**: REVISE\n")
+	assert.Contains(t, body, "**Judge Verdict**: REVISE\n",
+		"the judge's own conclusion is labelled apart from the normalized review verdict")
 	assert.Contains(t, body, "**Accepted**: 1\n")
 	assert.Contains(t, body, "**Rejected**: 1\n")
 	assert.Contains(t, body, "**Merged**: 1\n")

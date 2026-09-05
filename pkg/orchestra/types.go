@@ -99,7 +99,8 @@ type ProviderResponse struct {
 	EmptyOutput bool          // true when stdout is empty (exit 0 but no content)
 	Receipt     string        // reliability collection receipt path, if persisted
 	// ExecutedBackend records which backend produced this response:
-	// "pane", "subprocess", or "" / "none" when neither succeeded (REQ-005, F-003).
+	// "pane", "subprocess", "omp" (SPEC-OMP-006 read-only RPC session), or
+	// "" / "none" when none succeeded (REQ-005, F-003).
 	ExecutedBackend string
 	Role            string
 	Attempt         int

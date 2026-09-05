@@ -226,7 +226,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
-		fmt.Printf("Promotion receipt: %s\n", receiptPath)
+		fmt.Printf("Review receipt: %s\n", receiptPath)
 		if len(finalResult.Findings) > 0 {
 			// Issue #44: surface status breakdown instead of raw count so operators
 			// can tell at a glance whether any findings are still open.

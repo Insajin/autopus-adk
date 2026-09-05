@@ -93,7 +93,9 @@ func renderJudgeSection(judge *JudgeSummary) string {
 	fmt.Fprintf(&sb, "**Provider**: %s\n", sanitizeNote(judge.Provider))
 	fmt.Fprintf(&sb, "**Family**: %s\n", sanitizeNote(judge.Family))
 	fmt.Fprintf(&sb, "**Status**: %s\n", sanitizeNote(judge.Status))
-	fmt.Fprintf(&sb, "**Verdict**: %s\n", sanitizeNote(judge.Verdict))
+	// The judge's own conclusion; the review verdict in the header may differ
+	// after safety normalization (a PASS with active blocking findings).
+	fmt.Fprintf(&sb, "**Judge Verdict**: %s\n", sanitizeNote(judge.Verdict))
 	fmt.Fprintf(&sb, "**Accepted**: %d\n", judge.Accepted)
 	fmt.Fprintf(&sb, "**Rejected**: %d\n", judge.Rejected)
 	fmt.Fprintf(&sb, "**Merged**: %d\n", judge.Merged)

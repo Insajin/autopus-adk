@@ -25,7 +25,7 @@ import (
 const integrityRemedyHint = "문서/프로바이더 관측을 보강하거나 --allow-degraded 로 재실행하세요"
 
 // observationDegradedReasons returns the machine-readable degraded reasons for a
-// single review round. The order is stable — coverage before quorum — so
+// single revision. The order is stable — coverage before quorum — so
 // review.md, the findings sidecar, and the audit log stay diff-stable across
 // runs (REQ-RINT-TRUNC-04, REQ-RINT-QUORUM-05).
 // @AX:NOTE: [AUTO] subtle invariant — reasons are appended coverage-then-quorum; reordering or sorting this slice elsewhere changes the rendered verdict-line and audit-log text and breaks diff-stability across review runs
@@ -41,7 +41,7 @@ func observationDegradedReasons(coverages []spec.DocCoverage, statuses []spec.Pr
 }
 
 // applyObservationIntegrity computes per-document injection coverage and the
-// provider quorum for one review round, records both on the result, and returns
+// provider quorum for one revision, records both on the result, and returns
 // the coverage set for the findings sidecar. The budget is resolved solely
 // through spec.ResolveAuxTotalBudget so the coverage the gate reads matches what
 // the prompt injected (REQ-RINT-FULL-02). The promotion gate later reads
