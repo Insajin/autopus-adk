@@ -70,8 +70,10 @@ func settlePipelineOMPTurn(raw json.RawMessage) (pipelineOMPTurnIdentity, error)
 			if preview == "" {
 				preview = "provider reported no error message"
 			}
-			if len(preview) > pipelineOMPTurnErrorPreview {
-				preview = preview[:pipelineOMPTurnErrorPreview] + "..."
+			if runes := []rune(preview); len(runes) > pipelineOMPTurnErrorPreview {
+				// The whole preview, ellipsis included, stays within the cap and
+				// never splits a multi-byte character.
+				preview = string(runes[:pipelineOMPTurnErrorPreview-3]) + "..."
 			}
 			return identity, &pipelineOMPTurnError{Status: message.ErrorStatus, Message: preview}
 		case "aborted":

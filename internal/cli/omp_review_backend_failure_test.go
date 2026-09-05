@@ -92,6 +92,21 @@ func TestOMPReviewBackend_FailsClosedOnExecutedModelDrift(t *testing.T) {
 	assertOMPReviewFixtureRuntimeRemoved(t, logPath)
 }
 
+// A drifted model whose turn then yields no text is a model mismatch, not
+// "empty output": the drift is the earlier and more important fact.
+func TestOMPReviewBackend_ModelDriftOutranksEmptyOutput(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fixture executable uses a POSIX launcher")
+	}
+	projectDir, _ := configureOMPReviewRPCFixture(t, "model-drift-empty")
+	response, err := executeOMPReviewFixture(t, projectDir, 5*time.Second)
+	require.Error(t, err)
+	require.NotNil(t, response)
+	assert.False(t, response.EmptyOutput)
+	assert.Contains(t, response.Error, "executed model mismatch")
+	assert.Equal(t, "provider_model_error", structuredFailureClass(err))
+}
+
 func splitOMPReviewRPCRecordsAll(
 	t *testing.T,
 	records []ompReviewRPCRecord,

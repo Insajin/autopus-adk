@@ -138,7 +138,7 @@ func runOMPReviewRPCFixture() int {
 			}, "")
 		case "get_last_assistant_text":
 			text := "review output"
-			if mode == "empty" {
+			if mode == "empty" || mode == "model-drift-empty" {
 				text = ""
 			}
 			writeOMPReviewRPCResponse(output, command, true, map[string]any{"text": text}, "")
@@ -170,7 +170,7 @@ func ompReviewFixtureTurnMessages(mode, provider, model string) []map[string]any
 			_ = os.WriteFile(marker, nil, 0o600)
 			assistant["stopReason"], assistant["errorStatus"], assistant["errorMessage"] = "error", 529, "overloaded_error"
 		}
-	case "model-drift":
+	case "model-drift", "model-drift-empty":
 		assistant["model"] = "claude-sonnet-5"
 	}
 	return []map[string]any{

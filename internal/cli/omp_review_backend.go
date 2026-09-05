@@ -131,16 +131,18 @@ func executeOMPReviewRPC(
 		}
 	}
 	output, err := protocol.execute(ctx, "", prompt)
-	if err != nil {
-		return "", err
-	}
 	// The pinned model is a contract: a runtime that answered with another
-	// provider/model (fallback, alias drift) must not be reported as this one.
+	// provider/model (fallback, alias drift) must not be reported as this one,
+	// and a drifted turn's later failure (empty text, RPC error) must not
+	// mask the drift. The identity is settled at agent_end, so check it first.
 	if identity := protocol.lastTurn; identity.Provider != "" || identity.Model != "" {
 		if identity.Provider != provider || identity.Model != modelID {
 			return "", fmt.Errorf("OMP review session executed model mismatch: want %s/%s got %s/%s",
 				provider, modelID, identity.Provider, identity.Model)
 		}
+	}
+	if err != nil {
+		return "", err
 	}
 	return output, nil
 }

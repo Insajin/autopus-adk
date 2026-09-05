@@ -3,7 +3,9 @@ package cli
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,6 +41,13 @@ func TestSettlePipelineOMPTurn(t *testing.T) {
 	assert.True(t, (&pipelineOMPTurnError{Status: 429}).Transient())
 	assert.False(t, (&pipelineOMPTurnError{Status: 401}).Transient())
 	assert.False(t, (&pipelineOMPTurnError{}).Transient(), "an error without a status is not retried blindly")
+
+	long := strings.Repeat("가", 300)
+	_, err = settlePipelineOMPTurn(json.RawMessage(`[{"role":"assistant","content":[],"stopReason":"error","errorStatus":529,"errorMessage":"` + long + `"}]`))
+	require.ErrorAs(t, err, &turnErr)
+	assert.Equal(t, pipelineOMPTurnErrorPreview, len([]rune(turnErr.Message)), "preview incl. ellipsis stays within the cap")
+	assert.True(t, strings.HasSuffix(turnErr.Message, "..."))
+	assert.True(t, utf8.ValidString(turnErr.Message))
 
 	_, err = settlePipelineOMPTurn(json.RawMessage(`[{"role":"assistant","content":[],"stopReason":"aborted"}]`))
 	require.Error(t, err)
