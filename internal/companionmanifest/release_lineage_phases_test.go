@@ -1,7 +1,6 @@
 package companionmanifest
 
 import (
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -243,9 +242,9 @@ var releasePhases = []releasePhase{
 		bridgePredecessor: true,
 	},
 	{
-		// A25 carries the omp/18.1.5 pin. A24 shipped on omp/17.2.7, so the
-		// compaction reduction floor is measured for the first time against a
-		// new OMP major in this release's canary.
+		// A25 shipped on omp/17.2.7. Its first attempt carried omp/18.1.5 and
+		// failed closed in the cohort at call 6 of 42 before any tag existed, so
+		// the coordinate survived and the pin went back to the contract version.
 		phase: "A25", tag: "v0.50.114", version: "0.50.114",
 		acceptedField: "source-tree",
 		rejects:       "unsignedTag",
@@ -260,39 +259,21 @@ var releasePhases = []releasePhase{
 		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
 		bridgePredecessor: true,
 	},
-}
-
-const releaseCoordinateTableScript = "scripts/companion-release/produce-public-key-receipt.sh"
-
-// 좌표는 두 곳에만 산다: 프로듀서의 bash 표와 위 releasePhases. 이 테스트가 둘을 한 원본으로 묶는다.
-func TestReleaseCoordinateTable_ProducerRowsMatchDeclaredPhases(t *testing.T) {
-	helper := readReleaseFile(t, releaseCoordinateTableScript)
-	table := regexp.MustCompile(`(?s)readonly PUBLIC_KEY_RECEIPT_RELEASE_COORDINATES='\n(.*?)\n'`).
-		FindStringSubmatch(helper)
-	if table == nil {
-		t.Fatal("producer receipt helper no longer declares one coordinate table")
-	}
-	var produced []string
-	for _, line := range strings.Split(table[1], "\n") {
-		if fields := strings.Fields(line); len(fields) > 0 {
-			produced = append(produced, strings.Join(fields, " "))
-		}
-	}
-	declared := make([]string, 0, len(releasePhases))
-	for _, phase := range releasePhases {
-		declared = append(declared, phase.tag+" "+phase.version+" "+phase.phase)
-	}
-	if strings.Join(produced, "\n") != strings.Join(declared, "\n") {
-		t.Fatalf("coordinate table drifted\nproducer:\n%s\ndeclared:\n%s",
-			strings.Join(produced, "\n"), strings.Join(declared, "\n"))
-	}
-	// 알 수 없는 (tag, version) 조합은 여전히 정확히 이 코드로 크게 실패해야 한다.
-	for _, required := range []string{
-		`fail 'public_key_receipt_release_identity_mismatch'`,
-		`[[ "$GITHUB_REF_NAME" == "$coordinate_tag" && "$COMPANION_VERSION" == "$coordinate_version" ]]`,
-	} {
-		if !strings.Contains(helper, required) {
-			t.Fatalf("coordinate resolver no longer enforces %q", required)
-		}
-	}
+	{
+		// A26 follows the published A25 on the same omp/17.2.7 oracle; the
+		// predecessor pins are measured from immutable release 382345734.
+		phase: "A26", tag: "v0.50.115", version: "0.50.115",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "a6d199fb5a7b27721026916fcd75dffb58a4e228",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
 }

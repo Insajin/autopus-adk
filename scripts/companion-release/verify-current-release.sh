@@ -4,8 +4,8 @@ umask 077
 
 fail() { printf 'current release evidence: %s\n' "$1" >&2; exit 1; }
 readonly RELEASE_REPOSITORY='Insajin/autopus-adk'
-readonly RELEASE_VERSION='0.50.114'
-readonly RELEASE_TAG='v0.50.114'
+readonly RELEASE_VERSION='0.50.115'
+readonly RELEASE_TAG='v0.50.115'
 readonly REPORT_NAME='omp-context-promotion-report.v1.json'
 readonly ATTESTATION_NAME='omp-context-promotion-attestation.v2.json'
 readonly LINEAGE_NAME='release-lineage-v1.json'
@@ -246,4 +246,4 @@ env -i PATH="$PATH" HOME="${HOME:-/}" TMPDIR="${TMPDIR:-/tmp}" \
   fail 'A24 historical-recovery OMP evidence is invalid'
 install -m 0600 "$checksums" "$checksums_output" || fail 'cannot materialize checksums.txt'
 cmp -s "$checksums" "$checksums_output" || fail 'materialized checksums differ'
-printf 'current release evidence: exactly fifteen A25 normal release assets verified\n'
+printf 'current release evidence: exactly fifteen A26 normal release assets verified\n'

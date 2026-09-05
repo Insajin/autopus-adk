@@ -26,6 +26,7 @@ readonly A22_A21_ANCESTOR_SHA='b86fab067599f457261287552c5a9dd86460d7f4'
 readonly A23_A22_ANCESTOR_SHA='67f3def5d4a0a11aadd9e103389de6cc1cafc34e'
 readonly A24_A23_ANCESTOR_SHA='954f60a77acb59fd4106537020693fdcadb3d640'
 readonly A25_A24_ANCESTOR_SHA='bc2147a875b49e9fca75db4307455f83512837d6'
+readonly A26_A25_ANCESTOR_SHA='a6d199fb5a7b27721026916fcd75dffb58a4e228'
 
 fail() {
   printf 'companion release source: %s\n' "$1" >&2
@@ -63,7 +64,8 @@ case "$GITHUB_REF_NAME" in
   v0.50.111) release_phase='A23' ;;
   v0.50.113) release_phase='A24' ;;
   v0.50.114) release_phase='A25' ;;
-  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24/A25 policy' ;;
+  v0.50.115) release_phase='A26' ;;
+  *) fail 'release tag is outside the frozen A0/A1/A2/A3/A4/A5/A6/A7/A8/A9/A10/A11/A12/A13/A14/A15/A16/A17/A18/A19/A20/A21/A22/A23/A24/A25/A26 policy' ;;
 esac
 [[ "$GITHUB_REF_TYPE" == 'tag' ]] || fail 'release ref is not a tag'
 [[ "$GITHUB_SHA" =~ ^[0-9a-f]{40}$ ]] || fail 'source commit is not exact 40-hex'
@@ -88,7 +90,8 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
       "$release_phase" == 'A18' || "$release_phase" == 'A19' ||
       "$release_phase" == 'A20' || "$release_phase" == 'A21' ||
       "$release_phase" == 'A22' || "$release_phase" == 'A23' ||
-      "$release_phase" == 'A24' || "$release_phase" == 'A25' ]]; then
+      "$release_phase" == 'A24' || "$release_phase" == 'A25' ||
+      "$release_phase" == 'A26' ]]; then
   tag_object_type=$(git cat-file -t "refs/tags/$GITHUB_REF_NAME" 2>/dev/null) \
     || fail "cannot resolve exact ${release_phase} tag object"
   [[ "$tag_object_type" == 'tag' ]] \
@@ -174,15 +177,19 @@ if [[ "$release_phase" == 'A2' || "$release_phase" == 'A3' ||
   elif [[ "$release_phase" == 'A24' ]]; then
     git merge-base --is-ancestor "$A24_A23_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A24 source does not contain the immutable A23 release'
-  else
+  elif [[ "$release_phase" == 'A25' ]]; then
     git merge-base --is-ancestor "$A25_A24_ANCESTOR_SHA" "$GITHUB_SHA" \
       >/dev/null 2>&1 || fail 'A25 source does not contain the immutable A24 release'
+  else
+    git merge-base --is-ancestor "$A26_A25_ANCESTOR_SHA" "$GITHUB_SHA" \
+      >/dev/null 2>&1 || fail 'A26 source does not contain the immutable A25 release'
   fi
   # A24 signs with R2 like its predecessors. An earlier commit removed it from
   # this list on the belief that R2 was destroyed; the key was found intact in
   # the operator's release-key store, so the guarantee continues unbroken.
   if [[ "$release_phase" == 'A22' || "$release_phase" == 'A23' ||
-        "$release_phase" == 'A24' || "$release_phase" == 'A25' ]]; then
+        "$release_phase" == 'A24' || "$release_phase" == 'A25' ||
+        "$release_phase" == 'A26' ]]; then
     if [[ "$release_phase" == 'A22' &&
           "${COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED-0}" == '1' ]]; then
       [[ "${ADK_KEY_ROTATION_VERIFIED-}" == '1' ]] ||
