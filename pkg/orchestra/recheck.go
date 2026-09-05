@@ -42,6 +42,9 @@ func recheckTransport(cfg OrchestraConfig) (recheckRunner, string) {
 		return backend.Execute, backend.Name()
 	}
 	return func(ctx context.Context, req ProviderRequest) (*ProviderResponse, error) {
+		if req.Config.Backend != "" {
+			return runConfiguredProvider(ctx, cfg, req.Config, req.Prompt, req.Role, req.Round, nil)
+		}
 		return runProvider(ctx, req.Config, req.Prompt)
 	}, "subprocess"
 }

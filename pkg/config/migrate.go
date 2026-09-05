@@ -97,7 +97,9 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 	changed := false
 	for providerName, defaults := range defaultProviderEntries {
 		existing, exists := cfg.Orchestra.Providers[providerName]
-		if !exists {
+		if !exists || existing.Backend != "" {
+			// Backend-routed providers carry no CLI argv, schema flag, or
+			// pane wiring, so the CLI defaults below do not apply to them.
 			continue
 		}
 		if providerName == "codex" {

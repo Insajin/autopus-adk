@@ -22,6 +22,7 @@ var orchestraTemplates = []string{
 	"shared/orchestra-debater-r1.md.tmpl",
 	"shared/orchestra-debater-r2.md.tmpl",
 	"shared/orchestra-judge.md.tmpl",
+	"shared/spec-review-judge.md.tmpl",
 	"shared/orchestra-reviewer.md.tmpl",
 	"shared/orchestra-consensus.md.tmpl",
 }
@@ -74,6 +75,11 @@ func (pb *PromptBuilder) BuildJudge(data PromptData) (string, error) {
 	return pb.render("shared/orchestra-judge.md.tmpl", data)
 }
 
+// BuildReviewJudge renders the typed final judge prompt for structured SPEC reviews.
+func (pb *PromptBuilder) BuildReviewJudge(data ReviewJudgeData) (string, error) {
+	return pb.render("shared/spec-review-judge.md.tmpl", data)
+}
+
 // BuildReviewer renders the SPEC reviewer prompt.
 func (pb *PromptBuilder) BuildReviewer(data PromptData) (string, error) {
 	return pb.render("shared/orchestra-reviewer.md.tmpl", data)
@@ -85,7 +91,7 @@ func (pb *PromptBuilder) BuildReviewerWithManifest(data PromptData) (string, Pro
 }
 
 // render executes the named template with the given data.
-func (pb *PromptBuilder) render(name string, data PromptData) (string, error) {
+func (pb *PromptBuilder) render(name string, data any) (string, error) {
 	var buf bytes.Buffer
 	if err := pb.tmpl.ExecuteTemplate(&buf, name, data); err != nil {
 		return "", fmt.Errorf("prompt_builder: render %s: %w", name, err)

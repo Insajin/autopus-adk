@@ -1,6 +1,7 @@
 package orchestra
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -76,6 +77,73 @@ func (op *OutputParser) ParseReviewer(raw string) (*ReviewerOutput, error) {
 	return &out, nil
 }
 
+// ParseReviewJudge parses the typed adjudication of anonymized reviewer outputs.
+func (op *OutputParser) ParseReviewJudge(raw string) (*ReviewJudgeOutput, error) {
+	var payload struct {
+		Verdict   string          `json:"verdict"`
+		Findings  json.RawMessage `json:"findings"`
+		Rationale string          `json:"rationale"`
+	}
+	if err := op.unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("parse review_judge: %w", err)
+	}
+	findingsJSON := bytes.TrimSpace(payload.Findings)
+	if len(findingsJSON) == 0 || bytes.Equal(findingsJSON, []byte("null")) {
+		return nil, fmt.Errorf("parse review_judge: findings array is required")
+	}
+	var findings []JudgedFinding
+	if err := json.Unmarshal(payload.Findings, &findings); err != nil {
+		return nil, fmt.Errorf("parse review_judge: invalid findings array: %w", err)
+	}
+	out := ReviewJudgeOutput{
+		Verdict: payload.Verdict, Findings: findings, Rationale: payload.Rationale,
+	}
+	switch out.Verdict {
+	case "PASS", "REVISE", "REJECT":
+		// valid
+	default:
+		return nil, fmt.Errorf("parse review_judge: invalid verdict %q (expected PASS, REVISE, or REJECT)", out.Verdict)
+	}
+	seenIDs := make(map[string]struct{}, len(out.Findings))
+	acceptedIDs := make(map[string]struct{}, len(out.Findings))
+	for _, finding := range out.Findings {
+		if id := strings.TrimSpace(finding.ID); id != "" && finding.Decision == "accept" {
+			acceptedIDs[id] = struct{}{}
+		}
+	}
+	for i, finding := range out.Findings {
+		switch finding.Severity {
+		case "critical", "major", "minor", "suggestion":
+			// valid
+		default:
+			return nil, fmt.Errorf("parse review_judge: finding %d invalid severity %q", i, finding.Severity)
+		}
+		if id := strings.TrimSpace(finding.ID); id != "" {
+			if _, exists := seenIDs[id]; exists {
+				return nil, fmt.Errorf("parse review_judge: finding %d duplicate id %q", i, id)
+			}
+			seenIDs[id] = struct{}{}
+		}
+		switch finding.Decision {
+		case "accept":
+			// Accepted findings do not need an adjudication reason.
+		case "reject", "merge":
+			if strings.TrimSpace(finding.Reason) == "" {
+				return nil, fmt.Errorf("parse review_judge: finding %d reason required for decision %q", i, finding.Decision)
+			}
+			if finding.Decision == "merge" {
+				target := strings.TrimSpace(finding.MergeInto)
+				if _, ok := acceptedIDs[target]; target == "" || !ok {
+					return nil, fmt.Errorf("parse review_judge: finding %d merge_into must name an accepted finding id (got %q)", i, finding.MergeInto)
+				}
+			}
+		default:
+			return nil, fmt.Errorf("parse review_judge: finding %d invalid decision %q", i, finding.Decision)
+		}
+	}
+	return &out, nil
+}
+
 // ParseAny parses raw text as JSON of the given role type.
 func (op *OutputParser) ParseAny(raw string, role string) (any, error) {
 	switch role {
@@ -87,6 +155,8 @@ func (op *OutputParser) ParseAny(raw string, role string) (any, error) {
 		return op.ParseJudge(raw)
 	case "reviewer":
 		return op.ParseReviewer(raw)
+	case "review_judge":
+		return op.ParseReviewJudge(raw)
 	default:
 		return nil, fmt.Errorf("unknown role: %q", role)
 	}

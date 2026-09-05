@@ -83,10 +83,9 @@ func runRebuttalRound(ctx context.Context, cfg OrchestraConfig, prevResponses []
 				}
 			}
 			rebuttalPrompt := buildRebuttalPrompt(cfg.Prompt, others, 2)
-			resp, err := runProviderWithProgress(ctx, provider, rebuttalPrompt, progress)
-			applyProviderRequestEvidence(resp, ProviderRequest{
-				Provider: provider.Name, Config: provider, Role: "debater_r2", Round: 2,
-			}, "subprocess")
+			resp, err := runConfiguredProvider(
+				ctx, cfg, provider, rebuttalPrompt, "debater_r2", 2, progress,
+			)
 			rebuttalResults[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p)
 	}

@@ -164,10 +164,11 @@ func TestBuildProviderStatuses_StderrOnlyWarningIsSuccess(t *testing.T) {
 
 	responses := []orchestra.ProviderResponse{
 		{
-			Provider: "codex",
-			ExitCode: 0,
-			Output:   `{"verdict":"PASS","summary":"ok","findings":[]}`,
-			Error:    "warning: --full-auto is deprecated; use --sandbox workspace-write instead",
+			Provider:        "codex",
+			ExitCode:        0,
+			Output:          `{"verdict":"PASS","summary":"ok","findings":[]}`,
+			Error:           "warning: --full-auto is deprecated; use --sandbox workspace-write instead",
+			ExecutedBackend: "omp",
 		},
 	}
 
@@ -175,7 +176,7 @@ func TestBuildProviderStatuses_StderrOnlyWarningIsSuccess(t *testing.T) {
 
 	require := assert.New(t)
 	require.Len(got, 1)
-	require.Equal(spec.ProviderStatus{Provider: "codex", Status: "success", Note: "-"}, got[0])
+	require.Equal(spec.ProviderStatus{Provider: "codex", Status: "success", Note: "-", Backend: "omp"}, got[0])
 }
 
 func TestBuildProviderStatuses_FailedProviderOverridesWarningResponse(t *testing.T) {

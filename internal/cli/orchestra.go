@@ -214,6 +214,7 @@ func runOrchestraCommand(
 		WorkingDir:           workingDir,
 		FallbackMode:         flags.FallbackMode,
 	}
+	cfg.ProviderBackends = ompProviderBackends(cfg)
 	applyHookMode(&cfg)
 
 	providerNames := providerConfigNames(providers)
@@ -222,7 +223,7 @@ func runOrchestraCommand(
 		termName = cfg.Terminal.Name()
 	}
 	fmt.Fprintf(os.Stderr, "전략: %s, 프로바이더: %s, 백엔드: %s (terminal=%s, hook=%t)\n",
-		strategyStr, strings.Join(providerNames, ", "), orchestra.SelectBackend(cfg).Name(), termName, cfg.HookMode)
+		strategyStr, strings.Join(providerNames, ", "), selectRoutedBackend(cfg).Name(), termName, cfg.HookMode)
 
 	if orchestra.ShouldDetach(termName, isStdoutTTY(), cfg.NoDetach) {
 		jobID, err := orchestra.RunPaneOrchestraDetached(ctx, cfg)

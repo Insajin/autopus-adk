@@ -118,3 +118,25 @@ type ReviewerFindingStatusOut struct {
 	Status string `json:"status"` // open, resolved, regressed
 	Reason string `json:"reason,omitempty"`
 }
+
+// ReviewJudgeOutput is the typed final adjudication of anonymized SPEC reviews.
+type ReviewJudgeOutput struct {
+	Verdict   string          `json:"verdict"` // PASS, REVISE, REJECT
+	Findings  []JudgedFinding `json:"findings"`
+	Rationale string          `json:"rationale"`
+}
+
+// JudgedFinding records whether and why a reviewer finding survived adjudication.
+type JudgedFinding struct {
+	ID          string   `json:"id,omitempty"`
+	Severity    string   `json:"severity"`
+	Category    string   `json:"category,omitempty"`
+	ScopeRef    string   `json:"scope_ref,omitempty"`
+	Location    string   `json:"location"`
+	Description string   `json:"description"`
+	Suggestion  string   `json:"suggestion"`
+	Decision    string   `json:"decision"`             // accept, reject, merge
+	Sources     []string `json:"sources"`              // anonymized reviewer labels
+	Reason      string   `json:"reason,omitempty"`     // required for reject and merge
+	MergeInto   string   `json:"merge_into,omitempty"` // required for merge: id of the accepted canonical finding
+}

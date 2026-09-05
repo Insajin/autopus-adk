@@ -49,7 +49,7 @@ type pipelineOMPProcess struct {
 	closeErr    error
 }
 
-func startPipelineOMPProcess(ctx context.Context, config pipelineOMPBackendConfig) (*pipelineOMPProcess, error) { // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: isolated OMP process boundary.
+func startPipelineOMPProcessWithOptions(ctx context.Context, config pipelineOMPBackendConfig, options pipelineOMPProcessOptions) (*pipelineOMPProcess, error) { // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: isolated OMP process boundary.
 	// @AX:REASON [AUTO]: Runtime ownership, argv, environment, process group, bounded frame reader, and readiness are established together.
 	// @AX:WARN [AUTO]: OMP process startup has more than eight runtime, pipe, launch, and readiness branches.
 	// @AX:REASON [AUTO]: Every partial startup path must release the private runtime and reject an unready child before RPC use.
@@ -77,7 +77,7 @@ func startPipelineOMPProcess(ctx context.Context, config pipelineOMPBackendConfi
 		cleanup()
 		return nil, err
 	}
-	cmd := exec.Command(privateExecutable, "--mode", "rpc", "--no-session", "--no-extensions", "--session-dir", sessionDir)
+	cmd := exec.Command(privateExecutable, append([]string{"--mode", "rpc", "--no-session", "--no-extensions", "--session-dir", sessionDir}, options.ExtraArgs...)...)
 	cmd.Dir = config.ProjectDir
 	cmd.Env = append([]string(nil), config.canonicalEnv...)
 	cmd.Stderr = io.Discard

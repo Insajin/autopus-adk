@@ -12,11 +12,9 @@ import (
 var (
 	specReviewRunOrchestra    = runStructuredSpecReviewOrchestra
 	specReviewConfigProviders = buildReviewProvidersWithConfig
-	// specReviewBackendFactory routes structured spec review through SelectBackend
-	// (REQ-002): pane-capable terminals get the interactive pane backend, plain/CI
-	// terminals get the headless subprocess backend. It accepts the full config so
-	// SelectBackend can read the detected Terminal injected by spec_review_loop.go.
-	specReviewBackendFactory func(orchestra.OrchestraConfig) orchestra.ExecutionBackend = orchestra.SelectBackend
+	// specReviewBackendFactory preserves pane/subprocess selection as the base
+	// while routing only providers explicitly configured with backend: omp.
+	specReviewBackendFactory func(orchestra.OrchestraConfig) orchestra.ExecutionBackend = selectRoutedBackend
 )
 
 // shippedStatuses lists spec statuses that represent work already delivered.
@@ -59,7 +57,22 @@ func syncReviewedSpecStatusWithReceipt(
 	receipt.Verdict = string(result.Verdict)
 	receipt.AnalysisVerdict = string(result.Verdict)
 	receipt.DegradedReasons = append([]string(nil), result.DegradedReasons...)
+	receipt.Providers = append([]spec.ProviderStatus(nil), result.ProviderStatuses...)
 	receipt.CriticalVeto = hasCriticalSpecReviewVeto(result.Findings)
+	if result.Judge != nil {
+		receipt.Judge = &specReviewJudgeReceipt{
+			Provider:    result.Judge.Provider,
+			Family:      result.Judge.Family,
+			Status:      result.Judge.Status,
+			Verdict:     result.Judge.Verdict,
+			Accepted:    result.Judge.Accepted,
+			Rejected:    result.Judge.Rejected,
+			Merged:      result.Judge.Merged,
+			AcceptedIDs: append([]string{}, result.Judge.AcceptedIDs...),
+			Rationale:   truncateSpecReviewJudgeRationale(result.Judge.Rationale),
+			Reason:      result.Judge.Reason,
+		}
+	}
 
 	doc, err := spec.Load(specDir)
 	if err != nil {

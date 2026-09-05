@@ -6,9 +6,12 @@ import (
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 )
 
-func specReviewProviderBackendName(primary orchestra.ExecutionBackend) string {
+func specReviewProviderBackendName(primary orchestra.ExecutionBackend, provider orchestra.ProviderConfig) string {
 	if primary == nil {
 		return "unknown"
+	}
+	if resolver, ok := primary.(orchestra.ProviderBackendResolver); ok {
+		return resolver.BackendNameFor(provider)
 	}
 	return primary.Name()
 }

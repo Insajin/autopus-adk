@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/insajin/autopus-adk/pkg/spec"
 )
 
@@ -96,4 +97,162 @@ func maxFindingNumber(findings []spec.ReviewFinding) int {
 		}
 	}
 	return maxID
+}
+
+func parseSpecReviewerResults(
+	result *orchestra.OrchestraResult,
+	specID string,
+	revision int,
+	priorFindings []spec.ReviewFinding,
+) ([]spec.ReviewResult, []orchestra.ProviderResponse) {
+	if result == nil {
+		return nil, nil
+	}
+	failedProviderNames := make(map[string]struct{}, len(result.FailedProviders))
+	for _, failed := range result.FailedProviders {
+		failedProviderNames[failed.Name] = struct{}{}
+	}
+	reviews := make([]spec.ReviewResult, 0, len(result.Responses))
+	responses := make([]orchestra.ProviderResponse, 0, len(result.Responses))
+	for _, response := range result.Responses {
+		if isSpecReviewJudgeResponse(response) {
+			continue
+		}
+		if _, failed := failedProviderNames[response.Provider]; failed {
+			continue
+		}
+		if response.TimedOut || response.ExitCode != 0 || response.EmptyOutput {
+			continue
+		}
+		reviews = append(reviews, spec.ParseVerdict(
+			specID, response.Output, response.Provider, revision, nilIfEmpty(priorFindings),
+		))
+		responses = append(responses, response)
+	}
+	return reviews, responses
+}
+
+func applySpecReviewJudge(
+	merged *spec.ReviewResult,
+	result *orchestra.OrchestraResult,
+	reviewerResponses []orchestra.ProviderResponse,
+	judgeProvider string,
+	revision int,
+	priorFindings []spec.ReviewFinding,
+) {
+	if merged == nil || result == nil {
+		return
+	}
+	_, aliasToProvider := orchestra.AnonymizeReviewParticipants(reviewerResponses)
+	for _, response := range result.Responses {
+		if !isSpecReviewJudgeResponse(response) {
+			continue
+		}
+		out, err := (&orchestra.OutputParser{}).ParseReviewJudge(response.Output)
+		if err == nil {
+			err = validateStructuredReviewJudge(out, aliasToProvider)
+		}
+		if err != nil {
+			merged.Judge = &spec.JudgeSummary{
+				Provider: trimSpecReviewJudgeSuffix(response.Provider, judgeProvider),
+				Family:   response.ModelFamily,
+				Status:   "invalid",
+				Reason:   err.Error(),
+			}
+			return
+		}
+		accepted, rejected, combined := reviewJudgeDecisionCounts(out)
+		judgedFindings := spec.JudgedFindingsToReview(
+			merged.SpecID, revision, out, aliasToProvider, priorFindings,
+		)
+		merged.Judge = &spec.JudgeSummary{
+			Provider:    trimSpecReviewJudgeSuffix(response.Provider, judgeProvider),
+			Family:      response.ModelFamily,
+			Status:      "ok",
+			Verdict:     out.Verdict,
+			Accepted:    accepted,
+			Rejected:    rejected,
+			Merged:      combined,
+			AcceptedIDs: acceptedJudgeFindingIDs(judgedFindings, accepted),
+			Rationale:   out.Rationale,
+		}
+		merged.Verdict = spec.ReviewVerdict(out.Verdict)
+		merged.Findings = judgedFindings
+		downgradeJudgePassWithBlockingSeverity(merged)
+		return
+	}
+	applyFailedSpecReviewJudgeSummary(merged, result.FailedProviders, judgeProvider)
+}
+
+// JudgedFindingsToReview emits accepted findings before resolved prior findings.
+func acceptedJudgeFindingIDs(findings []spec.ReviewFinding, accepted int) []string {
+	ids := make([]string, 0, accepted)
+	for i := 0; i < len(findings) && i < accepted; i++ {
+		ids = append(ids, findings[i].ID)
+	}
+	return ids
+}
+
+func applyFailedSpecReviewJudgeSummary(
+	merged *spec.ReviewResult,
+	failedProviders []orchestra.FailedProvider,
+	judgeProvider string,
+) {
+	for _, failed := range failedProviders {
+		if failed.Role != "judge" && !strings.HasSuffix(strings.TrimSpace(failed.Name), specReviewJudgeSuffix) {
+			continue
+		}
+		merged.Judge = &spec.JudgeSummary{
+			Provider: trimSpecReviewJudgeSuffix(failed.Name, judgeProvider),
+			Family:   failed.ModelFamily,
+			Status:   specReviewJudgeFailureStatus(failed),
+			Reason:   specReviewJudgeFailureReason(failed),
+		}
+		return
+	}
+}
+
+func specReviewJudgeFailureStatus(failed orchestra.FailedProvider) string {
+	class := strings.ToLower(strings.TrimSpace(failed.FailureClass))
+	reason := strings.ToLower(failed.Error)
+	if strings.Contains(class, "invalid") ||
+		strings.Contains(reason, "invalid review judge") ||
+		strings.Contains(reason, "parse review_judge") {
+		return "invalid"
+	}
+	return "failed"
+}
+
+func specReviewJudgeFailureReason(failed orchestra.FailedProvider) string {
+	if reason := strings.TrimSpace(failed.Error); reason != "" {
+		return reason
+	}
+	return strings.TrimSpace(failed.FailureClass)
+}
+
+func trimSpecReviewJudgeSuffix(provider, fallback string) string {
+	provider = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(provider), specReviewJudgeSuffix))
+	if provider == "" {
+		return strings.TrimSpace(fallback)
+	}
+	return provider
+}
+
+// downgradeJudgePassWithBlockingSeverity lowers a judge PASS to REVISE only
+// when an accepted (still active) finding is blocking. Prior findings the
+// judge resolved keep their severity but must not veto convergence.
+func downgradeJudgePassWithBlockingSeverity(result *spec.ReviewResult) {
+	if result == nil || result.Verdict != spec.VerdictPass {
+		return
+	}
+	for _, finding := range result.Findings {
+		if finding.Status != spec.FindingStatusOpen && finding.Status != spec.FindingStatusRegressed {
+			continue
+		}
+		switch strings.ToLower(strings.TrimSpace(finding.Severity)) {
+		case "critical", "major":
+			result.Verdict = spec.VerdictRevise
+			return
+		}
+	}
 }

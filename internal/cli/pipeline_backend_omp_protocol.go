@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 )
 
@@ -19,6 +18,7 @@ type pipelineOMPRPCCommand struct {
 	Enabled            *bool  `json:"enabled,omitempty"`
 	Provider           string `json:"provider,omitempty"`
 	ModelID            string `json:"modelId,omitempty"`
+	Level              string `json:"level,omitempty"`
 	Message            string `json:"message,omitempty"`
 	CustomInstructions string `json:"customInstructions,omitempty"`
 	Confirmed          *bool  `json:"confirmed,omitempty"`
@@ -44,15 +44,17 @@ type pipelineOMPRPCFrame struct {
 	Aborted      bool            `json:"aborted,omitempty"`
 	Skipped      bool            `json:"skipped,omitempty"`
 	IsTerminal   *bool           `json:"isTerminal,omitempty"`
+	Messages     json.RawMessage `json:"messages,omitempty"`
 }
 
 type pipelineOMPRPCProtocol struct {
 	process              *pipelineOMPProcess
 	nextID               int
 	safeCompactionImages map[string]struct{}
-	// declaredContextWindow is the window the caller asserted for this model.
-	// Zero means unknown and disables the exhaustion diagnosis in executeManaged.
+	// declaredContextWindow is caller-asserted; zero disables executeManaged exhaustion diagnosis.
 	declaredContextWindow int
+	// lastTurn is the assistant identity reported by the most recent agent_end.
+	lastTurn pipelineOMPTurnIdentity
 }
 
 type pipelineOMPModelState struct {
@@ -155,6 +157,11 @@ func (protocol *pipelineOMPRPCProtocol) execute(
 	return output.Text, nil
 }
 
+func (protocol *pipelineOMPRPCProtocol) setThinkingLevel(ctx context.Context, level string) error {
+	_, err := protocol.call(ctx, pipelineOMPRPCCommand{Type: "set_thinking_level", Level: level}, false)
+	return err
+}
+
 func (protocol *pipelineOMPRPCProtocol) readIdleState(
 	ctx context.Context,
 	stage string,
@@ -202,11 +209,14 @@ func (protocol *pipelineOMPRPCProtocol) call(
 			if frame.Command != command.Type {
 				return nil, fmt.Errorf("OMP pipeline RPC response command mismatch")
 			}
-			if waitLifecycle {
+			if waitLifecycle && !bareOMPPromptAck(frame.Data) {
+				// omp 17.x acknowledges a prompt with {agentInvoked:true}; omp
+				// 18.1.x sends a bare success and proves the run through the
+				// agent_start/agent_end lifecycle frames awaited below.
 				var result struct {
 					AgentInvoked *bool `json:"agentInvoked"`
 				}
-				if len(frame.Data) == 0 || string(frame.Data) == "null" || json.Unmarshal(frame.Data, &result) != nil {
+				if json.Unmarshal(frame.Data, &result) != nil {
 					return nil, errors.New("OMP pipeline RPC prompt result is malformed")
 				}
 				if result.AgentInvoked == nil || !*result.AgentInvoked {
@@ -233,6 +243,13 @@ func (protocol *pipelineOMPRPCProtocol) call(
 				}
 				// A retry re-enters the agent loop, so only a terminal end settles the prompt.
 				ended = frame.IsTerminal == nil || *frame.IsTerminal
+				if ended {
+					identity, err := settlePipelineOMPTurn(frame.Messages)
+					if err != nil {
+						return nil, err
+					}
+					protocol.lastTurn = identity
+				}
 			}
 			if responded && started && ended {
 				return data, nil
@@ -241,55 +258,4 @@ func (protocol *pipelineOMPRPCProtocol) call(
 			return data, nil
 		}
 	}
-}
-
-func safePipelineOMPToken(value string) bool {
-	return strings.TrimSpace(value) == value && value != "" && !strings.ContainsAny(value, "\x00\r\n\t /")
-}
-
-func rejectDuplicatePipelineOMPJSON(data []byte) error {
-	decoder := json.NewDecoder(strings.NewReader(string(data)))
-	if err := scanUniquePipelineOMPJSONValue(decoder); err != nil {
-		return err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		return errors.New("OMP pipeline RPC frame contains trailing JSON")
-	}
-	return nil
-}
-
-// @AX:WARN [AUTO]: Recursive JSON structure and duplicate-key validation has cyclomatic complexity 16.
-// @AX:REASON [AUTO]: Untrusted RPC frames must reject duplicate authority fields and malformed nested delimiters before decoding.
-func scanUniquePipelineOMPJSONValue(decoder *json.Decoder) error {
-	token, err := decoder.Token()
-	if err != nil {
-		return err
-	}
-	delimiter, structured := token.(json.Delim)
-	if !structured {
-		return nil
-	}
-	if delimiter != '{' && delimiter != '[' {
-		return errors.New("invalid OMP pipeline RPC JSON structure")
-	}
-	seen := map[string]bool{}
-	for decoder.More() {
-		if delimiter == '{' {
-			keyToken, err := decoder.Token()
-			key, ok := keyToken.(string)
-			if err != nil || !ok || seen[key] {
-				return errors.New("OMP pipeline RPC frame contains duplicate or invalid key")
-			}
-			seen[key] = true
-		}
-		if err := scanUniquePipelineOMPJSONValue(decoder); err != nil {
-			return err
-		}
-	}
-	closing, err := decoder.Token()
-	if err != nil || delimiter == '{' && closing != json.Delim('}') || delimiter == '[' && closing != json.Delim(']') {
-		return errors.New("invalid OMP pipeline RPC JSON structure")
-	}
-	return nil
 }

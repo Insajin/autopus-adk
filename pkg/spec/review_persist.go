@@ -46,6 +46,9 @@ func formatReviewMd(r *ReviewResult) string {
 	if section := RenderProviderHealthSection(r.ProviderStatuses, totalConfigured); section != "" {
 		sb.WriteString(section)
 	}
+	if section := renderJudgeSection(r.Judge); section != "" {
+		sb.WriteString(section)
+	}
 
 	if section := RenderObservationCoverage(r.DocCoverages); section != "" {
 		sb.WriteString(section)
@@ -78,6 +81,26 @@ func formatReviewMd(r *ReviewResult) string {
 		}
 	}
 
+	return sb.String()
+}
+
+func renderJudgeSection(judge *JudgeSummary) string {
+	if judge == nil {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("## Judge\n\n")
+	fmt.Fprintf(&sb, "**Provider**: %s\n", sanitizeNote(judge.Provider))
+	fmt.Fprintf(&sb, "**Family**: %s\n", sanitizeNote(judge.Family))
+	fmt.Fprintf(&sb, "**Status**: %s\n", sanitizeNote(judge.Status))
+	fmt.Fprintf(&sb, "**Verdict**: %s\n", sanitizeNote(judge.Verdict))
+	fmt.Fprintf(&sb, "**Accepted**: %d\n", judge.Accepted)
+	fmt.Fprintf(&sb, "**Rejected**: %d\n", judge.Rejected)
+	fmt.Fprintf(&sb, "**Merged**: %d\n", judge.Merged)
+	if reason := sanitizeNote(judge.Reason); reason != "" {
+		fmt.Fprintf(&sb, "**Reason**: %s\n", reason)
+	}
+	sb.WriteString("\n")
 	return sb.String()
 }
 

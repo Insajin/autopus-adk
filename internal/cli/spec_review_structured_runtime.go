@@ -54,7 +54,7 @@ func runStructuredSpecReviewProvidersSequential(
 	start := time.Now()
 	for i, provider := range cfg.Providers {
 		if err := ctx.Err(); err != nil {
-			backendName := specReviewProviderBackendName(backend)
+			backendName := specReviewProviderBackendName(backend, provider)
 			results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "queued", cfg.TimeoutSeconds, time.Since(start), err)
 			logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			continue
@@ -105,7 +105,7 @@ func runStructuredSpecReviewProvidersParallel(
 				if done[i] {
 					continue
 				}
-				backendName := specReviewProviderBackendName(backend)
+				backendName := specReviewProviderBackendName(backend, provider)
 				results[i] = pendingStructuredReviewTimeoutOutcome(provider, backendName, "provider_execution", cfg.TimeoutSeconds, time.Since(start), ctx.Err())
 				logStructuredReviewOutcome(provider.Name, backendName, results[i], time.Since(start))
 			}
@@ -159,7 +159,7 @@ func executeStructuredSpecReviewProvider(
 ) specReviewStructuredOutcome {
 	timeout := specReviewTimeout(provider, cfg.TimeoutSeconds)
 	start := time.Now()
-	backendName := specReviewProviderBackendName(backend)
+	backendName := specReviewProviderBackendName(backend, provider)
 	fmt.Fprintf(os.Stderr, "SPEC 리뷰 provider 시작: %s (backend=%s, timeout=%s, mode=%s)\n",
 		provider.Name, backendName, timeout, mode)
 	if backend == nil {
@@ -260,6 +260,9 @@ func structuredReviewTimeoutOutcome(provider, backendName, stage string, timeout
 func decorateStructuredFailure(outcome *specReviewStructuredOutcome, timeout, elapsed time.Duration) {
 	if outcome == nil || outcome.failed == nil {
 		return
+	}
+	if outcome.failed.ExecutedBackend == "" {
+		outcome.failed.ExecutedBackend = outcome.resp.ExecutedBackend
 	}
 	outcome.failed.Role = "reviewer"
 	outcome.failed.ConfiguredDuration = timeout

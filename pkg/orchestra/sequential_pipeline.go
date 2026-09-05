@@ -16,11 +16,8 @@ func runPipeline(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 		// starve the remaining stages.
 		perTimeout := providerExecutionTimeout(provider, cfg.TimeoutSeconds)
 		stageCtx, stageCancel := context.WithTimeout(ctx, perTimeout)
-		response, err := runProvider(stageCtx, provider, prompt)
+		response, err := runConfiguredProvider(stageCtx, cfg, provider, prompt, "pipeline_stage", index+1, nil)
 		stageCancel()
-		applyProviderRequestEvidence(response, ProviderRequest{
-			Provider: provider.Name, Config: provider, Role: "pipeline_stage", Round: index + 1,
-		}, "subprocess")
 		if err != nil {
 			failure := buildFailedProviderWithContext(
 				provider, response, err, cfg.TimeoutSeconds, "pipeline_stage", len(responses) > 0,

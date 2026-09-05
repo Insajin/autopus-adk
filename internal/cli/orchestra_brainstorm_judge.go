@@ -12,14 +12,17 @@ import (
 func separateBrainstormJudge(providers []orchestra.ProviderConfig, judge string) ([]orchestra.ProviderConfig, string, error) {
 	judge = strings.TrimSpace(judge)
 	judgeFamily := providerModelFamily(judge)
-	if judgeFamily == "" {
-		return nil, "", fmt.Errorf("brainstorm debate: judge %q has no verifiable model family", judge)
-	}
-
 	for _, provider := range providers {
-		if providerModelFamily(provider.Name) == "" {
+		family := providerConfigModelFamily(provider)
+		if family == "" {
 			return nil, "", fmt.Errorf("brainstorm debate: provider %q has no verifiable model family", provider.Name)
 		}
+		if strings.EqualFold(provider.Name, judge) {
+			judgeFamily = family
+		}
+	}
+	if judgeFamily == "" {
+		return nil, "", fmt.Errorf("brainstorm debate: judge %q has no verifiable model family", judge)
 	}
 	if len(providers) < 2 {
 		return nil, "", fmt.Errorf("brainstorm debate: at least two configured debaters are required")
@@ -52,6 +55,13 @@ func resolveBrainstormJudgeConfig(
 	resolved := candidates[0]
 	resolved.ModelFamily = family
 	return &resolved, nil
+}
+
+func providerConfigModelFamily(provider orchestra.ProviderConfig) string {
+	if family := strings.TrimSpace(provider.ModelFamily); family != "" {
+		return family
+	}
+	return providerModelFamily(provider.Name)
 }
 
 func providerModelFamily(name string) string {

@@ -130,13 +130,24 @@ func TestPipelineOMPRPCProtocol_PromptLifecycleOrderingAndFailures(t *testing.T)
 			})
 		}
 	})
+	// omp 18.1.x acknowledges a prompt with a bare success and proves the run
+	// only through the lifecycle frames.
+	t.Run("bare acknowledgement settles on lifecycle", func(t *testing.T) {
+		protocol, _ := pipelineOMPProtocolFixture([]pipelineOMPRPCFrame{
+			{ID: "pipeline-1", Type: "response", Command: "prompt", Success: true},
+			{Type: "agent_start"}, {Type: "agent_end"},
+		})
+		data, err := protocol.call(context.Background(), pipelineOMPRPCCommand{Type: "prompt", Message: "phase"}, true)
+		require.NoError(t, err)
+		assert.Empty(t, data)
+	})
 	tests := []struct {
 		name, want string
 		frames     []pipelineOMPRPCFrame
 	}{
 		{"stale agent end", "out of order", []pipelineOMPRPCFrame{{Type: "agent_end"}, success}},
 		{"start after terminal end", "ambiguous", []pipelineOMPRPCFrame{{Type: "agent_start"}, {Type: "agent_end"}, {Type: "agent_start"}, success}},
-		{"missing invocation proof", "malformed", []pipelineOMPRPCFrame{{Type: "agent_start"}, {Type: "agent_end"}, {ID: "pipeline-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`null`)}}},
+		{"missing invocation proof", "malformed", []pipelineOMPRPCFrame{{Type: "agent_start"}, {Type: "agent_end"}, {ID: "pipeline-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`[]`)}}},
 		{"response says not invoked", "without invoking", []pipelineOMPRPCFrame{{ID: "pipeline-1", Type: "response", Command: "prompt", Success: true, Data: json.RawMessage(`{"agentInvoked":false}`)}}},
 		{"prompt result says not invoked", "did not enter", []pipelineOMPRPCFrame{{ID: "pipeline-1", Type: "prompt_result", AgentInvoked: boolPointer(false)}}},
 		{"late same-id failure", "late failure", []pipelineOMPRPCFrame{success, {ID: "pipeline-1", Type: "response", Command: "prompt", Error: "late failure"}}},

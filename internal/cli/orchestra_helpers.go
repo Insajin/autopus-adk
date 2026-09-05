@@ -229,10 +229,25 @@ func buildProviderConfigsForRuntime(names []string, quality, effort string) []or
 }
 
 func providerConfigFromEntry(name string, entry config.ProviderEntry, interactiveInput string) orchestra.ProviderConfig {
+	binary := entry.Binary
+	modelFamily := providerModelFamily(name)
+	var tools []string
+	if entry.Backend == config.ProviderBackendOMP {
+		tools = entry.EffectiveTools()
+		if binary == "" {
+			binary = config.ProviderBackendOMP
+		}
+		if modelFamily == "" {
+			modelFamily = orchestra.ModelFamilyForSelector(entry.Model)
+		}
+	}
 	return orchestra.ProviderConfig{
 		Name:             name,
-		Binary:           entry.Binary,
-		ModelFamily:      providerModelFamily(name),
+		Backend:          entry.Backend,
+		Model:            entry.Model,
+		Tools:            tools,
+		Binary:           binary,
+		ModelFamily:      modelFamily,
 		Args:             append([]string(nil), entry.Args...),
 		PaneArgs:         append([]string(nil), entry.PaneArgs...),
 		ModelPolicy:      entry.ModelPolicy,

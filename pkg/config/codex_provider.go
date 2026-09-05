@@ -244,11 +244,15 @@ func providerEntryEqual(left, right ProviderEntry) bool {
 		left.Subprocess == right.Subprocess
 }
 
+// shouldRestoreProviderDefaults reports whether a provider entry should be
+// replaced by the shipped defaults. An entry that names an execution backend
+// is explicit configuration even though it carries no CLI args, so it is
+// never restored.
 func shouldRestoreProviderDefaults(providerName string, entry ProviderEntry, exists bool) bool {
 	if !exists {
 		return true
 	}
-	if len(entry.Args) != 0 {
+	if entry.Backend != "" || len(entry.Args) != 0 {
 		return false
 	}
 	if providerName != "codex" {
@@ -265,7 +269,7 @@ func shouldRestoreProviderDefaults(providerName string, entry ProviderEntry, exi
 }
 
 func classifyCustomUnmarkedEmptyCodexProvider(providerName string, entry ProviderEntry) (ProviderEntry, bool) {
-	if providerName != "codex" || len(entry.Args) != 0 || entry.ModelPolicy != "" || isZeroLikeUnmarkedCodexProvider(entry) {
+	if providerName != "codex" || entry.Backend != "" || len(entry.Args) != 0 || entry.ModelPolicy != "" || isZeroLikeUnmarkedCodexProvider(entry) {
 		return entry, false
 	}
 	entry.ModelPolicy = ProviderModelPolicyPinned

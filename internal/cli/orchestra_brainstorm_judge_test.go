@@ -61,3 +61,18 @@ func TestResolveBrainstormJudgeConfig_PreservesRuntimeConfigAndSetsFamily(t *tes
 	assert.Equal(t, "/custom/claude", judge.Binary)
 	assert.Equal(t, "anthropic", judge.ModelFamily)
 }
+
+func TestSeparateBrainstormJudge_PrefersConfiguredModelFamily(t *testing.T) {
+	t.Parallel()
+
+	providers := []orchestra.ProviderConfig{
+		{Name: "custom-judge", Binary: "omp", ModelFamily: "openai"},
+		{Name: "claude", Binary: "claude", ModelFamily: "anthropic"},
+	}
+
+	got, family, err := separateBrainstormJudge(providers, "custom-judge")
+
+	require.NoError(t, err)
+	assert.Equal(t, "openai", family)
+	assert.Equal(t, []string{"custom-judge", "claude"}, providerConfigNames(got))
+}

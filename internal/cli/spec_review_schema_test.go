@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/orchestra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,4 +36,12 @@ func TestRunStructuredSpecReviewOrchestra_InlinesSchemaForPaneBackendEvenWithSch
 	require.Len(t, backend.requests, 1)
 	assert.Contains(t, backend.requests[0].Prompt, "Required JSON schema",
 		"pane backend cannot pass provider schema flags, so the schema must be inlined")
+}
+
+func TestShouldInlineStructuredReviewSchema_ForOMPBackend(t *testing.T) {
+	t.Parallel()
+	provider := orchestra.ProviderConfig{
+		Backend: config.ProviderBackendOMP, SchemaFlag: "--output-schema",
+	}
+	assert.True(t, shouldInlineStructuredReviewSchema(nil, provider))
 }

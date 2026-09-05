@@ -23,11 +23,15 @@ func buildReviewProvidersWithConfig(cfg *config.HarnessConfig, names []string) [
 func filterInstalledProviders(all []orchestra.ProviderConfig) []orchestra.ProviderConfig {
 	var available []orchestra.ProviderConfig
 	for _, provider := range all {
-		if detect.IsInstalled(provider.Binary) {
+		binary := provider.Binary
+		if provider.Backend == config.ProviderBackendOMP {
+			binary = config.ProviderBackendOMP
+		}
+		if detect.IsInstalled(binary) {
 			available = append(available, provider)
 			continue
 		}
-		fmt.Fprintf(os.Stderr, "경고: %s 바이너리를 찾을 수 없습니다 (건너뜀)\n", provider.Binary)
+		fmt.Fprintf(os.Stderr, "경고: %s 바이너리를 찾을 수 없습니다 (건너뜀)\n", binary)
 	}
 	return available
 }

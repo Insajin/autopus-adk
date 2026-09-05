@@ -46,6 +46,9 @@ func TestMain(m *testing.M) {
 	if os.Getenv(pipelineOMPActiveRPCFixtureEnv) == "1" {
 		os.Exit(runPipelineOMPActiveRPCFixture())
 	}
+	if os.Getenv(ompReviewRPCFixtureEnv) == "1" {
+		os.Exit(runOMPReviewRPCFixture())
+	}
 	if os.Getenv(pipelineOMPRPCFixtureEnv) == "1" {
 		os.Exit(runPipelineOMPRPCFixture())
 	}

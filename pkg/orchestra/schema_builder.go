@@ -13,10 +13,11 @@ type SchemaBuilder struct{}
 
 // roleStructs maps role names to their output struct types.
 var roleStructs = map[string]reflect.Type{
-	"debater_r1": reflect.TypeOf(DebaterR1Output{}),
-	"debater_r2": reflect.TypeOf(DebaterR2Output{}),
-	"judge":      reflect.TypeOf(JudgeOutput{}),
-	"reviewer":   reflect.TypeOf(ReviewerOutput{}),
+	"debater_r1":   reflect.TypeOf(DebaterR1Output{}),
+	"debater_r2":   reflect.TypeOf(DebaterR2Output{}),
+	"judge":        reflect.TypeOf(JudgeOutput{}),
+	"review_judge": reflect.TypeOf(ReviewJudgeOutput{}),
+	"reviewer":     reflect.TypeOf(ReviewerOutput{}),
 }
 
 // Generate returns a JSON Schema string for the given role.
@@ -25,7 +26,7 @@ func (sb *SchemaBuilder) Generate(role string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown role: %q", role)
 	}
-	schema := buildSchema(t)
+	schema := buildRoleSchema(role, t)
 	data, err := json.MarshalIndent(schema, "", "  ")
 	if err != nil {
 		return "", fmt.Errorf("marshal schema: %w", err)
@@ -63,7 +64,7 @@ func (sb *SchemaBuilder) EmbedInPrompt(role string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("unknown role: %q", role)
 	}
-	schema := buildSchema(t)
+	schema := buildRoleSchema(role, t)
 	data, err := json.Marshal(schema)
 	if err != nil {
 		return "", fmt.Errorf("marshal schema: %w", err)
@@ -91,6 +92,29 @@ func buildSchema(t reflect.Type) map[string]any {
 		"required":             required,
 		"additionalProperties": false,
 	}
+}
+
+func buildRoleSchema(role string, t reflect.Type) map[string]any {
+	schema := buildSchema(t)
+	if role != "review_judge" {
+		return schema
+	}
+
+	properties := schema["properties"].(map[string]any)
+	properties["verdict"].(map[string]any)["enum"] = []string{"PASS", "REVISE", "REJECT"}
+	findings := properties["findings"].(map[string]any)
+	finding := findings["items"].(map[string]any)
+	findingProperties := finding["properties"].(map[string]any)
+	findingProperties["decision"].(map[string]any)["enum"] = []string{"accept", "reject", "merge"}
+	finding["required"] = []string{
+		"severity",
+		"location",
+		"description",
+		"suggestion",
+		"decision",
+		"sources",
+	}
+	return schema
 }
 
 // fieldSchema returns a JSON Schema fragment for a Go type.

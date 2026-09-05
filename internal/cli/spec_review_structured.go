@@ -21,9 +21,9 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		return nil, fmt.Errorf("spec review: no providers configured")
 	}
 
-	// The review context must outlast the longest per-provider attempt budget.
-	// Provider execution itself is isolated by child contexts in the parallel fan-out.
-	watchdogSeconds := specReviewWatchdogSeconds(cfg.Providers, cfg.TimeoutSeconds)
+	// Reviewers run in parallel before the sequential judge, so the watchdog
+	// includes the longest reviewer-attempt budget plus the judge budget.
+	watchdogSeconds := specReviewWatchdogForConfig(cfg)
 	ctx, cancel := structuredSpecReviewContext(ctx, watchdogSeconds)
 	defer cancel()
 
@@ -55,12 +55,28 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 
 	results := runStructuredSpecReviewProviders(ctx, cfg, backend, parser, schemaPath, embeddedSchema, mode)
 
+	judgeEnabled := strings.TrimSpace(cfg.JudgeProvider) != "" && !cfg.NoJudge
 	responses := make([]orchestra.ProviderResponse, 0, len(results))
+	var reviewerResponses []orchestra.ProviderResponse
+	if judgeEnabled {
+		reviewerResponses = make([]orchestra.ProviderResponse, 0, len(results))
+	}
 	failed := make([]orchestra.FailedProvider, 0)
 	for _, result := range results {
 		responses = append(responses, result.resp)
 		if result.failed != nil {
 			failed = append(failed, *result.failed)
+		} else if judgeEnabled {
+			reviewerResponses = append(reviewerResponses, result.resp)
+		}
+	}
+	if judgeEnabled {
+		judgeResponse, judgeFailure := runStructuredSpecReviewJudge(ctx, cfg, backend, reviewerResponses)
+		if judgeResponse != nil {
+			responses = append(responses, *judgeResponse)
+		}
+		if judgeFailure != nil {
+			failed = append(failed, *judgeFailure)
 		}
 	}
 
@@ -68,7 +84,7 @@ func runStructuredSpecReviewOrchestra(ctx context.Context, cfg orchestra.Orchest
 		Strategy:        cfg.Strategy,
 		Responses:       responses,
 		Duration:        time.Since(start),
-		Summary:         fmt.Sprintf("structured spec review: %d providers", len(responses)),
+		Summary:         fmt.Sprintf("structured spec review: %d providers", len(results)),
 		FailedProviders: failed,
 	}, cfg), nil
 }
@@ -139,6 +155,9 @@ func malformedStructuredOutcome(provider string, err error, sourceResp *orchestr
 		failed.StderrPreview = truncateStructuredReviewError(sourceResp.Error, 240)
 		failed.OutputPreview = truncateStructuredReviewError(sourceResp.Output, 240)
 	}
+	// The receipt projects FailedProvider over the response for a failed
+	// reviewer, so the observed backend must travel on both.
+	failed.ExecutedBackend = response.ExecutedBackend
 	return specReviewStructuredOutcome{resp: response, failed: failed}
 }
 
@@ -198,55 +217,6 @@ func structuredFailureDescription(err error, resp *orchestra.ProviderResponse) s
 		parts = append(parts, "stdout preview: "+truncateStructuredReviewError(resp.Output, 160))
 	}
 	return strings.Join(parts, "; ")
-}
-
-func structuredFailureClass(err error) string {
-	if err == nil {
-		return "execution_error"
-	}
-	msg := strings.ToLower(err.Error())
-	switch {
-	case strings.Contains(msg, "timed out"):
-		return "timeout"
-	case strings.Contains(msg, "empty output"):
-		return "empty_output"
-	case strings.Contains(msg, "invalid reviewer json"):
-		return "execution_error"
-	default:
-		return "execution_error"
-	}
-}
-
-func structuredFailureRemediation(err error, provider string) string {
-	if err == nil {
-		return "Retry the provider and inspect subprocess diagnostics."
-	}
-	return structuredFailureRemediationText(err.Error(), provider)
-}
-
-func structuredFailureRemediationText(description, provider string) string {
-	msg := strings.ToLower(description)
-	if strings.Contains(msg, "timed out") && strings.Contains(msg, "backend=pane") {
-		return fmt.Sprintf("Retry with `auto spec review <SPEC-ID> --subprocess`, increase --timeout, or set orchestra.providers.%s.subprocess.timeout before rerunning.", provider)
-	}
-	if strings.Contains(msg, "timed out") {
-		return fmt.Sprintf("Increase --timeout or set orchestra.providers.%s.subprocess.timeout, then retry with a smaller review context if needed.", provider)
-	}
-	if strings.Contains(msg, "empty output") {
-		return "Check provider args or prompt transport, then inspect stderr diagnostics before retrying."
-	}
-	if strings.Contains(msg, "invalid reviewer json") {
-		return "Retry with stricter JSON-only prompting or provider-specific structured output settings."
-	}
-	return "Retry the provider with a shorter context or stronger schema enforcement."
-}
-
-func truncateStructuredReviewError(s string, max int) string {
-	s = strings.TrimSpace(s)
-	if len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
 }
 
 func specReviewTimeout(provider orchestra.ProviderConfig, fallbackSeconds int) time.Duration {

@@ -41,7 +41,7 @@ func resolveCodexProviderCapabilitiesWith(
 		provider := &resolved[i]
 		provider.Args = append([]string(nil), provider.Args...)
 		provider.PaneArgs = append([]string(nil), provider.PaneArgs...)
-		if provider.Name != "codex" || provider.ModelPolicy != config.ProviderModelPolicyQuality {
+		if provider.Backend == config.ProviderBackendOMP || provider.Name != "codex" || provider.ModelPolicy != config.ProviderModelPolicyQuality {
 			continue
 		}
 

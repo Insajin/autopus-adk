@@ -115,9 +115,60 @@ func TestSpecReviewProviderBackendName_UsesPrimaryBackend(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, specReviewProviderBackendName(tt.backend))
+			assert.Equal(t, tt.want, specReviewProviderBackendName(tt.backend, orchestra.ProviderConfig{}))
 		})
 	}
+}
+
+// A routed backend names the route a provider resolves to, not the composite
+// "base+route" label, so pre-execute outcomes match completed ones.
+func TestSpecReviewProviderBackendName_ResolvesRoutedProvider(t *testing.T) {
+	t.Parallel()
+	routed := orchestra.NewRoutedBackend(
+		&issue59ReviewBackend{name: "subprocess"},
+		map[string]orchestra.ExecutionBackend{"omp": &issue59ReviewBackend{name: "omp"}},
+	)
+	assert.Equal(t, "omp", specReviewProviderBackendName(routed, orchestra.ProviderConfig{Backend: "omp"}))
+	assert.Equal(t, "subprocess", specReviewProviderBackendName(routed, orchestra.ProviderConfig{}))
+	assert.Equal(t, "acp", specReviewProviderBackendName(routed, orchestra.ProviderConfig{Backend: "acp"}))
+}
+
+type blockingReviewBackend struct{ name string }
+
+func (b *blockingReviewBackend) Execute(ctx context.Context, _ orchestra.ProviderRequest) (*orchestra.ProviderResponse, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (b *blockingReviewBackend) Name() string { return b.name }
+
+// Parent cancellation stamps every unfinished provider with its own backend:
+// the receipt row for an omp provider must say executed_backend=omp even when
+// the run was cut off before that backend returned.
+func TestRunStructuredSpecReviewProvidersParallel_ParentCancelStampsProviderBackend(t *testing.T) {
+	t.Parallel()
+	routed := orchestra.NewRoutedBackend(
+		&blockingReviewBackend{name: "subprocess"},
+		map[string]orchestra.ExecutionBackend{"omp": &blockingReviewBackend{name: "omp"}},
+	)
+	cfg := orchestra.OrchestraConfig{
+		TimeoutSeconds: 60,
+		Providers: []orchestra.ProviderConfig{
+			{Name: "claude", Backend: "omp", Model: "anthropic/claude-fable-5-1"},
+			{Name: "codex", Binary: "codex"},
+		},
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	outcomes := runStructuredSpecReviewProviders(ctx, cfg, routed, nil, "", "", "parallel")
+	require.Len(t, outcomes, 2)
+	require.NotNil(t, outcomes[0].failed)
+	assert.Equal(t, "omp", outcomes[0].failed.ExecutedBackend)
+	assert.Equal(t, "omp", outcomes[0].resp.ExecutedBackend)
+	assert.Equal(t, "timeout", outcomes[0].failed.FailureClass)
+	assert.True(t, outcomes[0].resp.TimedOut)
+	require.NotNil(t, outcomes[1].failed)
+	assert.Equal(t, "subprocess", outcomes[1].failed.ExecutedBackend)
 }
 
 func TestExecuteStructuredSpecReviewProvider_UsesSelectedBackendForFailureDiagnostics(t *testing.T) {

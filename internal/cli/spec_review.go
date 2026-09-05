@@ -156,6 +156,11 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	}
 	providers := configureSpecReviewProviders(resolveCodexProviderCapabilities(ctx, specReviewConfigProviders(cfg, providerNames)))
 	providers = applySpecReviewExecutionTimeout(providers, requestedTimeout)
+	judgeConfig := resolveSpecReviewJudgeConfig(cfg, providers, gate.Judge)
+	if judgeConfig != nil {
+		configuredJudge := applySpecReviewExecutionTimeout([]orchestra.ProviderConfig{*judgeConfig}, requestedTimeout)
+		judgeConfig = &configuredJudge[0]
+	}
 	if len(providers) == 0 {
 		return fmt.Errorf("사용 가능한 프로바이더가 없습니다. 설치를 확인하세요: %v", providerNames)
 	}
@@ -194,6 +199,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		threshold:       threshold,
 		gate:            gate,
 		providers:       providers,
+		judgeConfig:     judgeConfig,
 		configuredNames: append([]string(nil), providerNames...),
 		codeContext:     codeContext,
 		subprocessMode:  opts.forceSubprocess || resolveSubprocessMode(&cfg.Orchestra),
@@ -248,4 +254,28 @@ func hasActiveFindings(findings []spec.ReviewFinding) bool {
 		}
 	}
 	return false
+}
+
+func resolveSpecReviewJudgeConfig(
+	cfg *config.HarnessConfig,
+	reviewers []orchestra.ProviderConfig,
+	judge string,
+) *orchestra.ProviderConfig {
+	if judge == "" {
+		return nil
+	}
+	for i := range reviewers {
+		if reviewers[i].Name == judge {
+			resolved := reviewers[i]
+			return &resolved
+		}
+	}
+	if cfg == nil {
+		return nil
+	}
+	resolved := configureSpecReviewProviders(resolveProviders(&cfg.Orchestra, "review", []string{judge}))
+	if len(resolved) == 0 {
+		return nil
+	}
+	return &resolved[0]
 }

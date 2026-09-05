@@ -40,12 +40,20 @@ func applyRuntimeHarnessOverrides(effective effectiveHarnessConfig, flags global
 var (
 	orchestraRunLoadConfig     = loadHarnessConfigForFlags
 	orchestraRunBuildProviders = buildProviderConfigsForRuntime
-	// orchestraRunBackendFactory routes the run pipeline backend through
-	// SelectBackend (REQ-003) so it consumes the detected terminal rather than a
-	// hardcoded subprocess backend. Kept as a var to preserve the test seam.
-	orchestraRunBackendFactory  func(orchestra.OrchestraConfig) orchestra.ExecutionBackend = orchestra.SelectBackend
+	// orchestraRunBackendFactory routes explicit OMP providers while preserving
+	// SelectBackend as the pane/subprocess base. Kept as a var for test seams.
+	orchestraRunBackendFactory  func(orchestra.OrchestraConfig) orchestra.ExecutionBackend = selectRoutedBackend
 	orchestraRunExecutePipeline                                                            = orchestra.RunSubprocessPipeline
 )
+
+func ompProviderBackends(cfg orchestra.OrchestraConfig) map[string]orchestra.ExecutionBackend {
+	if !orchestraConfigUsesOMP(cfg) {
+		return nil
+	}
+	return map[string]orchestra.ExecutionBackend{
+		config.ProviderBackendOMP: newOMPReviewBackend(cfg.WorkingDir),
+	}
+}
 
 func providerConfigNames(providers []orchestra.ProviderConfig) []string {
 	names := make([]string, 0, len(providers))
@@ -61,6 +69,7 @@ func executeOrchestraRunStrategy(
 	cfg orchestra.OrchestraConfig,
 	pipelineCfg orchestra.SubprocessPipelineConfig,
 ) (*orchestra.OrchestraResult, error) {
+	cfg.ProviderBackends = ompProviderBackends(cfg)
 	switch strategy {
 	// recheck reuses the legacy engine: a single provider over two rounds needs
 	// no schema-guided subprocess pipeline.

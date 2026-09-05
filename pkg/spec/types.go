@@ -153,9 +153,10 @@ type ReviewFinding struct {
 // ProviderStatus captures one provider's outcome for the Provider Health
 // section rendered in review.md (SPEC-SPECREV-001 REQ-VERD-1).
 type ProviderStatus struct {
-	Provider string // provider name (e.g., "claude")
-	Status   string // "success" | "timeout" | "error"
-	Note     string // human-readable detail or "-" when empty
+	Provider string `json:"provider"`                   // provider name (e.g., "claude")
+	Status   string `json:"status"`                     // "success" | "timeout" | "error"
+	Note     string `json:"note"`                       // human-readable detail or "-" when empty
+	Backend  string `json:"executed_backend,omitempty"` // backend that executed the provider request
 }
 
 // ReviewResult is the aggregated result of a multi-provider review.
@@ -167,6 +168,7 @@ type ReviewResult struct {
 	Responses         []string           // raw provider responses
 	Revision          int                // revision iteration (0 = first review)
 	ProviderStatuses  []ProviderStatus   // per-provider health (SPEC-SPECREV-001 REQ-VERD-1)
+	Judge             *JudgeSummary      `json:"judge,omitempty"` // typed SPEC review judge outcome, when requested
 
 	// Observation-integrity fields (SPEC-ADK-REVIEW-INTEGRITY-001). All are
 	// additive and optional so existing consumers and prior artifacts are

@@ -137,6 +137,24 @@ func TestResolveCodexProviderCapabilities_NoLowerEffortKeepsModel(t *testing.T) 
 	assert.Contains(t, receipt.String(), "reason=runtime_default")
 }
 
+func TestResolveCodexProviderCapabilities_SkipsOMPBackend(t *testing.T) {
+	t.Parallel()
+	provider := managedRuntimeCodexProvider(config.CodexEffortUltra)
+	provider.Backend = config.ProviderBackendOMP
+	calls := 0
+	probe := func(context.Context, string) ([]byte, error) {
+		calls++
+		return nil, errors.New("OMP routes must not probe codex")
+	}
+
+	got := resolveCodexProviderCapabilitiesWith(
+		context.Background(), []orchestra.ProviderConfig{provider}, probe, &bytes.Buffer{},
+	)
+
+	assert.Zero(t, calls)
+	assert.Equal(t, provider, got[0])
+}
+
 func managedRuntimeCodexProvider(effort string) orchestra.ProviderConfig {
 	entry := config.CodexProviderEntryForQuality(config.QualityConf{Default: "ultra"})
 	entry = config.ApplyCodexProviderProfile(entry, config.CodexProfile{Model: config.CodexSolModel, Effort: effort})

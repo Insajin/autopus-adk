@@ -125,7 +125,7 @@ func providersSupportCLISchema(providers []ProviderConfig) bool {
 		return false
 	}
 	for _, provider := range providers {
-		if strings.TrimSpace(provider.SchemaFlag) == "" {
+		if provider.Backend == "omp" || strings.TrimSpace(provider.SchemaFlag) == "" {
 			return false
 		}
 	}

@@ -42,7 +42,7 @@ func RunOrchestra(ctx context.Context, cfg OrchestraConfig) (*OrchestraResult, e
 	defer cancel()
 
 	for _, p := range cfg.Providers {
-		if !detect.IsInstalled(p.Binary) {
+		if p.Backend == "" && !detect.IsInstalled(p.Binary) {
 			return nil, fmt.Errorf("프로바이더 바이너리를 찾을 수 없습니다: %q", p.Binary)
 		}
 	}
@@ -135,14 +135,13 @@ func runParallel(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, 
 		go func(idx int, provider ProviderConfig, cancel context.CancelFunc) {
 			defer wg.Done()
 			defer cancel()
-			resp, err := runProviderWithProgress(childCtx, provider, cfg.Prompt, progress)
 			role := "participant"
 			if cfg.Strategy == StrategyDebate {
 				role = "debater_r1"
 			}
-			applyProviderRequestEvidence(resp, ProviderRequest{
-				Provider: provider.Name, Config: provider, Role: role, Round: 1,
-			}, "subprocess")
+			resp, err := runConfiguredProvider(
+				childCtx, cfg, provider, cfg.Prompt, role, 1, progress,
+			)
 			results[idx] = providerResult{resp: resp, err: err, idx: idx}
 		}(i, p, childCancel)
 	}
@@ -268,7 +267,7 @@ func runFastest(ctx context.Context, cfg OrchestraConfig) ([]ProviderResponse, e
 		wg.Add(1)
 		go func(provider ProviderConfig) {
 			defer wg.Done()
-			resp, err := runProvider(ctx, provider, cfg.Prompt)
+			resp, err := runConfiguredProvider(ctx, cfg, provider, cfg.Prompt, "fastest", 1, nil)
 			// Reject failures the same way runParallel does: an exit-0 provider
 			// with empty stdout is not a usable "fastest" winner (false green).
 			if err != nil || resp == nil || resp.TimedOut || resp.EmptyOutput {

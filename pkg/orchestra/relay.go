@@ -44,7 +44,7 @@ func runRelay(ctx context.Context, cfg *OrchestraConfig) ([]ProviderResponse, er
 		// downstream stage to be skipped.
 		perTimeout := providerExecutionTimeout(p, cfg.TimeoutSeconds)
 		stageCtx, stageCancel := context.WithTimeout(ctx, perTimeout)
-		resp, err := runProvider(stageCtx, agenticP, prompt)
+		resp, err := runConfiguredProvider(stageCtx, *cfg, agenticP, prompt, "relay_stage", 1, nil)
 		stageCancel()
 		if err != nil {
 			// Skip failed provider and continue with next (REQ-3a)

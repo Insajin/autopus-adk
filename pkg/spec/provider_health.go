@@ -101,11 +101,7 @@ func classifyFailedProvider(name string, f orchestra.FailedProvider) ProviderSta
 	if note == "" {
 		note = emptyNotePlaceholder
 	}
-	return ProviderStatus{
-		Provider: name,
-		Status:   status,
-		Note:     note,
-	}
+	return ProviderStatus{Provider: name, Status: status, Note: note, Backend: f.ExecutedBackend}
 }
 
 // noteMaxLen bounds Note length so provider stderr (which can carry stack
@@ -127,15 +123,15 @@ func classifyResponse(name string, r orchestra.ProviderResponse) ProviderStatus 
 			collectionModeFromBackend(r.ExecutedBackend),
 			hasPartialProviderOutput(r.Output),
 		)
-		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: note}
+		return ProviderStatus{Provider: name, Status: providerStatusTimeout, Note: note, Backend: r.ExecutedBackend}
 	case r.ExitCode != 0:
 		note := sanitizeNote(r.Error)
 		if note == "" {
 			note = fmt.Sprintf("exit=%d", r.ExitCode)
 		}
-		return ProviderStatus{Provider: name, Status: providerStatusError, Note: note}
+		return ProviderStatus{Provider: name, Status: providerStatusError, Note: note, Backend: r.ExecutedBackend}
 	default:
-		return ProviderStatus{Provider: name, Status: providerStatusSuccess, Note: emptyNotePlaceholder}
+		return ProviderStatus{Provider: name, Status: providerStatusSuccess, Note: emptyNotePlaceholder, Backend: r.ExecutedBackend}
 	}
 }
 

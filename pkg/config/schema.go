@@ -141,6 +141,9 @@ type SubprocessConf struct {
 
 // ProviderEntry는 프로바이더 실행 설정이다.
 type ProviderEntry struct {
+	Backend          string             `yaml:"backend,omitempty"`
+	Model            string             `yaml:"model,omitempty"`
+	Tools            []string           `yaml:"tools,flow,omitempty"`
 	Binary           string             `yaml:"binary"`
 	Args             []string           `yaml:"args,flow"`
 	PaneArgs         []string           `yaml:"pane_args,flow,omitempty"`
@@ -239,6 +242,9 @@ func (c *HarnessConfig) Validate() error {
 		if !isValidPlatform(p) {
 			return fmt.Errorf("invalid platform %q", p)
 		}
+	}
+	if err := c.validateProviderBackends(); err != nil {
+		return err
 	}
 	if c.Quality.Default != "" {
 		if _, ok := c.Quality.Presets[c.Quality.Default]; !ok {

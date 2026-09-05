@@ -22,6 +22,7 @@ type specReviewLoopParams struct {
 	threshold       float64
 	gate            config.ReviewGateConf
 	providers       []orchestra.ProviderConfig
+	judgeConfig     *orchestra.ProviderConfig
 	configuredNames []string
 	codeContext     string
 	subprocessMode  bool
@@ -61,7 +62,8 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			Prompt:              prompt,
 			TimeoutSeconds:      p.timeout,
 			JudgeProvider:       p.gate.Judge,
-			NoJudge:             true,
+			JudgeConfig:         p.judgeConfig,
+			NoJudge:             p.gate.Judge == "",
 			SubprocessMode:      p.subprocessMode,
 			WorkingDir:          workingDir,
 			RunID:               orchestra.NewSessionID(),
@@ -79,11 +81,9 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		fmt.Fprintf(os.Stderr, "SPEC 리뷰 시작: %s (전략: %s, 리비전: %d)\n", p.specID, p.strategy, revision)
 
-		// The review watchdog must outlast the longest per-provider attempt
-		// budget. Provider execution itself is isolated by child contexts in
-		// the structured review parallel fan-out.
+		// Bound the parallel reviewer fan-out and the sequential judge together.
 		reviewCtx, cancel := context.WithCancel(p.ctx)
-		if watchdog := specReviewWatchdogSeconds(p.providers, p.timeout); watchdog > 0 {
+		if watchdog := specReviewWatchdogForConfig(orchCfg); watchdog > 0 {
 			reviewCtx, cancel = context.WithTimeout(p.ctx, time.Duration(watchdog)*time.Second)
 		}
 		result, err := specReviewRunOrchestra(reviewCtx, orchCfg)
@@ -99,27 +99,8 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			p.runtimeEvidence.FinishedAt = time.Now().UTC()
 		}
 
-		// Parse verdicts from each provider.
-		// SPEC-SPECREV-001 S-005 hardening: skip responses from providers that
-		// timed out or exited non-zero. Their partial stdout may contain
-		// spurious VERDICT keywords (PASS/REJECT) that must not contribute to
-		// the merged verdict — the ProviderStatuses table already records the
-		// failure for operator visibility.
-		failedProviderNames := make(map[string]struct{}, len(result.FailedProviders))
-		for _, failed := range result.FailedProviders {
-			failedProviderNames[failed.Name] = struct{}{}
-		}
-		var reviews []spec.ReviewResult
-		for _, resp := range result.Responses {
-			if _, failed := failedProviderNames[resp.Provider]; failed {
-				continue
-			}
-			if resp.TimedOut || resp.ExitCode != 0 || resp.EmptyOutput {
-				continue
-			}
-			r := spec.ParseVerdict(p.specID, resp.Output, resp.Provider, revision, nilIfEmpty(priorFindings))
-			reviews = append(reviews, r)
-		}
+		// Failed or judge responses never contribute to reviewer supermajority.
+		reviews, reviewerResponses := parseSpecReviewerResults(result, p.specID, revision, priorFindings)
 
 		// SPEC-SPECREV-001 REQ-VERD-1: build per-provider health from orchestra.
 		configuredNames := specReviewConfiguredNames(p.configuredNames, p.providers)
@@ -160,6 +141,16 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			Responses:         allResponses,
 			Revision:          revision,
 			ProviderStatuses:  providerStatuses,
+		}
+		// Judge precedence is fixed: a valid judge replaces verdict/findings;
+		// accepted critical/major findings downgrade PASS to REVISE; then verify
+		// scope lock and deterministic findings run before effectiveReviewVerdict.
+		// effectiveReviewVerdict may preserve REVISE because of a reviewer
+		// checklist FAIL, but it never turns a judge PASS into REVISE from the
+		// reviewer checklist alone.
+		applySpecReviewJudge(merged, result, reviewerResponses, p.gate.Judge, revision, priorFindings)
+		if merged.Judge != nil && merged.Judge.Status == "ok" {
+			merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
 		}
 
 		// Apply scope lock in verify mode

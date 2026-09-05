@@ -7,7 +7,7 @@ import (
 	"github.com/insajin/autopus-adk/pkg/detect"
 )
 
-// @AX:ANCHOR: [AUTO] subprocess judge execution boundary that emits both verdict outcome and fresh-session evidence
+// @AX:ANCHOR: [AUTO] direct judge execution boundary that emits both verdict outcome and fresh-session evidence
 // @AX:REASON: [AUTO] debate finalization and run receipts depend on consistent failure, attempt, backend, and freshness projection
 func executeDebateJudge(
 	ctx context.Context,
@@ -26,7 +26,7 @@ func executeDebateJudge(
 		failure.ExecutedBackend = noneBackendMarker
 		return nil, &failure, freshJudgeSession
 	}
-	if !detect.IsInstalled(judgeCfg.Binary) {
+	if judgeCfg.Backend == "" && !detect.IsInstalled(judgeCfg.Binary) {
 		err := fmt.Errorf("judge binary not found: %s", judgeCfg.Binary)
 		freshJudgeSession.Reason = err.Error()
 		failure := buildFailedProviderWithContext(
@@ -42,11 +42,10 @@ func executeDebateJudge(
 	stopProgress := progress.StartHeartbeat(ctx, progressHeartbeatInterval)
 	defer stopProgress()
 	judgment := buildTypedJudgmentPrompt(cfg.Prompt, responses)
-	response, err := runProviderWithProgress(ctx, judgeCfg, judgment, progress)
-	applyProviderRequestEvidence(response, ProviderRequest{
-		Provider: judgeCfg.Name, Config: judgeCfg, Role: "judge", Round: judgeAttempt,
-	}, "subprocess")
-	verifyFreshSubprocessJudgeSession(freshJudgeSession, response)
+	response, err := runConfiguredProvider(
+		ctx, cfg, judgeCfg, judgment, "judge", judgeAttempt, progress,
+	)
+	verifyFreshConfiguredJudgeSession(freshJudgeSession, response, cfg, judgeCfg)
 	if response != nil {
 		response.freshJudgeSession = freshJudgeSession
 	}
@@ -72,6 +71,37 @@ func executeDebateJudge(
 	}
 	response.Provider = cfg.JudgeProvider + " (judge)"
 	return response, nil, freshJudgeSession
+}
+
+func verifyFreshConfiguredJudgeSession(
+	evidence *FreshJudgeSessionEvidence,
+	response *ProviderResponse,
+	cfg OrchestraConfig,
+	provider ProviderConfig,
+) {
+	if provider.Backend == "" {
+		verifyFreshSubprocessJudgeSession(evidence, response)
+		return
+	}
+	if evidence == nil {
+		return
+	}
+	if response == nil {
+		evidence.Reason = "fresh configured judge execution returned no response"
+		return
+	}
+	backend := cfg.ProviderBackends[provider.Backend]
+	fresh, ok := backend.(FreshExecutionBackend)
+	if !ok || !fresh.FreshExecutionPerRequest() {
+		evidence.Reason = fmt.Sprintf(
+			"configured judge backend %q does not guarantee fresh execution",
+			provider.Backend,
+		)
+		return
+	}
+	evidence.Isolated = true
+	evidence.Verified = true
+	evidence.Reason = "fresh configured backend execution verified"
 }
 
 func buildTypedJudgmentPrompt(topic string, responses []ProviderResponse) string {
