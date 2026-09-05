@@ -124,11 +124,11 @@ flowchart LR
 
 | Item | Blocks | Required resolution |
 |---|---|---|
-| Canonical `/auto` backend has no observed production evidence producer, provider credential/endpoint authority, stable reusable-session binding or multi-compaction admission gate | Outcome Lock and lifecycle completion | Produce 20 balanced AB/BA pairs in real tasks and prove every compaction's canonical re-admission at the provider boundary before active enablement. |
+| (none) | — | Production producer는 `auto workflow context-runtime observe-session`, authority/reusable-session/multi-compaction gate는 `pkg/promptlayer/omp_context_promotion_report_{authority,cohort}.go`, consumer는 `pipeline_omp_context_active_coordinator.go`이며, release v0.50.114(2026-09-03)가 20 balanced AB/BA pairs·42/42 calls·14/14 gate를 K3 서명 evidence로 남겨 active enablement 조건을 충족했다 |
 
 ## Final T9 Verification Evidence
 
-- PASS: historical T9 installed canary/exact aggregate `85.02%` (`3075/3617`)/four-package race/vet/build/full/strict/lore; current canonical-full delta installed loopback canaries, package race, vet/build, strict, exact aggregate `85.04%` (`3321/3905`) and package coverage `promptlayer=88.15%`, `adapter/omp=87.70%`, `config=90.99%`, `internal/cli=79.82%` versus T1 baselines. This does not close T5 active-history authority.
+- PASS: historical T9 installed canary/exact aggregate `85.02%` (`3075/3617`)/four-package race/vet/build/full/strict/lore; current canonical-full delta installed loopback canaries, package race, vet/build, strict, exact aggregate `85.04%` (`3321/3905`) and package coverage `promptlayer=88.15%`, `adapter/omp=87.70%`, `config=90.99%`, `internal/cli=79.82%` versus T1 baselines. PASS (2026-09-05, T5 close): release `v0.50.114` evidence tag `omp-context-evidence-v0.50.114`(report 14/14, 20/40, provider openai-codex, omp/17.2.7, K3 attestation) 확인; GitHub static policy `autopus.omp_context_promotion_runtime.v3`가 source_commit `a6d199fb`·K3로 갱신됨; `omp/18.1.10` 설치본에서 installed canary 3종(`AUTOPUS_OMP_CONTEXT_LIVE=1`) PASS; HEAD `go test ./...`, vet/build, strict PASS.
 
 ## Evolution Ideas
 

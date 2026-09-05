@@ -97,9 +97,9 @@ func runOMPLiveWorkflowTurn(
 	if strings.HasPrefix(prompt, "/auto-plan") {
 		commandName = "auto-plan"
 	}
-	commandBody := readOMPGeneratedBody(t, scratch, ".agents", "commands", commandName+".md")
-	autoBody := readOMPGeneratedBody(t, scratch, ".agents", "skills", "auto", "SKILL.md")
-	planBody := readOMPGeneratedBody(t, scratch, ".agents", "skills", "auto-plan", "SKILL.md")
+	commandBody := readOMPGeneratedBody(t, scratch, ".omp", "commands", commandName+".md")
+	autoBody := readOMPGeneratedBody(t, scratch, ".omp", "skills", "auto", "SKILL.md")
+	planBody := readOMPGeneratedBody(t, scratch, ".omp", "skills", "auto-plan", "SKILL.md")
 	assertOMPPlanProfile(t, planBody)
 
 	expandedCommandBody := expandedOMPLiveCommandBody(prompt, commandBody)
@@ -221,7 +221,7 @@ func writeOMPLiveOverlay(t *testing.T, profile string) string {
   enableClaudeUser: false
   enableClaudeProject: false
   enablePiUser: false
-  enablePiProject: false
+  enablePiProject: true
   enableAgentsUser: false
   enableAgentsProject: false
   enableSkillCommands: true

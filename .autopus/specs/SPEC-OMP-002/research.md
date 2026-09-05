@@ -117,7 +117,7 @@ flowchart LR
 
 | Item | Blocks | Required resolution |
 |------|--------|---------------------|
-| Exact integrated commit/HEAD lifecycle 증거 미생성 | sync completion only | 구현 worktree의 모든 기술 gate는 green이다. 별도 commit 승인 후 동일 candidate를 commit하고 exact HEAD에서 최종 gate를 재실행한다. |
+| (none) | — | integrated commit `e7a1f767`(base `b86fab06`)에 commit됐고 2026-09-05 HEAD에서 full test/vet/build/strict/hygiene와 S11 live gate(`omp/18.1.10`)를 재실행해 green이다 |
 
 ## Implementation Evidence
 
@@ -129,6 +129,7 @@ flowchart LR
 | config lifecycle | two marker forms, exact byte/mode preservation, transactional Clean/preflight/late-failure repair receipt PASS |
 | review and security convergence | discovery findings 전건 closed, final reviewer APPROVE, security APPROVE |
 | quality | focused/race/full affected-package tests, vet, Windows compile, coverage 87.1%, source 300-line cap PASS |
+| exact HEAD re-verification (2026-09-05) | integrated commit `e7a1f767`; HEAD `go test ./...`/vet/build/strict/hygiene green; S11 live gate on `omp/18.1.10` router/direct-alias PASS with the same projection and sandbox counters |
 
 ## Evolution Ideas
 

@@ -11,7 +11,8 @@
 ## Current Acceptance State
 
 - S1-S12와 S13의 installed managed/product live canary·changed-production coverage는 기존 `85.02%` 및 current delta `85.04% (3321/3905)`·package baseline·race·vet/build·strict sub-oracle을 통과했다.
-- Native `/auto` canonical-full production command path는 구현됐지만 S13의 active-history production evidence producer, provider-bound reusable session/multi-compaction admission oracle이 미충족이므로 Must acceptance는 `12/13`이고 전체 SPEC은 미완료다. Compaction-off RPC 성공이나 persisted fixture는 이 판정을 올리지 않는다.
+- S13의 active-history production evidence는 release `v0.50.114`(2026-09-03)의 evidence tag `omp-context-evidence-v0.50.114`로 충족됐다: 20 balanced AB/BA pairs(40 observations, AB 10/BA 10), provider credential/endpoint authority(`provider-authority` gate, openai-codex), stable reusable OMP session binding(full/optimized process·session 2+2, `reusable-session` gate), multi-compaction admission(`multi-compaction-admission` gate, cohort 42/42), K3 attestation(`omp-context-promotion-2026-q3-k3`), static policy 갱신. Must acceptance는 `13/13`이다.
+- 2026-09-05 `omp/18.1.10`에서 installed managed lifecycle canary 재실행: `provider_requests=3 pre_ack=1 post_ack=1 native_start=1 native_end=1 same_pid=true same_session=true exact_body=true cleanup_root_count=0 sandbox=true`; compaction lifecycle canary `threshold=7000 provider_turns=2 loopback_requests=2 external_requests=0 early_admission=0 optimized_dispatch=1`; product session real overlay `provider_requests=5 auth=5 external_endpoints=0 pre_ack=2 post_ack=2 native_start=2 native_end=2 same_pid=true same_session=true cleanup_root_count=0`. 설치본이 static policy pin(omp/17.2.7)과 다르므로 이 워크스테이션의 active admission은 S8대로 fail-closed(canonical full)다.
 
 ## Test Scenarios
 

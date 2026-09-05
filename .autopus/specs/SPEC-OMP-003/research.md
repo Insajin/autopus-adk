@@ -119,11 +119,10 @@ Current main의 key나 syntax는 설치 17.1.8 지원 증거가 아니다. compi
 
 | Item | Blocks | Required resolution |
 |------|--------|---------------------|
-| Exact integrated commit/HEAD와 SPEC-OMP-002 lifecycle status promotion이 기록되지 않음 | release/sync completion | Parent integrated candidate의 exact SHA를 고정하고 green technical evidence와 함께 SPEC-OMP-002 lifecycle sync를 수행 |
+| (none) | — | integrated commit `e7a1f767`(base `b86fab06`) 고정, SPEC-OMP-002 completed, 2026-09-05 HEAD에서 full test/vet/build/strict/hygiene·coverage gate·S19 canary 완료 |
 ## Current Pending Gates
 
-- T13~T15는 implemented다. T12 serial full test, vet/build/strict는 green이며 changed-file 85%/T1 baseline과 git/tracked-ignore release hygiene만 pending이다.
-- S19는 `not-run: explicit approval required`이며 S1~S18과 S20~S24의 blocker가 아니다.
+- 없음. T1~T15 complete. S19는 사용자 승인(2026-09-05) 아래 1회 호출로 PASS했다.
 ## Evolution Ideas
 
 These are optional improvements and do not block sync completion.

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -110,6 +111,9 @@ func runActualOMPRPC(
 		frame, readErr := nextOMPRPCFrame(ctx, frames, scanDone)
 		if readErr != nil {
 			return trace, readErr
+		}
+		if os.Getenv("AUTOPUS_OMP_LIVE_DEBUG") == "1" {
+			fmt.Fprintf(os.Stderr, "frame: %s\n", frame)
 		}
 		terminal, err = trace.consume(frame)
 		if err != nil {

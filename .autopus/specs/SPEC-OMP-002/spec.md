@@ -1,6 +1,6 @@
 # SPEC-OMP-002: OMP 워크플로 실행 파리티 및 설정 안전성
 
-**Status**: implemented
+**Status**: completed
 **Created**: 2026-08-02
 **Domain**: OMP
 

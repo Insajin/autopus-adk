@@ -184,6 +184,10 @@ And receipt에는 token/latency/selector와 pass/fail만 남고 prompt body, res
 
 승인이 없으면 S19는 `not-run: explicit approval required`로 보고하며 S1~S18의 deterministic release
 gate를 실패시키지 않는다. 승인 없는 실제 호출을 성공으로 간주해서도 안 된다.
+
+**S18 결과 (2026-09-05)**: hermetic full test/vet/build green; routing-owned changed production file 41개 aggregate `89.91%`(≥85); routing-owned 파일의 package별 aggregate(`internal/cli 83.44`, `pkg/adapter/omp 88.95`, `pkg/config 97.02`, `pkg/content 98.75`)가 T1 base `b86fab06` package coverage(`81.3 / 88.8 / 89.6 / 95.2`) 이상; default source의 새 concrete provider/model literal 0개(기존 테스트 고정). 판정: PASS.
+
+**S19 결과 (2026-09-05, 사용자 승인: "다 완주하자")**: autopus-workspace(`.omp/config.yml` ultra 프로필, doctor `model-routing.receipt supported/fresh/valid`)에서 role `autopus_validator`(doctor: agent=validator capability=deterministic_transform status=supported reason=selected)로 `omp --mode rpc --no-session --no-extensions --no-skills --no-lsp --tools read --model @autopus_validator` 세션을 열고 `get_state` readback 뒤 고정 prompt 1회를 보냈다. 컴파일된 projection `anthropic/claude-opus-5:xhigh` = readback(`provider=anthropic model=claude-opus-5 thinkingLevel=xhigh`) = 관측 assistant(`provider=anthropic model=claude-opus-5 stopReason=stop`). provider 호출 정확히 1회(messageCount 2). token input 4 / output 4 / cacheRead 12772 / cacheWrite 0, cost $0.0065, latency 1730ms(ttft 1204ms). receipt에는 위 수치·selector·pass만 기록하고 prompt/response body와 credential은 없다. 판정: PASS.
 ## Verification Commands
 
 ```bash

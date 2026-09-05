@@ -1,6 +1,6 @@
 # SPEC-OMP-003: OMP 역할 기반 멀티프로바이더 모델 라우팅
 
-**Status**: implemented
+**Status**: completed
 **Created**: 2026-08-02
 **Domain**: OMP
 

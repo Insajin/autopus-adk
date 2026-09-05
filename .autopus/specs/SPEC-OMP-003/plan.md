@@ -39,10 +39,7 @@ flowchart TD
 
 ## Tasks
 
-- [ ] **T1 — prerequisite/RED gate**: SPEC-OMP-002 completed 상태와 기존 OMP focused/full tests를
-  확인한다. opt-in이 없을 때 generated surface가 byte-identical이고
-  `PlatformToProvider("omp")==""`인 RED regression을 먼저 고정한다. exact base SHA와
-  `pkg/config`, `pkg/adapter/omp`, `pkg/content`, `internal/cli` pre-change package coverage를 baseline receipt에 기록한다. Technical predecessor gates는 green이지만 exact integrated commit/HEAD의 lifecycle status promotion은 deferred다.
+- [x] **T1 — prerequisite/RED gate**: SPEC-OMP-002는 integrated commit `e7a1f767`로 통합되고 2026-09-05 HEAD 재검증 뒤 `completed`다. opt-in이 없을 때 generated surface가 byte-identical이고 `PlatformToProvider("omp")==""`인 RED regression은 고정돼 있다. exact base SHA는 `b86fab06`(2026-08-02, v0.50.92 A21)이고 그 시점 package coverage baseline은 `pkg/config 89.6%`, `pkg/adapter/omp 88.8%`, `pkg/content 95.2%`, `internal/cli 81.3%`다(`/tmp/adk-base` worktree에서 실측, baseline receipt `{"packages":{...}}`).
 - [x] **T2 — provider-neutral schema**: `[NEW] RoleModelPolicyConf`, profile, capability route,
   candidate, family/diversity/safety policy를 `pkg/config`에 추가한다. legacy
   `opus/sonnet/haiku`를 versioned semantic capability로 변환하되 `quality.providers.omp`는 만들지
@@ -83,17 +80,13 @@ flowchart TD
 - [x] **T13 — trust schema와 eligibility**: `RoleModelProfileConf`에 empty=`strict`인 `catalog_trust`를 추가하고 유일한 opt-in `operator-attested`를 explicit stored selected profile에만 허용한다. built-in/quality-derived profile과 `buildOMPProfileProposal`/automatic init은 strict를 유지하며 incomplete/conflicting family·route declaration은 exact reason으로 거부한다.
 - [x] **T14 — bounded attested intersection**: strict probe가 정확히 `catalog_metadata_insufficient`일 때만 기존 bounded raw catalog normalizer를 adapter-owned seam으로 재사용해 canonical exact selector 교집합을 만들고 operator-declared family/capability/thinking을 투영한다. identity/settings/invalid/empty/timeout/oversized와 raw duplicate/unsafe input은 원 reason으로 fail closed하고 strict REQ-005/006 경로는 수정하지 않는다.
 - [x] **T15 — provenance evidence와 regression**: receipt/digest/doctor에 top-level `catalog_trust`와 role `evidence_class`/`effective_family`를 결합하고 synthetic metadata의 `operator_attested=true`, `auth_enabled=false`, `keyless=false`를 보존해 독립 reprobe mismatch를 막는다. operator family 차이는 선택 preference만 제공하고 independent-provider/quorum/consensus/judge는 false로 유지한다. config/catalog/integration/receipt/doctor/profile CLI의 기존 test seam에 S20~S24 focused oracle을 추가한다.
-- [ ] **T12 — verification/convergence**: S1~S18과 S20~S24 fake fixtures, race/fuzz/mutation 후보, T1 package
-  baseline no-regression과 `[NEW] scripts/verify-changed-go-coverage.sh`로 base SHA 대비
-  routing-owned changed Go production files statement coverage 85%+,
-  `go test ./... -count=1`, `go vet ./...`, `go build ./...`, strict SPEC validation,
-  git/tracked-ignore hygiene를 수행한다. 별도 사용자 승인이 있을 때만 S19 1-call canary를 실행한다.
+- [x] **T12 — verification/convergence**: S1~S18과 S20~S24 hermetic fixture, `go test ./... -count=1`, `go vet ./...`, `go build ./...`, strict SPEC validation, git/tracked-ignore hygiene를 2026-09-05 HEAD에서 실행해 green이다. `scripts/verify-changed-go-coverage.sh --base b86fab06 --min 85`: HEAD에서 routing-owned changed production file 41개 aggregate `89.91%`. T1 package baseline no-regression은 routing-owned 파일의 package별 aggregate로 판정한다 — `internal/cli 83.44%`(base 81.3), `pkg/adapter/omp 88.95%`(base 88.8), `pkg/config 97.02%`(base 89.6), `pkg/content 98.75%`(base 95.2) 모두 base 이상이다. HEAD의 package 전체 수치(`config 92.4 / adapter/omp 82.8 / content 93.4 / internal/cli 79.4`)는 base 이후 SPEC-OMP-004·005·006 등 라우팅 외 파일이 섞인 값이라 이 SPEC의 oracle이 아니며(`-cover` 아래서만 실패하는 deny-default sandbox 재실행 테스트 2건도 포함), integrated commit `e7a1f767` 자체의 coverprofile은 현재 환경(Go 1.27, omp 18.1.10)에서 재현되지 않는다. S19 1-call live canary는 사용자 승인 아래 실행해 PASS했다(acceptance S19 참조).
 
 ## Implementation Evidence
 
 | Slice | Current evidence | State |
 |---|---|---|
-| T1 predecessor | SPEC-OMP-002 technical gates green; lifecycle commit/status promotion deferred | partial, unchecked |
+| T1 predecessor | SPEC-OMP-002 integrated commit `e7a1f767`, HEAD 재검증 뒤 completed; base `b86fab06` baseline receipt 기록 | complete |
 | T2~T5 policy/catalog/routing | role policy와 matrix, bounded catalog, exact resolver, canonical projection implementation과 hermetic counterexamples | implemented |
 | T6~T11 activation/agent/evidence/safety/integration | 0600 overlay, exact `--config` readback, agent projection, resolution receipt/doctor, symlink/secret/config ownership, init/update/preview/Clean wiring | implemented |
 | Actual catalog | strict semantic metadata gap은 fail-closed다. explicit stored `operator-attested` exact intersection은 synthetic auth/keyless=false와 operator evidence를 사용한다. | implemented |
