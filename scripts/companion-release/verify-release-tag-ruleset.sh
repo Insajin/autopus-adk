@@ -7,9 +7,9 @@ usage() { printf '%s\n' 'usage: verify-release-tag-ruleset.sh --armed|--sealed|-
 case "$1" in --armed) mode=armed ;; --sealed) mode=sealed ;; --sealed-runtime) mode=sealed-runtime ;; *) usage ;; esac
 readonly mode
 readonly repository='Insajin/autopus-adk'
-readonly ruleset_name='autopus-v0.50.115-release-authority'
-readonly release_tag='v0.50.115'
-readonly release_ref='refs/tags/v0.50.115'
+readonly ruleset_name='autopus-v0.50.116-release-authority'
+readonly release_tag='v0.50.116'
+readonly release_ref='refs/tags/v0.50.116'
 readonly release_actor_id=204883817
 readonly environment_name='adk-companion-release'
 for tool in gh jq; do command -v "$tool" >/dev/null || fail "${tool} is unavailable"; done

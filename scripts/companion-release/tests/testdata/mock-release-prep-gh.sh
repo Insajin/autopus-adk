@@ -82,7 +82,7 @@ case "$command" in
     case "$method:$endpoint" in
       GET:repos/Insajin/autopus-adk) printf '%s\n' '{"permissions":{"admin":true}}' ;;
       'GET:repos/Insajin/autopus-adk/rulesets?includes_parents=true&targets=tag')
-        printf '%s\n' '[{"id":777,"name":"autopus-v0.50.115-release-authority","target":"tag"}]'
+        printf '%s\n' '[{"id":777,"name":"autopus-v0.50.116-release-authority","target":"tag"}]'
         ;;
       GET:repos/Insajin/autopus-adk/rulesets/777)
         ruleset_state=$(<"$state/ruleset-state")
@@ -96,12 +96,12 @@ case "$command" in
           *) exit 65 ;;
         esac
         jq -cn --argjson bypass "$bypass" --argjson rules "$rules" \
-          '{id:777,name:"autopus-v0.50.115-release-authority",target:"tag",enforcement:"active",
-            bypass_actors:$bypass,conditions:{ref_name:{include:["refs/tags/v0.50.115"],exclude:[]}},rules:$rules}'
+          '{id:777,name:"autopus-v0.50.116-release-authority",target:"tag",enforcement:"active",
+            bypass_actors:$bypass,conditions:{ref_name:{include:["refs/tags/v0.50.116"],exclude:[]}},rules:$rules}'
         ;;
       PUT:repos/Insajin/autopus-adk/rulesets/777)
         [[ -f "$input" ]] || exit 65
-        jq -e '.name == "autopus-v0.50.115-release-authority" and .target == "tag" and
+        jq -e '.name == "autopus-v0.50.116-release-authority" and .target == "tag" and
           .enforcement == "active" and .bypass_actors == [] and
           ([.rules[].type] | sort) == ["creation","deletion","update"]' "$input" >/dev/null || exit 65
         write_count
@@ -126,12 +126,12 @@ case "$command" in
         fi
         jq -c '[.]' "$state/releases.json"
         ;;
-      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.115)
-        jq -ce '.[] | select(.tag_name == "v0.50.115")' "$state/releases.json"
+      GET:repos/Insajin/autopus-adk/releases/tags/v0.50.116)
+        jq -ce '.[] | select(.tag_name == "v0.50.116")' "$state/releases.json"
         ;;
       POST:repos/Insajin/autopus-adk/releases)
-        [[ "$field_tag" == 'v0.50.115' && "$field_target" =~ ^[0-9a-f]{40}$ &&
-           "$field_release_name" == 'v0.50.115' &&
+        [[ "$field_tag" == 'v0.50.116' && "$field_target" =~ ^[0-9a-f]{40}$ &&
+           "$field_release_name" == 'v0.50.116' &&
            "$field_draft" == 'true' && "$field_prerelease" == 'false' ]] || exit 65
         jq -e --arg tag "$field_tag" 'all(.[]; .tag_name != $tag)' \
           "$state/releases.json" >/dev/null || exit 65
@@ -166,16 +166,16 @@ case "$command" in
           '{total_count:($policies[0] | length),branch_policies:$policies[0]}'
         ;;
       POST:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies)
-        [[ "$field_name" == 'v0.50.115' && "$field_type" == 'tag' ]] || exit 65
+        [[ "$field_name" == 'v0.50.116' && "$field_type" == 'tag' ]] || exit 65
         write_count
-        jq '[.[] | select(.name != "v0.50.115")] + [{id:596,type:"tag",name:"v0.50.115"}]' \
+        jq '[.[] | select(.name != "v0.50.116")] + [{id:596,type:"tag",name:"v0.50.116"}]' \
           "$state/deployment-policies.json" >"$state/deployment-policies.json.next"
         mv "$state/deployment-policies.json.next" "$state/deployment-policies.json"
         printf '%s\n' 'policy-create' >>"$log"
         if [[ "${MOCK_RELEASE_PREP_POLICY_RESPONSE_LOST:-0}" -eq 1 ]]; then
           exit 75
         fi
-        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.115"}'
+        printf '%s\n' '{"id":596,"type":"tag","name":"v0.50.116"}'
         ;;
       DELETE:repos/Insajin/autopus-adk/environments/adk-companion-release/deployment-branch-policies/596)
         write_count

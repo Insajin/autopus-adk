@@ -276,4 +276,21 @@ var releasePhases = []releasePhase{
 		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
 		bridgePredecessor: true,
 	},
+	{
+		// A27 follows the published A26 on the same omp/17.2.7 oracle; the
+		// predecessor pins are measured from immutable release 383249963.
+		phase: "A27", tag: "v0.50.116", version: "0.50.116",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "77ae668bf7e9eb8d0dae177d1c9b7e41a5d51ef6",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
 }

@@ -12,8 +12,8 @@ set -euo pipefail
 umask 077
 
 readonly repository='Insajin/autopus-adk'
-readonly release_tag="${1:-v0.50.115}"
-readonly predecessor_tag="${2:-v0.50.113}"
+readonly release_tag="${1:-v0.50.116}"
+readonly predecessor_tag="${2:-v0.50.115}"
 readonly release_ref="refs/tags/${release_tag}"
 readonly version="${release_tag#v}"
 
@@ -202,7 +202,8 @@ if [[ "$failures" -eq 0 ]]; then
     2. Push ${release_tag}. The workflow builds, signs, and publishes.
     3. Seal ruleset bypass immediately after the tag exists.
     4. Compare the published asset set against the expected 15 names.
-    5. Say in the release description that the tag is unsigned, and why.
+    5. Say in the release description that the tag is R2-signed and how to
+       verify it (git verify-tag against release-tag-signing-2026-q3-r2.pub).
 EOF
   exit 0
 fi
