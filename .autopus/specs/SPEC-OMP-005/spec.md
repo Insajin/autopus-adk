@@ -3,8 +3,8 @@
 ---
 id: SPEC-OMP-005
 title: OMP 에이전트별 모델 역할 투영
-version: 0.2.0
-status: implemented
+version: 1.0.0
+status: completed
 priority: HIGH
 created: 2026-09-05
 domain: OMP
