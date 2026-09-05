@@ -140,7 +140,7 @@ func launchInteractiveSessions(ctx context.Context, cfg OrchestraConfig, panes [
 				}
 				panes[i].responseFile = responseFile
 			}
-			cmd, launchFile, err := buildPaneLaunchCommand(cfg.WorkingDir, pi.provider, launchPrompt)
+			cmd, launchFile, err := buildPaneLaunchCommand(paneLaunchFor(cfg), pi.provider, launchPrompt)
 			if err != nil {
 				recordFailure(fmt.Sprintf("launch command failed: %v", err))
 				return

@@ -13,17 +13,25 @@ type OrchestrationTransition struct {
 }
 
 // ProviderRunReceipt records one observed provider or judge dispatch outcome.
+// The command/cwd/pid/sandbox/timestamp fields are present only for attempts
+// that started a provider process, so receipts of routed backends stay unchanged.
 type ProviderRunReceipt struct {
-	Provider     string `json:"provider"`
-	Role         string `json:"role"`
-	Attempt      int    `json:"attempt"`
-	Backend      string `json:"backend"`
-	ModelFamily  string `json:"model_family,omitempty"`
-	ExitCode     int    `json:"exit_code"`
-	TimedOut     bool   `json:"timed_out"`
-	Usable       bool   `json:"usable"`
-	FailureClass string `json:"failure_class,omitempty"`
-	Artifact     string `json:"artifact,omitempty"`
+	Provider     string   `json:"provider"`
+	Role         string   `json:"role"`
+	Attempt      int      `json:"attempt"`
+	Backend      string   `json:"backend"`
+	ModelFamily  string   `json:"model_family,omitempty"`
+	ExitCode     int      `json:"exit_code"`
+	TimedOut     bool     `json:"timed_out"`
+	Usable       bool     `json:"usable"`
+	FailureClass string   `json:"failure_class,omitempty"`
+	Artifact     string   `json:"artifact,omitempty"`
+	Command      []string `json:"command,omitempty"`
+	Cwd          string   `json:"cwd,omitempty"`
+	PID          int      `json:"pid,omitempty"`
+	SandboxMode  string   `json:"sandbox_mode,omitempty"`
+	StartedAt    string   `json:"started_at,omitempty"`
+	EndedAt      string   `json:"ended_at,omitempty"`
 }
 
 // WorkerRunReceipt is the common multi-agent handoff shape used by platform adapters.
@@ -60,6 +68,7 @@ type OrchestrationRunReceipt struct {
 	DispatchCount          int                             `json:"dispatch_count"`
 	QuorumRequired         int                             `json:"quorum_required"`
 	QuorumMet              bool                            `json:"quorum_met"`
+	QuorumUsable           int                             `json:"quorum_usable"`
 	Attempts               int                             `json:"attempts"`
 	ConsensusMetrics       *ConsensusMetrics               `json:"consensus_metrics,omitempty"`
 	JudgeSeparation        *JudgeSeparationEvidence        `json:"judge_separation,omitempty"`
@@ -69,6 +78,7 @@ type OrchestrationRunReceipt struct {
 	WorkerReceipts         []WorkerRunReceipt              `json:"worker_receipts"`
 	Artifacts              []string                        `json:"artifacts"`
 	Transitions            []OrchestrationTransition       `json:"transitions"`
+	Workspace              *WorkspaceEvidence              `json:"workspace,omitempty"`
 }
 
 func refreshOrchestrationRunReceipt(result *OrchestraResult) {
@@ -95,6 +105,7 @@ func refreshOrchestrationRunReceipt(result *OrchestraResult) {
 		DispatchCount:          result.DispatchCount,
 		QuorumRequired:         result.QuorumRequired,
 		QuorumMet:              result.QuorumMet,
+		QuorumUsable:           result.QuorumUsable,
 		Attempts:               attempts,
 		ConsensusMetrics:       result.ConsensusMetrics,
 		JudgeSeparation:        result.JudgeSeparation,
@@ -103,6 +114,7 @@ func refreshOrchestrationRunReceipt(result *OrchestraResult) {
 		ProviderReceipts:       providerReceipts,
 		WorkerReceipts:         []WorkerRunReceipt{},
 		Artifacts:              collectRunArtifacts(result),
+		Workspace:              result.Workspace,
 		Transitions: []OrchestrationTransition{{
 			Sequence: 1, State: result.TerminalState,
 			AnalysisVerdict: result.AnalysisVerdict, GateStatus: result.GateStatus,
@@ -193,13 +205,7 @@ func buildProviderRunReceipts(result *OrchestraResult) ([]ProviderRunReceipt, in
 		if hasFailedReceipt(receipts, failed.Name, role, attempt) {
 			continue
 		}
-		receipts = append(receipts, ProviderRunReceipt{
-			Provider: failed.Name, Role: role, Attempt: attempt,
-			Backend:     firstNonempty(failed.ExecutedBackend, failed.CollectionMode),
-			ModelFamily: failed.ModelFamily, ExitCode: failed.ExitCode,
-			TimedOut: failed.TimedOut, Usable: false,
-			FailureClass: failed.FailureClass, Artifact: failed.Receipt,
-		})
+		receipts = append(receipts, failedProviderRunReceipt(failed, role, attempt))
 		if attempt > maxAttempt {
 			maxAttempt = attempt
 		}
@@ -219,44 +225,6 @@ func buildProviderRunReceipts(result *OrchestraResult) ([]ProviderRunReceipt, in
 	return receipts, maxAttempt
 }
 
-func providerRunReceipt(response ProviderResponse, role string, attempt int, failed []FailedProvider) ProviderRunReceipt {
-	provider := trimJudgeRole(response.Provider)
-	receipt := ProviderRunReceipt{
-		Provider: provider, Role: role, Attempt: attempt,
-		Backend: response.ExecutedBackend, ExitCode: response.ExitCode,
-		ModelFamily: response.ModelFamily,
-		TimedOut:    response.TimedOut, Usable: responseUsable(response), Artifact: response.Receipt,
-	}
-	for _, entry := range failed {
-		entryRole := entry.Role
-		if entryRole == "" {
-			entryRole = "participant"
-		}
-		entryAttempt := entry.Attempt
-		if entryAttempt == 0 {
-			entryAttempt = 1
-		}
-		if entry.Name == provider && entryRole == role && entryAttempt == attempt {
-			receipt.FailureClass = entry.FailureClass
-			break
-		}
-	}
-	return receipt
-}
-
-func responseUsable(response ProviderResponse) bool {
-	return !response.TimedOut && !response.EmptyOutput && response.ExitCode == 0 && strings.TrimSpace(response.Output) != ""
-}
-
-func hasFailedReceipt(receipts []ProviderRunReceipt, provider, role string, attempt int) bool {
-	for _, receipt := range receipts {
-		if receipt.Provider == provider && receipt.Role == role && receipt.Attempt == attempt && !receipt.Usable {
-			return true
-		}
-	}
-	return false
-}
-
 func responseWasDispatched(response ProviderResponse) bool {
 	return response.ExecutedBackend != noneBackendMarker ||
 		(response.TerminalState != TerminalSkipped && response.TerminalState != TerminalBlocked)
@@ -269,15 +237,6 @@ func firstNonempty(values ...string) string {
 		}
 	}
 	return ""
-}
-
-func hasProviderReceipt(receipts []ProviderRunReceipt, provider string) bool {
-	for _, receipt := range receipts {
-		if receipt.Provider == provider {
-			return true
-		}
-	}
-	return false
 }
 
 func collectRunArtifacts(result *OrchestraResult) []string {

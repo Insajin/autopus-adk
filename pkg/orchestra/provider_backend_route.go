@@ -14,6 +14,7 @@ func runConfiguredProvider(
 	round int,
 	tracker *ProgressTracker,
 ) (*ProviderResponse, error) {
+	provider = resolveProviderWorkDir(cfg, provider)
 	request := ProviderRequest{
 		Provider: provider.Name,
 		Prompt:   prompt,

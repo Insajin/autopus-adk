@@ -12,20 +12,21 @@ import (
 )
 
 type orchestraFailureReport struct {
-	Timestamp        time.Time                  `json:"timestamp"`
-	Command          string                     `json:"command"`
-	Strategy         string                     `json:"strategy"`
-	Providers        []string                   `json:"providers"`
-	RunID            string                     `json:"run_id,omitempty"`
-	SessionID        string                     `json:"session_id,omitempty"`
-	CleanupCommand   string                     `json:"cleanup_command,omitempty"`
-	Duration         string                     `json:"duration,omitempty"`
-	Error            string                     `json:"error,omitempty"`
-	Summary          string                     `json:"summary,omitempty"`
-	EffectiveTimeout ResolvedOrchestraTimeout   `json:"effective_timeout"`
-	FailedProviders  []orchestraFailureProvider `json:"failed_providers,omitempty"`
-	RetryHints       []string                   `json:"retry_hints,omitempty"`
-	ArtifactDir      string                     `json:"artifact_dir,omitempty"`
+	Timestamp        time.Time                          `json:"timestamp"`
+	Command          string                             `json:"command"`
+	Strategy         string                             `json:"strategy"`
+	Providers        []string                           `json:"providers"`
+	RunID            string                             `json:"run_id,omitempty"`
+	SessionID        string                             `json:"session_id,omitempty"`
+	CleanupCommand   string                             `json:"cleanup_command,omitempty"`
+	Duration         string                             `json:"duration,omitempty"`
+	Error            string                             `json:"error,omitempty"`
+	Summary          string                             `json:"summary,omitempty"`
+	EffectiveTimeout ResolvedOrchestraTimeout           `json:"effective_timeout"`
+	FailedProviders  []orchestraFailureProvider         `json:"failed_providers,omitempty"`
+	RetryHints       []string                           `json:"retry_hints,omitempty"`
+	ArtifactDir      string                             `json:"artifact_dir,omitempty"`
+	RunReceipt       *orchestra.OrchestrationRunReceipt `json:"run_receipt,omitempty"` // typed receipt incl. workspace evidence and provider provenance
 }
 
 type orchestraFailureProvider struct {
@@ -44,6 +45,19 @@ func saveOrchestraFailureReport(command, strategy string, providers []string, ti
 
 func saveOrchestraDegradedReport(command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult) (string, error) {
 	return saveOrchestraDiagnosticsReport("degraded", command, strategy, providers, timeout, result, nil)
+}
+
+// reportOrchestraFailure persists the diagnostics artifact for a failed run,
+// prints the summary, and returns the surfaced error.
+func reportOrchestraFailure(command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult, runErr error, noPersist bool) error {
+	if result != nil && !noPersist {
+		reportPath, reportErr := saveOrchestraFailureReport(command, strategy, providers, timeout, result, runErr)
+		if reportErr != nil {
+			fmt.Fprintf(os.Stderr, "실패 보고서 저장 실패: %v\n", reportErr)
+		}
+		fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(timeout, result, reportPath))
+	}
+	return fmt.Errorf("오케스트레이션 실패: %w", runErr)
 }
 
 func saveOrchestraDiagnosticsReport(prefix, command, strategy string, providers []string, timeout ResolvedOrchestraTimeout, result *orchestra.OrchestraResult, runErr error) (string, error) {
@@ -82,6 +96,7 @@ func saveOrchestraDiagnosticsReport(prefix, command, strategy string, providers 
 			})
 		}
 		report.RetryHints = collectRetryHints(result.FailedProviders)
+		report.RunReceipt = result.RunReceipt
 	}
 
 	data, err := json.MarshalIndent(report, "", "  ")
@@ -105,6 +120,9 @@ func renderOrchestraFailureSummary(timeout ResolvedOrchestraTimeout, result *orc
 		fmt.Fprintf(&sb, "- provider timeout %s: %s (%s)\n", detail.Provider, detail.Duration, detail.Source)
 	}
 	if result != nil {
+		if result.Workspace != nil && result.Workspace.MutationDetected {
+			fmt.Fprintf(&sb, "- workspace mutation (no rollback): %s\n", strings.Join(result.Workspace.ChangedFiles, ", "))
+		}
 		if sessionID, cleanupCommand := orchestraRecoveryHandle(result); sessionID != "" {
 			fmt.Fprintf(&sb, "- session: %s\n", sessionID)
 			fmt.Fprintf(&sb, "- cleanup: %s\n", cleanupCommand)
@@ -179,8 +197,7 @@ func synthesizeOrchestraFailureError(result *orchestra.OrchestraResult) error {
 		return fmt.Errorf("필수 judge가 실패했습니다: %s", summarizeFailedProviders(result.FailedProviders))
 	}
 	if containsDegradedReason(result.DegradedReasons, "provider_quorum") {
-		return fmt.Errorf("프로바이더 quorum 미충족: usable %d/%d, required %d",
-			len(result.UsableProviders), len(result.ConfiguredProviders), result.QuorumRequired)
+		return fmt.Errorf("프로바이더 quorum 미충족: %s", result.QuorumSummary())
 	}
 	if result.TerminalState == orchestra.TerminalBlocked && len(result.FailedProviders) == 0 {
 		return fmt.Errorf("오케스트레이션 gate가 차단되었습니다")

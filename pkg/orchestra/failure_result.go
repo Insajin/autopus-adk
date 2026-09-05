@@ -45,6 +45,7 @@ func buildFailedProviderWithContext(
 		failure.Receipt = resp.Receipt
 		failure.Usage = append([]telemetry.UsageEnvelope(nil), resp.Usage...)
 		failure.UsageCapability = resp.UsageCapability
+		failure.Execution = resp.Execution
 		if resp.Provider != "" {
 			failure.Name = resp.Provider
 		}

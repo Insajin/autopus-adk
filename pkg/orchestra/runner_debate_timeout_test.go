@@ -92,4 +92,14 @@ func TestRunOrchestra_DebateJudgeRunsAfterProviderTimeout(t *testing.T) {
 	assert.Equal(t, "fast", result.Responses[0].Provider)
 	assert.Equal(t, "fast (judge)", result.Responses[1].Provider)
 	assert.Contains(t, result.Responses[1].Output, "judge response")
+
+	// Issue #108: the judge success must not inflate the quorum numerator; the
+	// message reports the same configured-usable count the decision used.
+	assert.Equal(t, []string{"fast"}, result.UsableProviders)
+	assert.Equal(t, 1, result.QuorumUsable)
+	assert.False(t, result.QuorumMet)
+	assert.Equal(t, "usable 1/2, required 2", result.QuorumSummary())
+	require.NotNil(t, result.RunReceipt)
+	assert.Equal(t, 1, result.RunReceipt.QuorumUsable)
+	assert.False(t, result.RunReceipt.QuorumMet)
 }

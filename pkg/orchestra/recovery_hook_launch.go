@@ -69,7 +69,7 @@ func launchRecoveryProvider(
 		}
 	}
 
-	cmd := buildInteractiveLaunchCmdWithCWD(provider, "", cfg.WorkingDir)
+	cmd := buildInteractiveLaunchCommand(provider, "", paneLaunchFor(cfg))
 	launchErr, launchEnterErr := sendPaneInputAndEnterSerialized(ctx, cfg.Terminal, paneID, promptRegisterDelay, func() error {
 		return cfg.Terminal.SendLongText(ctx, paneID, cmd)
 	})

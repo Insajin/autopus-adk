@@ -25,8 +25,10 @@ type fakeCommand struct {
 	stdin         io.Reader
 	stdout        io.Writer
 	stderr        io.Writer
+	dir           string
 	waitCh        chan error
 	exitCode      int
+	pid           int
 	startFn       func(*fakeCommand) error
 	terminateFn   func(*fakeCommand, string) error
 	terminateCall atomic.Int32
@@ -46,6 +48,8 @@ func (f *fakeCommand) SetStderr(w io.Writer) {
 	f.stderr = w
 }
 
+func (f *fakeCommand) SetDir(dir string) { f.dir = dir }
+
 func (f *fakeCommand) Start() error {
 	if f.startFn != nil {
 		return f.startFn(f)
@@ -60,6 +64,8 @@ func (f *fakeCommand) Wait() error {
 func (f *fakeCommand) ExitCode() int {
 	return f.exitCode
 }
+
+func (f *fakeCommand) PID() int { return f.pid }
 
 func (f *fakeCommand) Terminate(reason string) error {
 	f.terminateCall.Add(1)

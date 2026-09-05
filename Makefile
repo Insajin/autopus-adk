@@ -46,7 +46,11 @@ ISOLATED_TIMEOUT    ?= 10m
 # exec 하면 비용이 사라진다 - pkg/processprobe 는 그렇게 고쳐 이 목록에서
 # 뺐다. 코드가 fixture 경로를 직접 exec 해야 하는 나머지(가짜 omp/claude
 # 바이너리 프로브)는 아직 격리한다.
-PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_)
+#
+# TestOrchestraBrainstorm_ spawns real shell providers per test and one case
+# measures a 2s timeout kill; on the shared scheduler that clock reads load,
+# not budget. Same rule, same -race gate, -p 1.
+PROCESS_HEAVY_TESTS ?= ^(TestReleaseHardeningBashContract|TestValidatePluginList|TestDetect|TestProbeOMPIdentity_|TestPOSIXInstaller|TestExecuteDesktopObservation_|TestOrchestraBrainstorm_)
 
 test:
 	go test -race -count=1 -timeout=$(INTEGRATION_TIMEOUT) -tags integration -skip '$(PROCESS_HEAVY_TESTS)' ./...

@@ -45,7 +45,7 @@ func recheckTransport(cfg OrchestraConfig) (recheckRunner, string) {
 		if req.Config.Backend != "" {
 			return runConfiguredProvider(ctx, cfg, req.Config, req.Prompt, req.Role, req.Round, nil)
 		}
-		return runProvider(ctx, req.Config, req.Prompt)
+		return runProvider(ctx, resolveProviderWorkDir(cfg, req.Config), req.Prompt)
 	}, "subprocess"
 }
 

@@ -13,9 +13,11 @@ type command interface {
 	SetStdin(r io.Reader)
 	SetStdout(w io.Writer)
 	SetStderr(w io.Writer)
+	SetDir(dir string)
 	Start() error
 	Wait() error
 	ExitCode() int
+	PID() int
 	Terminate(reason string) error
 }
 
@@ -49,6 +51,11 @@ func (e *execCommand) SetStderr(w io.Writer) {
 	e.cmd.Stderr = w
 }
 
+// SetDir pins the process working directory; an empty dir inherits the caller's.
+func (e *execCommand) SetDir(dir string) {
+	e.cmd.Dir = dir
+}
+
 func (e *execCommand) Start() error {
 	return e.cmd.Start()
 }
@@ -62,6 +69,14 @@ func (e *execCommand) ExitCode() int {
 		return -1
 	}
 	return e.cmd.ProcessState.ExitCode()
+}
+
+// PID reports the started process ID, or 0 before Start succeeds.
+func (e *execCommand) PID() int {
+	if e.cmd.Process == nil {
+		return 0
+	}
+	return e.cmd.Process.Pid
 }
 
 func (e *execCommand) Terminate(reason string) error {

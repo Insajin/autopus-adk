@@ -137,7 +137,7 @@ func (b *InteractivePaneBackend) Execute(ctx context.Context, req ProviderReques
 		}
 		pi.responseFile = responseFile
 	}
-	cmd, launchFile, launchErr := buildPaneLaunchCommand(b.cfg.WorkingDir, req.Config, launchPrompt)
+	cmd, launchFile, launchErr := buildPaneLaunchCommand(paneLaunchFor(b.cfg), req.Config, launchPrompt)
 	if launchErr != nil {
 		return paneExecutionFailure(req, "interactive pane execution failed: launch command error: "+launchErr.Error())
 	}

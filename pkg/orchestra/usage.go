@@ -104,6 +104,8 @@ func finishProviderResponse(startArgs providerResponseArgs, rawStdout, rawStderr
 	if response != nil {
 		response.Usage = usage
 		response.UsageCapability = capability
+		startArgs.execution.finish(response.Duration)
+		response.Execution = startArgs.execution
 	}
 	return response, err
 }
@@ -115,6 +117,7 @@ type providerResponseArgs struct {
 	waitErr        error
 	ctx            context.Context
 	exitCode       int
+	execution      *ProviderExecution
 }
 
 func aggregateOrchestraUsage(result *OrchestraResult) {

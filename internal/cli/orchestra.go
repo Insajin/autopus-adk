@@ -93,12 +93,14 @@ func runOrchestraCommand(
 			judge = resolveJudge(orchConf, commandName, "")
 		}
 	}
-	if commandName == "plan" {
-		projected, planErr := applyPlanReadOnlyProviderPolicy(providers)
-		if planErr != nil {
-			return planErr
-		}
-		providers = projected
+	execution, err := prepareOrchestraExecution(commandName, flags.ContextAware)
+	if err != nil {
+		return err
+	}
+	defer execution.cleanup()
+	readOnlyOpts := readOnlyPolicyOptions{OutsideRepo: execution.outsideRepo()}
+	if providers, err = applyCommandReadOnlyPolicy(commandName, providers, readOnlyOpts); err != nil {
+		return err
 	}
 	providers = resolveCodexProviderCapabilities(ctx, providers)
 	initialProviderNames := providerConfigNames(providers)
@@ -122,10 +124,8 @@ func runOrchestraCommand(
 	}
 	providers, riskTierSingleProvider := applyReviewProviderPolicy(
 		providers, commandName, flags.RiskTier, flags.RiskInputs, flags.ProvidersExplicit, os.Stderr)
-	if commandName == "plan" {
-		if providers, err = applyPlanReadOnlyProviderPolicy(providers); err != nil {
-			return err
-		}
+	if providers, err = applyCommandReadOnlyPolicy(commandName, providers, readOnlyOpts); err != nil {
+		return err
 	}
 
 	if rounds > 0 && s != orchestra.StrategyDebate {
@@ -163,12 +163,15 @@ func runOrchestraCommand(
 		if separationErr != nil {
 			return separationErr
 		}
+		if judgeConfig, err = applyJudgeReadOnlyPolicy(commandName, judgeConfig, readOnlyOpts); err != nil {
+			return err
+		}
 	}
 	configuredProviderNames := providerConfigNames(providers)
 
 	keepRelay := flags.KeepRelay
 	noJudge := flags.NoJudge || riskTierSingleProvider
-	nd := flags.NoDetach || (s == orchestra.StrategyDebate && judge != "" && !noJudge)
+	nd := flags.NoDetach || execution.guarded || (s == orchestra.StrategyDebate && judge != "" && !noJudge)
 	yieldRounds := flags.YieldRounds
 	contextAware := flags.ContextAware
 	subprocessMode := flags.SubprocessMode
@@ -212,6 +215,8 @@ func runOrchestraCommand(
 		MonitorEnabled:       monitorRuntime.Enabled,
 		MonitorTimeout:       monitorRuntime.PatternTimeout,
 		WorkingDir:           workingDir,
+		ProviderWorkDir:      execution.workDir,
+		ReadOnly:             execution.readOnly,
 		FallbackMode:         flags.FallbackMode,
 	}
 	cfg.ProviderBackends = ompProviderBackends(cfg)
@@ -235,19 +240,9 @@ func runOrchestraCommand(
 		return nil
 	}
 
-	result, err := runOrchestraExecute(ctx, cfg)
-	if err == nil && shouldTreatOrchestraResultAsFailure(result) {
-		err = synthesizeOrchestraFailureError(result)
-	}
+	result, err := runGuardedOrchestra(ctx, cfg, execution)
 	if err != nil {
-		if result != nil && !flags.NoPersist {
-			reportPath, reportErr := saveOrchestraFailureReport(commandName, strategyStr, providerNames, resolvedTimeout, result, err)
-			if reportErr != nil {
-				fmt.Fprintf(os.Stderr, "실패 보고서 저장 실패: %v\n", reportErr)
-			}
-			fmt.Fprint(os.Stderr, renderOrchestraFailureSummary(resolvedTimeout, result, reportPath))
-		}
-		return fmt.Errorf("오케스트레이션 실패: %w", err)
+		return reportOrchestraFailure(commandName, strategyStr, providerNames, resolvedTimeout, result, err, flags.NoPersist)
 	}
 
 	if flags.OutputFormat == orchestraOutputJSON {

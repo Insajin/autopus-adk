@@ -34,6 +34,8 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	defer cleanupLastMessage()
 
 	cmd := newCommand(ctx, provider.Binary, args...)
+	cmd.SetDir(provider.WorkDir)
+	execution := newProviderExecution(provider, args, start)
 
 	detector := &fastFailDetector{}
 	fastFailRules := resolveFastFailRules(provider.FastFailPatterns)
@@ -56,6 +58,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		if err := cmd.Start(); err != nil {
 			return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
 		}
+		execution.PID = cmd.PID()
 		waitCh := startCommandWait(cmd)
 
 		if _, err := io.WriteString(stdinPipe, prompt); err != nil {
@@ -66,7 +69,7 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 		_ = stdinPipe.Close()
 
 		waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
-		return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode()},
+		return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode(), execution},
 			stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
 	}
 
@@ -74,10 +77,11 @@ func runProvider(ctx context.Context, provider ProviderConfig, prompt string) (*
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%s 시작 실패: %w", provider.Name, err)
 	}
+	execution.PID = cmd.PID()
 
 	waitCh := startCommandWait(cmd)
 	waitErr := waitForCommand(ctx, cmd, provider.Name, waitCh, readyMonitor)
-	return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode()},
+	return finishProviderResponse(providerResponseArgs{start, provider, detector.Reason(), waitErr, ctx, cmd.ExitCode(), execution},
 		stdoutBuf.String(), stderrBuf.String(), lastMessagePath)
 }
 

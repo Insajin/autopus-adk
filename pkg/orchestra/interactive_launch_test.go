@@ -104,7 +104,7 @@ func TestBuildPaneLaunchCommand_AntigravityPromptUsesShortScript(t *testing.T) {
 		InteractiveInput: "stdin",
 	}
 
-	cmd, launchFile, err := buildPaneLaunchCommand(workingDir, p, "open the Markdown file and reply PONG")
+	cmd, launchFile, err := buildPaneLaunchCommand(paneLaunch{scriptDir: workingDir, cwd: workingDir}, p, "open the Markdown file and reply PONG")
 	require.NoError(t, err)
 	defer cleanupPromptFiles([]string{launchFile})
 

@@ -162,7 +162,7 @@ func sendPaneCommands(ctx context.Context, cfg OrchestraConfig, panes []paneInfo
 			panes[i].promptFiles = append(panes[i].promptFiles, promptFile)
 		}
 		panes[i].responseFile = responseFile
-		cmd := buildPaneCommand(pi.provider, prompt, pi.outputFile) + "\n"
+		cmd := prefixLaunchDir(buildPaneCommand(pi.provider, prompt, pi.outputFile), cfg.ProviderWorkDir) + "\n"
 		if err := cfg.Terminal.SendCommand(ctx, pi.paneID, cmd); err != nil {
 			failed = append(failed, FailedProvider{
 				Name:  pi.provider.Name,

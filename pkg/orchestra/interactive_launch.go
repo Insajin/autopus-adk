@@ -19,16 +19,30 @@ const closePaneSurfaceAttempts = 3
 
 var closeSurfaceUntracker = untrackSurfaceForTerminal
 
+// paneLaunch carries the per-run launch policy shared by every pane launch site.
+type paneLaunch struct {
+	scriptDir string // repo-side root for launch scripts (artifact working directory)
+	cwd       string // provider process cwd; empty keeps the pane shell cwd
+	readOnly  bool   // never append permission-bypass flags
+}
+
+// paneLaunchFor derives the launch policy from the run configuration: scripts
+// stay under the artifact WorkingDir while the provider itself starts in the
+// isolated ProviderWorkDir when one is set.
+func paneLaunchFor(cfg OrchestraConfig) paneLaunch {
+	return paneLaunch{scriptDir: cfg.WorkingDir, cwd: cfg.providerLaunchDir(), readOnly: cfg.ReadOnly}
+}
+
 // buildInteractiveLaunchCmd constructs the launch command for interactive mode.
 // Uses the binary name plus model/variant flags from PaneArgs, excluding print/pipe flags.
 // When the provider supports launch-time input, prompt is a short instruction
 // pointing at a Markdown prompt file, not the full prompt body.
 // @AX:NOTE [AUTO] REQ-1 hardcoded provider check (p.Binary == "claude") — update when adding new providers needing permission bypass
 func buildInteractiveLaunchCmd(p ProviderConfig, prompt string) string {
-	return buildInteractiveLaunchCmdWithCWD(p, prompt, "")
+	return buildInteractiveLaunchCommand(p, prompt, paneLaunch{})
 }
 
-func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir string) string {
+func buildInteractiveLaunchCommand(p ProviderConfig, prompt string, launch paneLaunch) string {
 	cmd := shellQuoteCommandArg(p.Binary)
 	for _, arg := range interactiveLaunchArgs(p) {
 		// Skip non-interactive flags that conflict with TUI mode.
@@ -45,7 +59,8 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 		cmd += " " + shellQuoteCommandArg(arg)
 	}
 	// REQ-1: Add permission bypass for interactive sessions that support it.
-	if p.Binary == "claude" || usesAntigravityPromptInteractive(p) {
+	// A read-only run never widens provider permissions (issue #108).
+	if !launch.readOnly && (p.Binary == "claude" || usesAntigravityPromptInteractive(p)) {
 		if !strings.Contains(cmd, "--dangerously-skip-permissions") {
 			cmd += " --dangerously-skip-permissions"
 		}
@@ -61,10 +76,16 @@ func buildInteractiveLaunchCmdWithCWD(p ProviderConfig, prompt, workingDir strin
 		normalized := strings.ReplaceAll(prompt, "\n", " ")
 		cmd += " " + shellQuote(normalized)
 	}
-	if workingDir != "" {
-		return "cd " + shellQuote(workingDir) + " && " + cmd
+	return prefixLaunchDir(cmd, launch.cwd)
+}
+
+// prefixLaunchDir makes a pane shell command start inside dir; an empty dir
+// keeps the pane shell's own cwd.
+func prefixLaunchDir(cmd, dir string) string {
+	if dir == "" {
+		return cmd
 	}
-	return cmd
+	return "cd " + shellQuote(dir) + " && " + cmd
 }
 
 func interactiveLaunchArgs(p ProviderConfig) []string {
@@ -104,12 +125,12 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
-func buildPaneLaunchCommand(workingDir string, provider ProviderConfig, prompt string) (string, string, error) {
-	cmd := buildInteractiveLaunchCmdWithCWD(provider, prompt, workingDir)
+func buildPaneLaunchCommand(launch paneLaunch, provider ProviderConfig, prompt string) (string, string, error) {
+	cmd := buildInteractiveLaunchCommand(provider, prompt, launch)
 	if !usesLaunchScript(provider, prompt) {
 		return cmd, "", nil
 	}
-	path, err := writeLaunchScript(workingDir, provider, cmd)
+	path, err := writeLaunchScript(launch.scriptDir, provider, cmd)
 	if err != nil {
 		return "", "", err
 	}

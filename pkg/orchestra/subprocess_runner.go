@@ -52,6 +52,8 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 	start := time.Now()
 
 	cmd := newCommand(ctx, req.Config.Binary, args...)
+	cmd.SetDir(req.Config.WorkDir)
+	execution := newProviderExecution(req.Config, args, start)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.SetStdout(&stdoutBuf)
@@ -62,8 +64,10 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 	}
 
 	waitCh := startCommandWait(cmd)
+	execution.PID = cmd.PID()
 	waitErr := waitForCommand(ctx, cmd, req.Provider, waitCh, nil)
 	duration := time.Since(start)
+	execution.finish(duration)
 
 	rawOutput := stdoutBuf.String()
 	usage, usageCapability := decorateProviderUsage(req.Config, req.Role, req.Round, rawOutput)
@@ -80,6 +84,7 @@ func (b *subprocessBackend) Execute(ctx context.Context, req ProviderRequest) (*
 		ExecutedBackend: "subprocess", // REQ-005/F-003: record direct subprocess production
 		Usage:           usage,
 		UsageCapability: usageCapability,
+		Execution:       execution,
 	}
 
 	if ctx.Err() != nil {
