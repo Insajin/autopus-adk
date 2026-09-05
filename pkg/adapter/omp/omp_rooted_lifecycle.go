@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -175,6 +174,10 @@ func (a *Adapter) buildUpdateTransactionPlanAt(
 	if err != nil {
 		return adapter.TransactionPlan{}, nil, err
 	}
+	writes, removes, err = a.releaseOMPProjectManagedConfigAt(workspace, files, writes, removes)
+	if err != nil {
+		return adapter.TransactionPlan{}, nil, err
+	}
 	manifest := adapter.ManifestFromFiles(adapterName, pf)
 	if oldManifest != nil {
 		for _, path := range skippedPaths {
@@ -217,67 +220,4 @@ func ompRootedManifestUnchanged(workspace *ompRootedWorkspace, oldManifest, next
 	}
 	info, err := workspace.lstat(filepath.Join(".autopus", next.Platform+"-manifest.json"))
 	return err == nil && info.Mode().IsRegular() && info.Mode().Perm() == 0o600
-}
-
-// @AX:WARN [AUTO]: legacy bridge migration contains eight conditional branches.
-// @AX:REASON [AUTO]: manifest ownership, marker policy, bounded rooted reads, managed-section parsing, removal, and user-remainder preservation must fail closed.
-func migrateOMPLegacyBridgeConfigAt(
-	workspace *ompRootedWorkspace,
-	oldManifest *adapter.Manifest,
-	files []adapter.FileMapping,
-	writes []adapter.TransactionWrite,
-	removes []adapter.TransactionRemove,
-) ([]adapter.TransactionWrite, []adapter.TransactionRemove, error) {
-	if oldManifest == nil || ompMappingsContainPath(files, configFile) {
-		return writes, removes, nil
-	}
-	previous, managed := oldManifest.Files[configFile]
-	if !managed {
-		return writes, removes, nil
-	}
-	removes = filterOMPTransactionRemove(removes, configFile)
-	if previous.Policy != adapter.OverwriteMarker {
-		return writes, removes, nil
-	}
-	data, info, err := workspace.readFile(configFile, 4<<20)
-	if errors.Is(err, fs.ErrNotExist) {
-		return writes, removes, nil
-	}
-	if err != nil {
-		return nil, nil, fmt.Errorf("read legacy %s: %w", configFile, err)
-	}
-	remainder, found, err := stripOMPManagedDocument(string(data))
-	if err != nil {
-		return nil, nil, err
-	}
-	if !found {
-		return writes, removes, nil
-	}
-	if strings.TrimSpace(remainder) == "" {
-		removes = append(removes, adapter.TransactionRemove{Path: configFile})
-		return writes, removes, nil
-	}
-	writes = append(writes, adapter.TransactionWrite{
-		Path: configFile, Content: []byte(remainder), Perm: info.Mode().Perm(),
-	})
-	return writes, removes, nil
-}
-
-func ompMappingsContainPath(files []adapter.FileMapping, path string) bool {
-	for _, file := range files {
-		if filepath.ToSlash(file.TargetPath) == path {
-			return true
-		}
-	}
-	return false
-}
-
-func filterOMPTransactionRemove(removes []adapter.TransactionRemove, path string) []adapter.TransactionRemove {
-	filtered := removes[:0]
-	for _, remove := range removes {
-		if filepath.ToSlash(remove.Path) != path {
-			filtered = append(filtered, remove)
-		}
-	}
-	return filtered
 }

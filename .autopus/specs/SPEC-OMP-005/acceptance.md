@@ -13,6 +13,8 @@
 - S1-S7은 `pkg/config`(`role_model_policy_test.go`, `role_model_policy_agents_test.go`, `role_model_policy_builtin_agents_test.go`, `role_model_policy_attested_test.go`)와 `pkg/adapter/omp`(`omp_model_integration_builtin_test.go`, `omp_model_projection_test.go`, doctor 테스트)로 고정됐고 통과했다.
 - S8은 2026-09-05 autopus-workspace(`omp/18.1.10`)에서 실측했다: `auto update --local` 후 `.omp/config.yml`의 native 키 0개·`autopus_*` 16개, `omp config get modelRoles`가 전역 `default=claude-fable-5-1:xhigh`/`tiny=gpt-5.6-luna:max`/`task=gpt-5.6-sol:max`와 프로젝트 `autopus_executor=claude-opus-5:xhigh`를 함께 반환, `--model @autopus_executor` RPC가 `claude-opus-5`/`xhigh`, `@autopus_planner`가 `claude-fable-5-1`/`max`, `@autopus_reviewer`가 `gpt-6-astra`/`max`, `auto doctor` `model-routing.receipt`가 `supported/fresh`.
 - 실측 중 발견: 역할 16개의 직렬 RPC readback이 doctor의 공유 20s 데드라인을 넘겨 `projection_mismatch`가 났다. readback을 4-way 병렬로 바꿔 `auto update`가 22s→12s로 줄었고 doctor가 통과한다(plan.md Risks의 첫 항목 해소).
+- 실측 중 발견 2: hand-written 프로필(`agents.executor.candidates` 오버라이드, overlay 모드)로 전환하자 `.omp/config.yml`의 관리 키는 남고 ownership ledger만 prune되어, project-managed로 되돌릴 때 `managed_key_conflict: prior fingerprint mismatch`로 막혔다. `Update`에 ledger preimage 복원(`releaseOMPProjectManagedConfigAt`)을 추가해 모드 왕복이 byte-identical로 돌아오는 것을 워크스페이스에서 확인했다. 오버라이드 자체는 `autopus_executor: anthropic/claude-sonnet-5:high`, `autopus_tester: anthropic/claude-opus-5:xhigh`(capability 기본값)로 정확히 투영됐다.
+- `family: openai` anchor는 `auto update --local --preview`(RPC readback 포함)로 검증했다.
 
 ### S1: 역할 이름 규칙과 native 키 부재
 Given canonical agent 16개.

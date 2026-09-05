@@ -102,6 +102,42 @@ func TestOMPModelIntegration_S11_ProjectManagedConflictIsByteIdentical(t *testin
 	assertNoIntegrationArtifacts(t, root)
 }
 
+// Leaving project-managed mode must hand .omp/config.yml back to its ledger
+// preimage; otherwise the managed keys outlive the pruned ledger and the next
+// project-managed apply is rejected as a prior-fingerprint mismatch.
+func TestOMPModelIntegration_ProjectManagedToOverlayRestoresPreimageAndRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, configFile)
+	runner := newModelIntegrationRunner()
+	a := NewWithRoot(root).WithModelIntegrationRunner(runner)
+	if _, err := a.Generate(context.Background(), integrationHarnessConfig("project-managed")); err != nil {
+		t.Fatalf("project-managed Generate: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("project-managed apply did not write %s: %v", configFile, err)
+	}
+
+	if _, err := a.Update(context.Background(), integrationHarnessConfig("overlay")); err != nil {
+		t.Fatalf("switch to overlay: %v", err)
+	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("overlay switch left %s behind (err=%v)", configFile, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, OMPModelProjectOwnershipRelativePath)); !os.IsNotExist(err) {
+		t.Fatalf("overlay switch kept the ownership ledger (err=%v)", err)
+	}
+
+	if _, err := a.Update(context.Background(), integrationHarnessConfig("project-managed")); err != nil {
+		t.Fatalf("switch back to project-managed: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(got), "modelRoles:") {
+		t.Fatalf("project-managed re-apply did not restore managed keys: %v\n%s", err, got)
+	}
+}
+
 func TestOMPModelIntegration_S10_ManagedInvocationReturnsExactConfigWithoutCallingModel(t *testing.T) {
 	t.Parallel()
 
