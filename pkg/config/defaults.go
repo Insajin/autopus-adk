@@ -98,12 +98,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			TimeoutSeconds:  240,
 			Judge:           "claude",
 			Providers: map[string]ProviderEntry{
-				"claude": {
-					Binary:     "claude",
-					Args:       []string{"--print", "--model", "opus", "--effort", "high"},
-					PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
-					Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
-				},
+				"claude": DefaultClaudeProviderEntry(),
 				// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into the ""
 				// slot); pane argv carries no --print (interactive session).
 				"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text", Timeout: GeminiOrchestraTimeoutSeconds}},
@@ -116,10 +111,9 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				"brainstorm": {Strategy: "debate", Providers: []string{"claude", "codex", "gemini"}},
 			},
 		},
-		// Quality presets map every canonical source agent to a relative tier.
-		// Claude frontmatter, Codex profiles, costs, and OMP ultra project from
-		// these exhaustive tiers. OMP balanced owns its explicit family matrix
-		// in role_model_policy_balanced.go.
+		// Ultra keeps the shared tier ladder. Standard balanced placement
+		// uses one role matrix across Claude, Codex, and OMP; custom native
+		// agent tiers continue to use the tier ladder.
 		Quality: QualityConf{
 			Default:               "balanced",
 			SupervisorModelPolicy: SupervisorModelPolicyInherit,
@@ -137,15 +131,8 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 					},
 				},
 				"balanced": {
-					Description: "기획·보안은 Fable, 구현·리뷰는 Opus, 기본 작업은 Sonnet. Haiku 미사용.",
-					Agents: map[string]string{
-						"architect": "fable", "planner": "fable", "security-auditor": "fable",
-						"debugger": "opus", "deep-worker": "opus", "executor": "opus",
-						"reviewer": "opus", "spec-writer": "opus",
-						"annotator": "sonnet", "devops": "sonnet", "explorer": "sonnet",
-						"frontend-specialist": "sonnet", "perf-engineer": "sonnet",
-						"tester": "sonnet", "ux-validator": "sonnet", "validator": "sonnet",
-					},
+					Description: "기획·리뷰·디버깅은 최상위, 구현·검증은 경량 모델.",
+					Agents:      defaultBalancedAgentTiers(),
 				},
 			},
 		},

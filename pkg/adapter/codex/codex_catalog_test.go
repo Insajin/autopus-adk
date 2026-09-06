@@ -115,8 +115,15 @@ func TestCodexRenderContext_ResolvesAgentModelWithDeclaredEffort(t *testing.T) {
 	cfg := config.DefaultFullConfig("tuple-project")
 	data := codexRenderContext{HarnessConfig: cfg, adapter: a}
 
-	assert.Equal(t, config.CodexTerraModel, data.CodexAgentModel("tester", "sonnet", "medium"))
-	assert.Equal(t, config.CodexEffortMedium, data.CodexAgentEffort("tester", "sonnet", "medium"))
+	// A non-canonical agent has no native balanced placement, so its declared
+	// tier and effort still decide the tuple the template receives.
+	model, err := data.CodexAgentModel("synthetic", "sonnet", "medium")
+	require.NoError(t, err)
+	effort, err := data.CodexAgentEffort("synthetic", "sonnet", "medium")
+	require.NoError(t, err)
+
+	assert.Equal(t, config.CodexTerraModel, model)
+	assert.Equal(t, config.CodexEffortMedium, effort)
 	assert.Empty(t, warnings.String())
 }
 

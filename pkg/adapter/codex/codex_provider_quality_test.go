@@ -14,7 +14,8 @@ import (
 func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 	t.Parallel()
 
-	// tester is Sonnet in balanced and Opus in ultra while planner remains Fable.
+	// tester takes the native Luna/max placement under balanced and the Sol
+	// ladder rung under ultra, while planner anchors on Astra in both.
 	tests := []struct {
 		name              string
 		global            string
@@ -30,8 +31,8 @@ func TestGenerateCodexSurfacesUseCodexProviderOverride(t *testing.T) {
 			codex:             "balanced",
 			wantRootEffort:    config.CodexEffortXHigh,
 			wantPlannerEffort: config.CodexEffortMax,
-			wantMidModel:      config.CodexTerraModel,
-			wantMidEffort:     config.CodexEffortMedium,
+			wantMidModel:      config.CodexLunaModel,
+			wantMidEffort:     config.CodexEffortMax,
 		},
 		{
 			name:              "global balanced codex ultra",

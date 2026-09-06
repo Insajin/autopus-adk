@@ -13,7 +13,7 @@ Adaptive Quality is a sub-extension of Quality Mode. In **Balanced mode only**, 
 | Mode | Behavior |
 |------|----------|
 | **Ultra** | Uses the fixed role profile: reasoning core=`fable`, remaining roles=`opus`. Complexity is IGNORED. |
-| **Balanced** | Uses `fable`/`opus`/`sonnet` by role and task complexity. Adaptive Quality applies. |
+| **Balanced** | Uses a shared role matrix: top reasoning roles, lighter implementation, and routine verification. Explicit custom tiers remain supported. |
 | **Solo** | No Agent() calls. Not applicable. |
 
 Adaptive Quality is **not** a replacement for Quality Mode — it is a refinement that operates exclusively within Balanced mode.
@@ -70,15 +70,19 @@ When criteria overlap (e.g., 1 file but 250 lines), use the highest matching lev
 
 | Assignment | Balanced | Ultra |
 |-----------|----------|-------|
-| Strategic judgment | `fable`: planner, architect, security-auditor | `fable`: planner, architect, spec-writer, security-auditor, reviewer, debugger, deep-worker |
-| Implementation, review, and deep work | `opus`: spec-writer, deep-worker, executor, reviewer, debugger | `opus`: every role outside the seven-role reasoning core |
-| Routine and default work | `sonnet`: remaining roles | follows the Ultra role profile; complexity does not lower the tier |
+| Planning, review, security, debugging, long work | `fable`: planner, architect, spec-writer, reviewer, security-auditor, debugger, deep-worker | same seven-role `fable` core |
+| Implementation and testing | `sonnet`: executor, tester, devops, frontend-specialist, perf-engineer | `opus` |
+| Routine work | `sonnet`: explorer, annotator, validator, ux-validator | `opus` |
 
 Platform note:
-- Claude maps `fable`, `opus`, `sonnet`, and `haiku` to Claude Fable 5.1, Opus 5, Sonnet 5, and Haiku 4.5. The shipped presets do not assign Haiku.
-- Codex maps `fable` to Astra/`max`, `opus` to Sol/`xhigh`, `sonnet` to Terra with role effort, and `haiku` to Luna with role effort. Quality-managed supervisors and orchestras use Astra.
+- Standard balanced uses the same role matrix in Claude Code, Codex, and OMP. Claude emits Fable 5.1/max for the seven-role core, Sonnet 5/max for implementation, and Sonnet 5/high for routine work. Codex emits Astra/max for the core and Luna/max for every other canonical agent.
+- Explicit nonstandard native agent tiers retain the tier ladder: Claude Fable/Opus/Sonnet/Haiku and Codex Astra/Sol/Terra/Luna. Ultra remains unchanged. Native multi-provider review defaults to Fable 5.1/max and Astra/max regardless of quality mode; explicit provider pins and effort overrides stay authoritative.
 - Gemini maps `fable`/`opus`/`sonnet` to `gemini-3.1-pro` and `haiku` to `gemini-3.8-flash`.
 - OpenCode keeps the configured default runtime model; tier changes act as reasoning-profile hints until explicit model overrides are available.
+
+Use debugger or deep-worker for complex diagnosis and long-running work; their standard
+balanced profiles already use the top model at max. Do not silently promote or demote
+the standard executor's model based on task size.
 
 ## Claude Fable 5.1 / Opus 5
 
@@ -137,8 +141,9 @@ Quality Mode defaults:
 | Any | Fable 5.1 | `max` |
 | Ultra | Opus 5 / Opus 4.8 / Opus 4.7 | `max` |
 | Ultra | Opus 4.6 / Sonnet 5 | `high` |
-| Balanced | Opus tier | `high` |
-| Balanced | Sonnet tier | `medium` |
+| Balanced standard | Sonnet 5 implementation/testing roles | `max` |
+| Balanced standard | Sonnet 5 routine roles | `high` |
+| Balanced custom tier | Opus / Sonnet | `high` / `medium` |
 | Any | Haiku 4.5 | strip effort |
 
 Claude model/API effort is the closed set `low`, `medium`, `high`, `xhigh`, and
@@ -163,11 +168,11 @@ Codex-specific rendering:
 | Ultra | quality-managed orchestra | Astra + `max` |
 | Ultra | Fable-tier worker | Astra + `max` |
 | Ultra | Opus-tier worker | Sol + `xhigh` |
-| Balanced | quality-managed supervisor / orchestra | Astra + `xhigh` |
-| Balanced | Fable-tier worker | Astra + `max` |
-| Balanced | Opus-tier worker | Sol + `xhigh` |
-| Balanced | Sonnet-tier worker | Terra + declared role effort |
-| Balanced | Haiku-tier worker | Luna + declared role effort (capped at `max`) |
+| Balanced | quality-managed supervisor | Astra + `xhigh` |
+| Balanced | quality-managed orchestra | Astra + `max` |
+| Balanced standard | seven-role planning/review/debugging core | Astra + `max` |
+| Balanced standard | implementation and routine roles | Luna + `max` |
+| Balanced custom tier | explicit nonstandard tier | Existing tier ladder and declared role effort |
 
 Codex custom agent files are loaded when a session starts. Run `auto quality provider codex <mode> --apply` to persist a Codex-only profile and refresh the current project's Codex managed agents, or `auto quality <mode> --apply` to change the global fallback and refresh every configured platform. Then start a new Codex session. `auto quality supervisor inherit --apply` keeps the primary session on the user's configured Codex model. `auto quality supervisor quality --apply` opts an unchanged Autopus-managed root config into the managed Astra profile; user-owned root model or effort assignments remain preserved and take precedence. A per-run `--quality` override can change a managed orchestra launch, but it cannot hot-swap agents already loaded by the current session.
 

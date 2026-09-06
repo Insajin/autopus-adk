@@ -61,12 +61,10 @@ func TestDefaultFullConfig_QualityPresets(t *testing.T) {
 		assert.True(t, exists, "balanced preset must contain agent %q defined in ultra preset", agent)
 	}
 
-	assert.Equal(t, "추론 코어 7개는 Fable, 나머지는 Opus. 최고 품질.", ultra.Description)
-	assert.Equal(t, "기획·보안은 Fable, 구현·리뷰는 Opus, 기본 작업은 Sonnet. Haiku 미사용.", balanced.Description)
 	assert.Equal(t, map[string]string{
 		"architect": "fable", "planner": "fable", "security-auditor": "fable",
-		"debugger": "opus", "deep-worker": "opus", "executor": "opus",
-		"reviewer": "opus", "spec-writer": "opus",
+		"debugger": "fable", "deep-worker": "fable",
+		"reviewer": "fable", "spec-writer": "fable", "executor": "sonnet",
 		"annotator": "sonnet", "devops": "sonnet", "explorer": "sonnet",
 		"frontend-specialist": "sonnet", "perf-engineer": "sonnet",
 		"tester": "sonnet", "ux-validator": "sonnet", "validator": "sonnet",
@@ -106,7 +104,7 @@ func TestDefaultFullConfig_CodexPromptViaArgs(t *testing.T) {
 	assert.False(t, codex.PromptViaArgs, "codex provider must have PromptViaArgs=false")
 	// SPEC-ORCH-021 REQ-014/015: exec --sandbox workspace-write (no deprecated
 	// --full-auto) with reasoning effort aligned to autopus.yaml.
-	assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="xhigh"`}, codex.Args,
+	assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexFrontierModel, "-c", `model_reasoning_effort="max"`}, codex.Args,
 		"codex provider must have correct exec-mode args")
 	assert.Equal(t, CodexOrchestraTimeoutSeconds, codex.Subprocess.Timeout,
 		"codex provider must have a longer default orchestra timeout")
@@ -126,7 +124,7 @@ func TestDefaultCodexProviderEntryUsesBalancedProfile(t *testing.T) {
 	assert.Equal(t, CodexLunaModel, CodexSparkModel)
 	assert.Equal(t, CodexLegacyModel, CodexFallbackModel)
 	assert.Equal(t,
-		[]string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="xhigh"`},
+		[]string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="max"`},
 		entry.Args,
 	)
 }
@@ -177,25 +175,14 @@ func TestDefaultFullConfig_GeminiProviderTimeout(t *testing.T) {
 		"gemini per-provider timeout must exceed the global orchestra timeout")
 }
 
-// TestDefaultFullConfig_ClaudeEffortHigh verifies claude defaults to --effort high
-// (not max) for spec review's structured-output workload. See issue #55 for the
-// rationale: max-effort reasoning routinely exceeded 4 minutes on opus.
-func TestDefaultFullConfig_ClaudeEffortHigh(t *testing.T) {
+func TestDefaultFullConfig_ClaudeReviewUsesFrontierMax(t *testing.T) {
 	t.Parallel()
 	cfg := DefaultFullConfig("test-project")
-	require.NotNil(t, cfg)
-
 	claude, ok := cfg.Orchestra.Providers["claude"]
 	require.True(t, ok, "claude provider must exist")
-
-	assert.Contains(t, claude.Args, "high",
-		"claude default args must use --effort high (issue #55)")
-	assert.NotContains(t, claude.Args, "max",
-		"claude default args must not use --effort max (issue #55)")
-	assert.Contains(t, claude.PaneArgs, "high",
-		"claude default pane args must use --effort high (issue #55)")
-	assert.NotContains(t, claude.PaneArgs, "max",
-		"claude default pane args must not use --effort max (issue #55)")
+	want := []string{"--print", "--model", "claude-fable-5-1", "--effort", "max"}
+	assert.Equal(t, want, claude.Args)
+	assert.Equal(t, want, claude.PaneArgs)
 }
 
 func TestDefaultFullConfig_SpecReviewContextUsesAdaptiveLimit(t *testing.T) {

@@ -134,10 +134,12 @@ Fable의 동적 alias인 `best`는 사용 권한에 따라 최신 Opus로 해석
 기본 프리셋은 Fable 5.1의 전체 모델 ID를 생성합니다.
 
 Quality Mode가 effort를 정할 때 Fable은 모드와 관계없이 `max`를 사용합니다.
-Ultra의 Opus는 `max`, Sonnet은 `high`를 사용하고, Balanced의 Opus는 `high`,
-Sonnet은 `medium`을 사용합니다. Haiku에서는 effort를 생략합니다. 명시적인
-`--effort`, `CLAUDE_CODE_EFFORT_LEVEL`, agent frontmatter 값은 기존 우선순위에
-따라 Quality Mode 기본값보다 먼저 적용됩니다.
+Ultra의 Opus는 `max`, Sonnet은 `high`를 사용합니다. 표준 Balanced에서는
+기획·리뷰·보안·debugger·deep-worker가 Fable 5.1 `max`, 구현·테스트가 Sonnet 5
+`max`, 탐색·주석·검증이 Sonnet 5 `high`입니다. Codex의 같은 핵심 역할은 Astra
+`max`, 나머지는 Luna `max`입니다. 명시적인 사용자 티어 지정은 기존 변환 규칙을
+유지하며, Haiku에서는 Claude effort를 생략합니다. 멀티프로바이더 리뷰 기본값은
+품질 모드와 관계없이 Fable 5.1 `max`와 Astra `max`이고 명시적인 provider pin은 보존합니다.
 
 모델/API effort 값은 `low`, `medium`, `high`, `xhigh`, `max`입니다.
 `ultracode`는 여섯 번째 model effort가 아니라 실제 `xhigh`와 dynamic

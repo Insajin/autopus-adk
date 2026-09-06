@@ -10,18 +10,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Ultra: the orchestra runs Astra/max, the fable-tier planner Astra/max, and
-// the opus-tier executor Sol/xhigh. Balanced keeps the same tiers but the
-// orchestra drops to Astra/xhigh.
+// Both modes persist an orchestra provider at Astra/max. Ultra keeps the tier
+// ladder for agents (fable-tier planner Astra/max, opus-tier executor
+// Sol/xhigh); balanced routes both through the native placement (planner
+// Astra/max, executor Luna/max).
 func TestInitCmd_QualityUltraInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
 	assertInitCodexQualityProfile(t, "ultra", "max", "gpt-5.6-sol", "xhigh", "max")
 }
 
 func TestInitCmd_QualityBalancedInheritsCodexSupervisorAndSetsManagedAgents(t *testing.T) {
-	assertInitCodexQualityProfile(t, "balanced", "xhigh", "gpt-5.6-sol", "xhigh", "max")
+	assertInitCodexQualityProfile(t, "balanced", "max", "gpt-5.6-luna", "max", "max")
 }
 
-func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorModel, executorEffort, plannerEffort string) {
+func assertInitCodexQualityProfile(t *testing.T, quality, orchestraEffort, executorModel, executorEffort, plannerEffort string) {
 	t.Helper()
 	installCodex56CatalogFixture(t)
 	dir := t.TempDir()
@@ -51,7 +52,7 @@ func assertInitCodexQualityProfile(t *testing.T, quality, rootEffort, executorMo
 	assert.Contains(t, harness, "supervisor_model_policy: inherit")
 	assert.Contains(t, harness, "model_policy: quality")
 	assert.Contains(t, harness, "gpt-6-astra")
-	assert.GreaterOrEqual(t, strings.Count(harness, `model_reasoning_effort="`+rootEffort+`"`), 2)
+	assert.GreaterOrEqual(t, strings.Count(harness, `model_reasoning_effort="`+orchestraEffort+`"`), 2)
 }
 
 func installCodex56CatalogFixture(t *testing.T) {

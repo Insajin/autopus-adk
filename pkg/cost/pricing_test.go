@@ -71,7 +71,7 @@ func TestQualityModeToModels_FableRoutesStrategicRoles(t *testing.T) {
 		{"ultra", "planner", "claude-fable-5-1"},
 		{"ultra", "executor", "claude-opus-5"},
 		{"balanced", "planner", "claude-fable-5-1"},
-		{"balanced", "executor", "claude-opus-5"},
+		{"balanced", "executor", "claude-sonnet-5"},
 		{"balanced", "tester", "claude-sonnet-5"},
 	}
 	for _, tc := range cases {
@@ -114,9 +114,9 @@ func TestQualityModeToModels_Balanced(t *testing.T) {
 	}{
 		{"planner", "claude-fable-5-1"},
 		{"architect", "claude-fable-5-1"},
-		{"executor", "claude-opus-5"},
+		{"executor", "claude-sonnet-5"},
 		{"tester", "claude-sonnet-5"},
-		{"reviewer", "claude-opus-5"},
+		{"reviewer", "claude-fable-5-1"},
 		{"validator", "claude-sonnet-5"},
 	}
 
@@ -142,7 +142,7 @@ func TestModelForAgent_Known(t *testing.T) {
 		{"ultra", "planner", "claude-fable-5-1"},
 		{"ultra", "executor", "claude-opus-5"},
 		{"balanced", "planner", "claude-fable-5-1"},
-		{"balanced", "executor", "claude-opus-5"},
+		{"balanced", "executor", "claude-sonnet-5"},
 		{"balanced", "tester", "claude-sonnet-5"},
 		{"balanced", "validator", "claude-sonnet-5"},
 	}
@@ -170,7 +170,7 @@ func TestModelForAgent_TeamPhaseRoles(t *testing.T) {
 		{"ultra", "planner", "claude-fable-5-1"},
 		{"ultra", "executor", "claude-opus-5"},
 		{"balanced", "planner", "claude-fable-5-1"},
-		{"balanced", "executor", "claude-opus-5"},
+		{"balanced", "executor", "claude-sonnet-5"},
 		{"balanced", "tester", "claude-sonnet-5"},
 		// Team-phase roles — Ultra mode.
 		{"ultra", "annotator", "claude-opus-5"},

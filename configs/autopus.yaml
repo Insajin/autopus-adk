@@ -56,14 +56,15 @@ orchestra:
   providers:
     claude:
       binary: claude
-      args: ["--print", "--model", "opus", "--effort", "high"]
+      args: ["--print", "--model", "claude-fable-5-1", "--effort", "max"]
+      pane_args: ["--print", "--model", "claude-fable-5-1", "--effort", "max"]
       subprocess:
         timeout: 480
     codex:
       binary: codex
-      args: ["exec", "--sandbox", "workspace-write", "-m", "gpt-5.6-sol", "-c", 'model_reasoning_effort="xhigh"']
+      args: ["exec", "--json", "--sandbox", "workspace-write", "-m", "gpt-6-astra", "-c", 'model_reasoning_effort="max"']
       model_policy: quality
-      pane_args: ["-m", "gpt-5.6-sol", "-c", 'model_reasoning_effort="xhigh"']
+      pane_args: ["-m", "gpt-6-astra", "-c", 'model_reasoning_effort="max"']
     gemini:
       binary: agy
       args: ["--print", ""]

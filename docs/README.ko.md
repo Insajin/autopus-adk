@@ -518,8 +518,9 @@ auto platform omp profile apply balanced --agent executor=inherit
 의미 메타데이터가 없는 native 카탈로그에서는 내장 프로필이나 선택한 사용자 프로필에
 해당 selector의 family가 명시돼 있어야 합니다. 선언되지 않은 모델을 임의로 추측하지 않습니다.
 
-이 표는 OMP 전용입니다. 공통 `quality.presets.balanced.agents` 티어는 더 이상
-내장 OMP balanced 배치를 결정하지 않습니다. Ultra와 사용자 프로필의 동작은 유지합니다.
+이 표준 역할표는 Claude Code와 Codex 네이티브 에이전트도 공유합니다. 다만 공통
+`quality.presets.balanced.agents`의 사용자 티어 지정은 OMP에 적용하지 않습니다.
+OMP는 `role_model_policy.agents`로 재정의하며 Ultra와 사용자 OMP 프로필의 동작은 유지합니다.
 `role_model_policy.profiles.balanced`에 명시적 정의가 있으면 내장 프로필보다 우선합니다.
 이 경우 `--family`는 조용히 무시하지 않고 오류로 처리합니다.
 OMP 프로필 선택은 `quality.default`, 독립 Claude/Codex 설정, 주 세션의 native 모델 역할을
@@ -1026,7 +1027,7 @@ sequenceDiagram
 
 ```bash
 /auto go SPEC-ID --quality ultra      # 모든 역할에 프리미엄 경로 적용, Codex effort는 역할별 차등
-/auto go SPEC-ID --quality balanced   # 적응형: 태스크 복잡도별 Opus/Sonnet/Haiku
+/auto go SPEC-ID --quality balanced   # 기획·리뷰·디버깅은 최상위, 구현·검증은 경량 모델
 
 auto quality ultra --apply            # Ultra를 기본값으로 저장하고 현재 프로젝트에 반영
 auto quality balanced --apply         # Balanced를 기본값으로 저장하고 현재 프로젝트에 반영
@@ -1060,7 +1061,7 @@ Custom preset 이름은 1–64자의 ASCII 영숫자로 시작하고, 이후에�
 orchestra provider에 계속 적용됩니다. 이 정책이 없는 기존 프로젝트는 이전의 quality-managed
 해석을 유지하되, 소유권이 모호한 markerless root assignment는 마이그레이션 중 보존합니다.
 알려진 생성 프로필을 명시적으로 제거하려면 `auto quality supervisor inherit --apply`를,
-변경되지 않은 Autopus 관리 주 세션 설정에 선택한 품질 모드의 Sol 프로필을 적용하려면
+변경되지 않은 Autopus 관리 주 세션 설정에 선택한 품질 모드의 Astra 프로필을 적용하려면
 `auto quality supervisor quality --apply`를 실행하세요. 사용자가 직접 설정한 프로젝트의
 `model` 또는 `model_reasoning_effort` 값은 그대로 유지되며 이 정책보다 먼저 적용됩니다.
 관리형 에이전트 정의는 세션을 시작할 때 불러오므로, 설정을 반영한 뒤 새 Codex 세션을
@@ -1071,17 +1072,31 @@ GPT/Codex Ultra 기능이 CLI에 포함되어 있어도 프로젝트에서 자�
 `auto quality ultra --apply`를 명시적으로 실행한 뒤 새 Codex 세션을 시작해야 합니다.
 `Ultra compact` 활성화와 promotion은 별도로 진행하며, 위 업데이트 명령만으로 활성화되지 않습니다.
 
-Codex Ultra에서 quality-managed supervisor와 orchestra는 Sol+`ultra`, `planner`·`architect`·
-`security-auditor`는 Sol+`max`, 나머지 관리형 에이전트는 Sol+`xhigh`를 사용합니다. 아래 표의
-Opus 표기는 모델 계층을 지원하는 플랫폼의 동작을 나타내며, Codex는 이 역할별 effort 정책을
-사용합니다.
+Claude Code와 Codex도 OMP와 같은 표준 Balanced 역할표를 사용합니다.
 
-| 모드 | Planner | Executor | Validator | 비용 |
-|------|---------|----------|-----------|------|
-| **Ultra** | Opus | Opus | Opus | $$$ |
-| **Balanced** | Opus | 적응형* | Sonnet | $ |
+| 네이티브 에이전트 그룹 | Claude Code balanced | Codex balanced |
+|---|---|---|
+| planner, architect, spec-writer, reviewer, security-auditor, debugger, deep-worker | `claude-fable-5-1` / `max` | `gpt-6-astra` / `max` |
+| executor, tester, devops, frontend-specialist, perf-engineer | `claude-sonnet-5` / `max` | `gpt-5.6-luna` / `max` |
+| explorer, annotator, validator, ux-validator | `claude-sonnet-5` / `high` | `gpt-5.6-luna` / `max` |
 
-\* HIGH 복잡도 → Opus · MEDIUM/LOW → Sonnet
+실제 생성 파일은 `.claude/agents/autopus/*.md`의 `model`·`effort`와
+`.codex/agents/*.toml`의 `model`·`model_reasoning_effort`입니다.
+`auto quality balanced --apply`로 함께 적용하거나 위의 provider별 명령을 사용하세요.
+과거 기본 배치와 완전히 일치하는 설정은 YAML을 다시 쓰지 않고 표준 배치로 해석합니다.
+특정 역할을 다른 티어로 지정했거나 사용자 품질 프리셋을 만들었다면 기존 해석을 유지합니다.
+한 에이전트의 지정값을 바꿔도 다른 역할의 배치는 바뀌지 않습니다.
+
+Codex 카탈로그를 읽을 수 없으면 요청한 표준 모델을 유지하고 미검증임을 알립니다.
+관측한 카탈로그가 모델이나 추론 강도를 지원하지 않으면, 낮은 모델로 대체하지 않고
+파일을 쓰기 전에 생성을 차단합니다.
+
+Ultra는 기존대로 핵심 7개 역할에 Fable/Astra, 나머지에 Opus/Sol을 사용합니다.
+Claude Ultra의 Fable/Opus는 max, Codex Ultra는 Astra/max와 Sol/xhigh입니다.
+주 세션은 기본적으로 사용자 모델을 상속합니다. quality-managed Codex 주 세션만
+Ultra에서 Astra/ultra, Balanced에서 Astra/xhigh를 사용합니다.
+네이티브 멀티프로바이더 리뷰 기본값은 두 모드 모두 Fable 5.1/max와 Astra/max이며,
+명시적인 provider 모델·추론 강도 지정은 보존합니다.
 
 ### 실행 모드
 

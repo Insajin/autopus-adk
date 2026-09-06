@@ -90,9 +90,8 @@ func applyClaudeAgentProfile(cfg *config.HarnessConfig, filename, content string
 		return content
 	}
 	agent := config.NormalizeAgentName(strings.TrimSuffix(filename, ".md"))
-	tier := cfg.Quality.AgentTier(config.QualityProviderClaude, agent, currentModel)
-	lines[modelIndex] = "model: " + tier
-	effort := claudeAgentEffort(cfg.Quality.EffectiveMode(config.QualityProviderClaude), tier)
+	model, effort := claudeAgentProfile(cfg, agent, currentModel)
+	lines[modelIndex] = "model: " + model
 	if effortIndex >= 0 {
 		if effort == "" {
 			lines = append(lines[:effortIndex], lines[effortIndex+1:]...)
@@ -103,6 +102,29 @@ func applyClaudeAgentProfile(cfg *config.HarnessConfig, filename, content string
 		lines = append(lines[:modelIndex+1], append([]string{"effort: " + effort}, lines[modelIndex+1:]...)...)
 	}
 	return strings.Join(lines, "\n")
+}
+
+// claudeAgentProfile resolves one agent's frontmatter model and reasoning
+// effort. The standard balanced placement addresses exact model ids so Claude
+// Code routes the top rung to the frontier model instead of whichever release
+// the tier alias currently points at; every other preset — Ultra, a custom
+// preset, or a per-agent tier the user moved off the standard rung — keeps
+// projecting the relative tier alias.
+func claudeAgentProfile(cfg *config.HarnessConfig, agent, fallbackTier string) (model, effort string) {
+	if candidate, ok := cfg.Quality.NativeBalancedAgentCandidate(config.QualityProviderClaude, agent); ok {
+		return nativeClaudeModelID(candidate.Selector), candidate.Thinking
+	}
+	tier := cfg.Quality.AgentTier(config.QualityProviderClaude, agent, fallbackTier)
+	return tier, claudeAgentEffort(cfg.Quality.EffectiveMode(config.QualityProviderClaude), tier)
+}
+
+// nativeClaudeModelID drops the routing provider prefix from a role model
+// selector, leaving the model id the Claude CLI itself accepts.
+func nativeClaudeModelID(selector string) string {
+	if _, model, found := strings.Cut(selector, "/"); found {
+		return model
+	}
+	return selector
 }
 
 func claudeAgentEffort(mode, tier string) string {

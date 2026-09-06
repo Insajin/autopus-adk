@@ -606,8 +606,9 @@ and remain explicit overrides across profile/family changes until cleared with `
 On a native catalog without semantic metadata, a pin must have an exact family declaration
 in the shipped built-in profiles or the selected custom profile; arbitrary unknown models are rejected.
 
-This matrix is OMP-specific: shared `quality.presets.balanced.agents` tiers no longer determine
-the built-in OMP balanced routes. Ultra and custom profile definitions retain their existing behavior.
+This standard matrix is shared with native Claude Code and Codex. OMP's built-in routes remain
+independent of custom `quality.presets.balanced.agents` tiers; OMP overrides use `role_model_policy.agents`.
+Ultra and custom OMP profile definitions retain their existing behavior.
 An explicit `role_model_policy.profiles.balanced` definition still wins over the built-in;
 `--family` is rejected for such a custom definition instead of silently ignoring it.
 OMP profile selection does not change `quality.default`, standalone Claude/Codex settings,
@@ -1114,7 +1115,7 @@ sequenceDiagram
 
 ```bash
 /auto go SPEC-ID --quality ultra      # Premium path for every role; Codex effort varies by role
-/auto go SPEC-ID --quality balanced   # Adaptive: Opus/Sonnet/Haiku by task complexity
+/auto go SPEC-ID --quality balanced   # Top-model planning/review/debugging; lighter implementation
 
 auto quality ultra --apply            # Persist Ultra and refresh this project's managed agents
 auto quality balanced --apply         # Persist Balanced and refresh this project's managed agents
@@ -1150,7 +1151,7 @@ quality-managed orchestra providers. Existing projects without this policy keep 
 quality interpretation, while ambiguous markerless root assignments are preserved during migration.
 Run `auto quality supervisor inherit --apply` to explicitly remove a known generated root profile, or
 `auto quality supervisor quality --apply` to opt an unchanged Autopus-managed primary config into the
-Sol profile for the selected quality mode. User-owned project model or effort assignments remain
+Astra profile for the selected quality mode. User-owned project model or effort assignments remain
 preserved and take precedence. Start a new Codex session after applying changes so managed agent
 definitions are reloaded.
 
@@ -1159,33 +1160,30 @@ new binary does not enable Ultra. Run `auto update` to refresh the project's gen
 opt in with `auto quality ultra --apply` and start a new Codex session. Any Ultra compact rollout or
 promotion remains separate and is not activated by these update commands.
 
-In Codex Ultra, a quality-managed supervisor and orchestra use Sol+`ultra`; `planner`, `architect`,
-and `security-auditor` use Sol+`max`; every other managed agent uses Sol+`xhigh`. The Opus labels
-below describe model-tiered platform behavior; Codex uses this role-selective effort profile.
+Claude Code and Codex share the standard balanced role matrix with OMP:
 
-```mermaid
-flowchart LR
-    subgraph Ultra ["🔥 Ultra — All Opus"]
-        U1["Planner\nOpus"] --> U2["Executor\nOpus"] --> U3["Validator\nOpus"]
-    end
+| Native agent group | Claude Code balanced | Codex balanced |
+|---|---|---|
+| planner, architect, spec-writer, reviewer, security-auditor, debugger, deep-worker | `claude-fable-5-1` / `max` | `gpt-6-astra` / `max` |
+| executor, tester, devops, frontend-specialist, perf-engineer | `claude-sonnet-5` / `max` | `gpt-5.6-luna` / `max` |
+| explorer, annotator, validator, ux-validator | `claude-sonnet-5` / `high` | `gpt-5.6-luna` / `max` |
 
-    subgraph Balanced ["⚖️ Balanced — Adaptive"]
-        B1["Planner\nOpus"] --> B2["Executor\nby complexity"]
-        B2 -->|HIGH| BH["Opus"]
-        B2 -->|MEDIUM| BM["Sonnet"]
-        B2 -->|LOW| BL["Sonnet"]
-    end
+The native files are `.claude/agents/autopus/*.md` (`model`, `effort`) and
+`.codex/agents/*.toml` (`model`, `model_reasoning_effort`).
+Apply both through `auto quality balanced --apply`, or use the provider-specific commands above.
+Complete historical default layouts receive the standard placement without rewriting their YAML;
+an explicit different agent tier or a custom quality preset keeps its existing interpretation.
+One custom agent does not change its siblings.
 
-    style Ultra fill:#fff3bf,stroke:#f08c00
-    style Balanced fill:#d0ebff,stroke:#1971c2
-```
+Codex retains the exact standard profile with an unverified diagnostic when its native catalog
+cannot be read. If an observed catalog rejects the requested model or effort, generation stops
+before writing files instead of substituting an older model or lower effort.
 
-| Mode | Planner | Executor | Validator | Cost |
-|------|---------|----------|-----------|------|
-| **Ultra** | Opus | Opus | Opus | $$$ |
-| **Balanced** | Opus | Adaptive* | Sonnet | $ |
-
-\* HIGH complexity → Opus · MEDIUM/LOW → Sonnet
+Ultra is unchanged: its seven-role core uses Fable/Astra, and remaining roles use Opus/Sol.
+Claude Ultra emits max for its Fable/Opus agents; Codex Ultra uses Astra/max and Sol/xhigh.
+Supervisors still inherit by default; quality-managed Codex supervisors use Astra/ultra in Ultra
+and Astra/xhigh in Balanced. Native multi-provider review defaults to Fable 5.1/max and Astra/max
+in both modes, while explicit provider model/effort pins remain untouched.
 
 ### Execution Modes
 

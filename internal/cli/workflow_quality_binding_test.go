@@ -6,8 +6,6 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/insajin/autopus-adk/pkg/cost"
 )
 
 // S20: resolveTeamQualityBinding + serializeTeamQualityBinding produce the bare
@@ -61,37 +59,30 @@ func TestResolveTeamQualityBinding_SerializesBarePhaseMap(t *testing.T) {
 	}
 }
 
-// S16/T13: the binding reuses the canonical resolvers (no fork) — model comes
-// from cost.ModelForAgent and effort from ResolveEffort.
-func TestResolveTeamQualityBinding_ReusesCanonicalResolvers(t *testing.T) {
+func TestResolveTeamQualityBindingPreservesUltraAndUsesBalancedPlacement(t *testing.T) {
 	t.Parallel()
-
 	ultra := resolveTeamQualityBinding("ultra", "")
-	wantModel := cost.ModelForAgent("ultra", "executor")
 	impl := ultra.Phases["implementation"]
-	if impl.Model != wantModel {
-		t.Fatalf("implementation model = %q, want %q (cost.ModelForAgent)", impl.Model, wantModel)
+	if impl.Model != "claude-opus-5" || impl.Effort != "max" {
+		t.Fatalf("ultra implementation changed: %+v", impl)
 	}
-	effRes, err := ResolveEffort(EffortResolveInput{FlagQuality: "ultra", Model: wantModel})
-	if err != nil {
-		t.Fatalf("ResolveEffort: %v", err)
-	}
-	if impl.Effort != string(effRes.Effort) {
-		t.Fatalf("implementation effort = %q, want %q (ResolveEffort)", impl.Effort, string(effRes.Effort))
-	}
-
 	balanced := resolveTeamQualityBinding("balanced", "")
-	bp := balanced.Phases["planning"]
-	if bp.Model != "claude-fable-5-1" || bp.Effort != "max" {
-		t.Fatalf("balanced planning = %+v, want claude-fable-5-1 + max", bp)
+	for phase, want := range map[string]struct{ model, effort string }{
+		"planning":       {"claude-fable-5-1", "max"},
+		"implementation": {"claude-sonnet-5", "max"},
+		"test_scaffold":  {"claude-sonnet-5", "max"},
+		"annotation":     {"claude-sonnet-5", "high"},
+		"testing":        {"claude-sonnet-5", "max"},
+		"review":         {"claude-fable-5-1", "max"},
+	} {
+		got := balanced.Phases[phase]
+		if got.Model != want.model || got.Effort != want.effort {
+			t.Errorf("%s = %+v, want %s/%s", phase, got, want.model, want.effort)
+		}
 	}
-	bi := balanced.Phases["implementation"]
-	if bi.Model != "claude-opus-5" || bi.Effort != "high" {
-		t.Fatalf("balanced implementation = %+v, want claude-opus-5 + high", bi)
-	}
-	br := balanced.Phases["review"]
-	if br.VerifyVotes != 1 || br.Synthesis {
-		t.Fatalf("balanced review = %+v, want verify_votes=1 synthesis=false", br)
+	review := balanced.Phases["review"]
+	if review.VerifyVotes != 1 || review.Synthesis {
+		t.Fatalf("balanced review depth changed: %+v", review)
 	}
 }
 

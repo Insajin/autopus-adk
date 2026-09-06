@@ -51,14 +51,40 @@ func (c codexRenderContext) CodexSupervisorEffort() string {
 	return c.resolve(c.Quality.CodexSupervisorProfile()).Effective.Effort
 }
 
-func (c codexRenderContext) CodexAgentModel(agentName, fallbackTier, declaredEffort string) string {
-	requested := c.Quality.CodexAgentProfile(agentName, fallbackTier, declaredEffort)
-	return c.resolve(requested).Effective.Model
+// CodexAgentModel and CodexAgentEffort answer the agent TOML templates. Both
+// return an error so a catalog that rejects the native balanced placement stops
+// template execution, and with it the whole surface preparation, before any
+// mapping reaches the transaction.
+func (c codexRenderContext) CodexAgentModel(agentName, fallbackTier, declaredEffort string) (string, error) {
+	resolution, err := c.resolveAgent(agentName, fallbackTier, declaredEffort)
+	if err != nil {
+		return "", err
+	}
+	return resolution.Effective.Model, nil
 }
 
-func (c codexRenderContext) CodexAgentEffort(agentName, fallbackTier, declaredEffort string) string {
+func (c codexRenderContext) CodexAgentEffort(agentName, fallbackTier, declaredEffort string) (string, error) {
+	resolution, err := c.resolveAgent(agentName, fallbackTier, declaredEffort)
+	if err != nil {
+		return "", err
+	}
+	return resolution.Effective.Effort, nil
+}
+
+// resolveAgent resolves one managed agent profile against the probed catalog.
+// The standard native balanced placement is a routing decision rather than a
+// preference: answering it with a lower model or effort would hand the agent a
+// weaker rung than the policy names, so that path refuses substitution. Every
+// other profile — Ultra, a hand-edited tier, a non-canonical agent — keeps the
+// ordered availability fallback it has always had.
+func (c codexRenderContext) resolveAgent(
+	agentName, fallbackTier, declaredEffort string,
+) (config.CodexProfileResolution, error) {
 	requested := c.Quality.CodexAgentProfile(agentName, fallbackTier, declaredEffort)
-	return c.resolve(requested).Effective.Effort
+	if _, placed := c.Quality.NativeBalancedAgentCandidate(config.QualityProviderCodex, agentName); placed {
+		return c.adapter.resolveCodexPlacement(requested)
+	}
+	return c.resolve(requested), nil
 }
 
 func (c codexRenderContext) resolve(requested config.CodexProfile) config.CodexProfileResolution {
@@ -71,26 +97,17 @@ func (a *Adapter) reportCodexFallback(resolution config.CodexProfileResolution) 
 	if !resolution.Fallback || a.codexFallbackWriter == nil {
 		return
 	}
-	selected := "runtime-default"
-	if resolution.Effective.Model != "" {
-		selected = resolution.Effective.Model
-		if resolution.Effective.Effort != "" {
-			selected += "/" + resolution.Effective.Effort
-		}
-	}
+	selected := describeCodexProfile(resolution.Effective)
 	key := strings.Join([]string{
+		"fallback",
 		resolution.Requested.Model,
 		resolution.Requested.Effort,
 		selected,
 		string(resolution.Reason),
 	}, "|")
-	if a.codexFallbackSeen == nil {
-		a.codexFallbackSeen = make(map[string]struct{})
-	}
-	if _, exists := a.codexFallbackSeen[key]; exists {
+	if !a.claimCodexDiagnostic(key) {
 		return
 	}
-	a.codexFallbackSeen[key] = struct{}{}
 	fmt.Fprintf(a.codexFallbackWriter,
 		"Codex model fallback: requested=%s/%s selected=%s reason=%s\n",
 		resolution.Requested.Model,
@@ -98,4 +115,18 @@ func (a *Adapter) reportCodexFallback(resolution config.CodexProfileResolution) 
 		selected,
 		resolution.Reason,
 	)
+}
+
+// claimCodexDiagnostic reports whether this diagnostic is new. Sixteen agent
+// templates each ask for a model and an effort, so the same profile is resolved
+// many times per run and must still be reported once.
+func (a *Adapter) claimCodexDiagnostic(key string) bool {
+	if a.codexFallbackSeen == nil {
+		a.codexFallbackSeen = make(map[string]struct{})
+	}
+	if _, exists := a.codexFallbackSeen[key]; exists {
+		return false
+	}
+	a.codexFallbackSeen[key] = struct{}{}
+	return true
 }

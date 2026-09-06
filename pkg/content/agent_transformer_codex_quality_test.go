@@ -42,21 +42,25 @@ func TestTransformAgentForCodex_RendersQualityAwareProfiles(t *testing.T) {
 		forbidEfforts []string
 	}{
 		{
-			name:       "balanced planner",
+			name:       "balanced planner keeps custom tier",
 			source:     codexProfileSource("planner", "opus", "max"),
 			quality:    balanced,
 			wantModel:  "gpt-5.6-sol",
 			wantEffort: "xhigh",
 		},
 		{
+			// executor's explicit tier equals its standard balanced tier, so it
+			// takes the shared native placement instead of the tier ladder.
 			name:       "balanced executor",
 			source:     codexProfileSource("executor", "opus", "medium"),
 			quality:    balanced,
-			wantModel:  "gpt-5.6-terra",
-			wantEffort: "medium",
+			wantModel:  "gpt-5.6-luna",
+			wantEffort: "max",
 		},
 		{
-			name:       "balanced reviewer",
+			// reviewer's explicit sonnet differs from its standard fable tier,
+			// so that one agent stays on the tier ladder.
+			name:       "balanced reviewer keeps custom tier",
 			source:     codexProfileSource("reviewer", "opus", "high"),
 			quality:    balanced,
 			wantModel:  "gpt-5.6-terra",

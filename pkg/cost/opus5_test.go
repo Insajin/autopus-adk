@@ -49,10 +49,10 @@ func TestQualityModeToModels_FableAndOpusFollowPresets(t *testing.T) {
 	wantBalanced := map[string]string{
 		"planner":          "claude-fable-5-1",
 		"architect":        "claude-fable-5-1",
-		"executor":         "claude-opus-5",
+		"executor":         "claude-sonnet-5",
 		"security_auditor": "claude-fable-5-1",
 		"tester":           "claude-sonnet-5",
-		"reviewer":         "claude-opus-5",
+		"reviewer":         "claude-fable-5-1",
 		"validator":        "claude-sonnet-5",
 		"test_scaffold":    "claude-sonnet-5",
 		"annotator":        "claude-sonnet-5",

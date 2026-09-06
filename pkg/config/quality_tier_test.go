@@ -7,10 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestQualityPresetsCoverEveryCanonicalAgent pins the single-tier-source
-// invariant. Claude frontmatter, Codex profiles, cost accounting, and the OMP
-// role-model profiles all project from these presets, so an agent missing from
-// a preset silently falls back to the mid tier on every one of those surfaces.
+// TestQualityPresetsCoverEveryCanonicalAgent keeps the default tier presets
+// exhaustive even when standard balanced uses the shared exact model matrix.
 func TestQualityPresetsCoverEveryCanonicalAgent(t *testing.T) {
 	t.Parallel()
 	presets := DefaultFullConfig("tier-source").Quality.Presets
@@ -69,7 +67,7 @@ func TestClaudeAgentModelProjectsResolvedTier(t *testing.T) {
 	quality := DefaultFullConfig("projection").Quality
 
 	assert.Equal(t, ClaudeFableModel, quality.ClaudeAgentModel("planner", ""))
-	assert.Equal(t, ClaudeOpusModel, quality.ClaudeAgentModel("executor", ""))
+	assert.Equal(t, ClaudeSonnetModel, quality.ClaudeAgentModel("executor", ""))
 	assert.Equal(t, ClaudeSonnetModel, quality.ClaudeAgentModel("tester", ""))
 
 	assert.Equal(t, ClaudeFableModel, ClaudeModelForTier("fable"))

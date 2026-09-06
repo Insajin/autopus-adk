@@ -198,9 +198,9 @@ func buildProviderConfigsForRuntime(names []string, quality, effort string) []or
 		profile.Effort = codexEffortForRuntime(effort)
 		codexEntry = config.ApplyCodexProviderProfile(codexEntry, profile)
 	}
-	claudeArgs := []string{"--print", "--model", "opus", "--effort", "high"}
+	claudeEntry := config.DefaultClaudeProviderEntry()
 	knownProviders := map[string]orchestra.ProviderConfig{
-		"claude": {Name: "claude", Binary: "claude", ModelFamily: "anthropic", Args: upsertClaudeEffortArg(claudeArgs, effort), PaneArgs: upsertClaudeEffortArg(claudeArgs, effort), PromptViaArgs: false},
+		"claude": {Name: "claude", Binary: claudeEntry.Binary, ModelFamily: "anthropic", Args: upsertClaudeEffortArg(claudeEntry.Args, effort), PaneArgs: upsertClaudeEffortArg(claudeEntry.PaneArgs, effort), PromptViaArgs: false},
 		// SPEC-ORCH-021 REQ-014/015: codex subprocess uses `exec --sandbox workspace-write`
 		// (no deprecated --full-auto) with reasoning effort aligned to autopus.yaml; pane argv
 		// stays interactive (no leading `exec`). SchemaFlag carries the structured schema.

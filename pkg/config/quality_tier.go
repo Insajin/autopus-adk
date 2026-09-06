@@ -69,6 +69,9 @@ func (q QualityConf) AgentTier(provider, agentName, fallbackTier string) string 
 
 // ClaudeAgentModel projects the resolved tier onto a Claude model slug.
 func (q QualityConf) ClaudeAgentModel(agentName, fallbackTier string) string {
+	if candidate, standard := q.NativeBalancedAgentCandidate(QualityProviderClaude, agentName); standard {
+		return strings.TrimPrefix(candidate.Selector, "anthropic/")
+	}
 	return ClaudeModelForTier(q.AgentTier(QualityProviderClaude, agentName, fallbackTier))
 }
 

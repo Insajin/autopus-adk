@@ -175,15 +175,15 @@ func TestBuildProviderConfigsForRuntime_AppliesClaudeExplicitEffort(t *testing.T
 	if len(got) != 1 {
 		t.Fatalf("providers = %d, want 1", len(got))
 	}
-	want := []string{"--print", "--model", "opus", "--effort", "xhigh"}
+	want := []string{"--print", "--model", config.ClaudeFableModel, "--effort", "xhigh"}
 	if !reflect.DeepEqual(got[0].Args, want) || !reflect.DeepEqual(got[0].PaneArgs, want) {
 		t.Fatalf("fallback Claude = args %v pane %v, want %v", got[0].Args, got[0].PaneArgs, want)
 	}
 
 	empty := buildProviderConfigsForRuntime([]string{"claude"}, "balanced", "")
-	defaultArgs := []string{"--print", "--model", "opus", "--effort", "high"}
+	defaultArgs := config.DefaultClaudeProviderEntry().Args
 	if len(empty) != 1 || !reflect.DeepEqual(empty[0].Args, defaultArgs) || !reflect.DeepEqual(empty[0].PaneArgs, defaultArgs) {
-		t.Fatalf("empty effort changed fallback defaults: %+v", empty)
+		t.Fatalf("fallback Claude = %+v, want the shipped default argv %v", empty, defaultArgs)
 	}
 }
 

@@ -6,13 +6,8 @@ import "slices"
 // defaultProviderEntries holds the canonical default settings for known orchestra providers.
 // @AX:NOTE: [AUTO] hardcoded provider defaults — update when adding new providers or changing CLI flags
 var defaultProviderEntries = map[string]ProviderEntry{
-	"claude": {
-		Binary:     "claude",
-		Args:       []string{"--print", "--model", "opus", "--effort", "high"},
-		PaneArgs:   []string{"--print", "--model", "opus", "--effort", "high"},
-		Subprocess: SubprocessProvConf{Timeout: ClaudeOrchestraTimeoutSeconds},
-	},
-	"codex": DefaultCodexProviderEntry(),
+	"claude": DefaultClaudeProviderEntry(),
+	"codex":  DefaultCodexProviderEntry(),
 	// SPEC-ORCH-021 REQ-014/015: prompt is the value of --print (injected into "" slot);
 	// pane argv carries no --print (interactive session).
 	"gemini": {Binary: "agy", Args: []string{"--print", ""}, PaneArgs: []string{}, PromptViaArgs: true, InteractiveInput: "stdin", Subprocess: SubprocessProvConf{OutputFormat: "text", Timeout: GeminiOrchestraTimeoutSeconds}},
@@ -33,9 +28,11 @@ func defaultProviderEntryForQuality(providerName string, quality QualityConf) (P
 //  1. Classify Codex model policy: exact historical defaults become quality-managed;
 //     every other unmarked provider becomes pinned.
 //  2. Migrate opencode provider entries back to codex.
-//  3. For each platform that maps to a known orchestra provider,
+//  3. Upgrade a Claude provider still carrying a shipped historical default
+//     argv onto the current default model policy.
+//  4. For each platform that maps to a known orchestra provider,
 //     add the provider entry if it is missing.
-//  4. For each orchestra command, ensure every provider in orchestra.Providers
+//  5. For each orchestra command, ensure every provider in orchestra.Providers
 //     is listed in the command's Providers slice.
 func MigrateOrchestraConfig(cfg *HarnessConfig) (bool, error) {
 	if !cfg.Orchestra.Enabled {
@@ -114,12 +111,8 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 			}
 		}
 		if providerName == "claude" {
-			if args, migrated := migrateClaudeDeprecatedEffort(existing.Args); migrated {
-				existing.Args = args
-				changed = true
-			}
-			if paneArgs, migrated := migrateClaudeDeprecatedEffort(existing.PaneArgs); migrated {
-				existing.PaneArgs = paneArgs
+			var migrated bool
+			if existing, migrated = upgradeHistoricalClaudeProviderDefaults(existing); migrated {
 				changed = true
 			}
 		}
@@ -137,16 +130,6 @@ func migrateKnownProviderDefaults(cfg *HarnessConfig) bool {
 		cfg.Orchestra.Providers[providerName] = existing
 	}
 	return changed
-}
-
-func migrateClaudeDeprecatedEffort(args []string) ([]string, bool) {
-	if !slices.Equal(args, []string{"--print", "--model", "opus", "--effort", "max"}) &&
-		!slices.Equal(args, []string{"-p", "--model", "opus", "--effort", "max"}) {
-		return args, false
-	}
-	next := append([]string{}, args...)
-	next[len(next)-1] = "high"
-	return next, true
 }
 
 // EnsureOrchestraProvider ensures a specific provider exists in the orchestra config.

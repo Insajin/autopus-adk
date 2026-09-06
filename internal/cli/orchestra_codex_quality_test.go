@@ -30,20 +30,22 @@ func TestLoadHarnessConfigForDir_CodexRuntimeOverridesAreEphemeral(t *testing.T)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".codex", "config.toml"), rootSentinel, 0644))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, ".codex", "agents", "executor.toml"), agentSentinel, 0644))
 
-	effective, err := loadHarnessConfigForDir(dir, globalFlags{Quality: "ultra", Effort: config.CodexEffortMax})
+	// The runtime effort deliberately differs from the persisted managed value
+	// so the on-disk comparison still discriminates.
+	effective, err := loadHarnessConfigForDir(dir, globalFlags{Quality: "ultra", Effort: config.CodexEffortLow})
 	require.NoError(t, err)
 	assert.Equal(t, "ultra", effective.Quality.Default)
 	provider := effective.Orchestra.Providers["codex"]
 	assert.Equal(t, config.ProviderModelPolicyQuality, provider.ModelPolicy)
 	assert.Contains(t, provider.Args, config.CodexAstraModel)
-	assert.Contains(t, provider.Args, `model_reasoning_effort="max"`)
-	assert.Contains(t, provider.PaneArgs, `model_reasoning_effort="max"`)
+	assert.Contains(t, provider.Args, `model_reasoning_effort="low"`)
+	assert.Contains(t, provider.PaneArgs, `model_reasoning_effort="low"`)
 
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
 	assert.Contains(t, string(disk), "default: balanced")
-	assert.Contains(t, string(disk), `model_reasoning_effort="xhigh"`)
-	assert.NotContains(t, string(disk), `model_reasoning_effort="max"`)
+	assert.Contains(t, string(disk), `model_reasoning_effort="max"`)
+	assert.NotContains(t, string(disk), `model_reasoning_effort="low"`)
 	rootAfter, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
 	require.NoError(t, err)
 	agentAfter, err := os.ReadFile(filepath.Join(dir, ".codex", "agents", "executor.toml"))
@@ -66,8 +68,10 @@ func TestLoadHarnessConfigForDir_RuntimeBalancedOverridesPersistentUltra(t *test
 	require.NoError(t, err)
 	assert.Equal(t, "balanced", effective.Quality.Default)
 	provider := effective.Orchestra.Providers["codex"]
-	assertCodexProfileInArgs(t, provider.Args, config.CodexAstraModel, config.CodexEffortXHigh)
-	assertCodexProfileInArgs(t, provider.PaneArgs, config.CodexAstraModel, config.CodexEffortXHigh)
+	// Orchestra runs the anchor model at max in both modes, so the runtime mode
+	// switch is visible in the effective quality rather than the argv effort.
+	assertCodexProfileInArgs(t, provider.Args, config.CodexAstraModel, config.CodexEffortMax)
+	assertCodexProfileInArgs(t, provider.PaneArgs, config.CodexAstraModel, config.CodexEffortMax)
 
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)
@@ -201,10 +205,10 @@ func TestBuildProviderConfigsForRuntime_CodexQualityMatrix(t *testing.T) {
 		effort  string
 		want    string
 	}{
-		{name: "default balanced", want: config.CodexEffortXHigh},
-		{name: "balanced", quality: "balanced", want: config.CodexEffortXHigh},
+		{name: "default balanced", want: config.CodexEffortMax},
+		{name: "balanced", quality: "balanced", want: config.CodexEffortMax},
 		{name: "ultra", quality: "ultra", want: config.CodexEffortMax},
-		{name: "explicit effort", quality: "ultra", effort: config.CodexEffortMax, want: config.CodexEffortMax},
+		{name: "explicit effort wins", quality: "ultra", effort: config.CodexEffortHigh, want: config.CodexEffortHigh},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

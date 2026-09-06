@@ -158,6 +158,6 @@ func TestRunSpecReview_AppliesOrchestraMigrationToClaudeProvider(t *testing.T) {
 	defer func() { specReviewRunOrchestra = origRunner }()
 
 	require.NoError(t, runSpecReview(context.Background(), "SPEC-REVIEW-MIGRATE-001", "consensus", 0))
-	assert.Equal(t, []string{"--print", "--model", "opus", "--effort", "high"}, capturedProvider.Args)
+	assert.Equal(t, config.DefaultClaudeProviderEntry().Args, capturedProvider.Args)
 	assert.Equal(t, 480*time.Second, capturedProvider.ExecutionTimeout)
 }

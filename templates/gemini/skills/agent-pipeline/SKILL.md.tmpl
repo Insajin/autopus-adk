@@ -147,14 +147,14 @@ Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip 
 Gate 1:    Approval        → skipped if --auto
 Phase 1.8: Doc Fetch       → main session (Context7 MCP) — skip if no external libs detected
 Phase 1.9: Probe Gate      → main session (execute Risk-First Integration Probe rows before fan-out)
-Phase 2:   Implementation  → executor×N  (opus, acceptEdits, parallel with worktree isolation)
+Phase 2:   Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
 Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
 Gate 2:    Validation      → validator   (sonnet, plan)  — retry up to 3x on FAIL
 Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX tags on modified files
 Phase 3:   Testing         → tester      (sonnet, acceptEdits)
 Gate 3:    Coverage        → verify 85%+ coverage
 Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) — optional, frontend only
-Phase 4:   Review          → reviewer (opus) + security-auditor (fable), parallel + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
+Phase 4:   Review          → reviewer (fable) + security-auditor (fable), parallel + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
 ```
 
 > The assignments above are for Balanced mode. Ultra assigns its seven-role reasoning core to `fable` and every remaining role to `opus`.
@@ -249,7 +249,7 @@ In Balanced mode, task complexity determines the generated agent profile:
 
 Current workspace policy:
 - The shared hierarchy is `fable` > `opus` > `sonnet` > `haiku`. Claude maps those tiers to Fable 5.1, Opus 5, Sonnet 5, and Haiku 4.5; the shipped presets do not assign Haiku
-- Codex maps `fable` to Astra/`max`, `opus` to Sol/`xhigh`, `sonnet` to Terra with role effort, and `haiku` to Luna with role effort. Ultra uses Astra/`ultra` for a quality-managed supervisor and Astra/`max` for its orchestra; Balanced uses Astra/`xhigh` for both
+- Standard balanced uses Astra/max for planner, architect, spec-writer, reviewer, security-auditor, debugger, and deep-worker; the remaining Codex agents use Luna/max. Claude uses Fable 5.1/max for that core, Sonnet 5/max for implementation/testing, and Sonnet 5/high for routine roles. Explicit custom tiers retain the tier ladder. Quality-managed Codex orchestras use Astra/max in both modes; supervisors remain inherited by default (when managed: Ultra Astra/ultra, Balanced Astra/xhigh).
 - Gemini maps `fable`/`opus`/`sonnet` to `gemini-3.1-pro` and `haiku` to `gemini-3.8-flash`
 - OpenCode should keep its configured default runtime model and vary reasoning effort rather than forcing a model ID
 

@@ -45,16 +45,13 @@ func TestEstimateCost_UltraExecutor(t *testing.T) {
 }
 
 func TestEstimateCost_BalancedExecutor(t *testing.T) {
-	// balanced/executor → claude-opus-5: input=$5/M, output=$25/M.
-	// The executor stays on Opus in both presets. Cost derives from the shared
-	// config tier source, so balanced and ultra price this role identically.
-	// total=4000 → input=3000, output=1000
-	// cost = (3000/1_000_000 * 5) + (1000/1_000_000 * 25) = 0.015 + 0.025 = 0.04
+	// Balanced executor uses Sonnet 5: input=$2/M, output=$10/M.
+	// 4,000 tokens split into 3,000 input and 1,000 output cost $0.016.
 	e := cost.NewEstimator("balanced")
 	run := telemetry.AgentRun{AgentName: "executor", EstimatedTokens: 4_000}
 
 	got := roundTo6(e.EstimateCost(run))
-	want := roundTo6(0.04)
+	want := roundTo6(0.016)
 	if got != want {
 		t.Errorf("EstimateCost balanced/executor: want %f, got %f", want, got)
 	}
@@ -113,7 +110,7 @@ func TestEstimatePipelineCost_MultiplePhases(t *testing.T) {
 	// pipeline QualityMode="balanced"
 	// phase1: executor(4000 tokens) + validator(1000 tokens)
 	// phase2: planner(2000 tokens)
-	// balanced/executor (opus-5):    (3000/1M*5)+(1000/1M*25) = 0.015+0.025 = 0.04
+	// balanced/executor (sonnet-5): (3000/1M*2)+(1000/1M*10) = 0.006+0.010 = 0.016
 	// balanced/validator (sonnet-5): (750/1M*2)+(250/1M*10) = 0.0015+0.0025 = 0.004
 	// balanced/planner (fable-5-1):  (1500/1M*10)+(500/1M*50) = 0.015+0.025 = 0.04
 	e := cost.NewEstimator("ultra") // estimator mode doesn't matter; pipeline overrides it
@@ -136,15 +133,8 @@ func TestEstimatePipelineCost_MultiplePhases(t *testing.T) {
 	}
 
 	got := e.EstimatePipelineCost(pipeline)
-	if got <= 0 {
-		t.Errorf("EstimatePipelineCost: expected positive cost, got %f", got)
-	}
-
-	// Verify component costs sum correctly using the single-agent helper.
-	balancedEst := cost.NewEstimator("balanced")
-	wantTotal := balancedEst.EstimateCost(telemetry.AgentRun{AgentName: "executor", EstimatedTokens: 4_000}) +
-		balancedEst.EstimateCost(telemetry.AgentRun{AgentName: "validator", EstimatedTokens: 1_000}) +
-		balancedEst.EstimateCost(telemetry.AgentRun{AgentName: "planner", EstimatedTokens: 2_000})
+	// Independent oracle: $0.016 + $0.004 + $0.040 = $0.060.
+	const wantTotal = 0.060
 
 	if roundTo6(got) != roundTo6(wantTotal) {
 		t.Errorf("EstimatePipelineCost: want %f, got %f", wantTotal, got)

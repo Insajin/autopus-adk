@@ -55,7 +55,12 @@ func TestGenerateAgents_TOMLContent(t *testing.T) {
 	}
 }
 
-func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
+// Balanced renders the native placement rather than the agent template's
+// declared effort: the seven reasoning-core roles land on Astra/max and the
+// nine execution roles on Luna/max. This adapter has no probed catalog, so it
+// covers the config-only render path; the catalog-verified path is in
+// codex_native_balanced_test.go.
+func TestGenerateAgents_BalancedQualityRendersNativePlacement(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	a := NewWithRoot(dir)
@@ -63,20 +68,14 @@ func TestGenerateAgents_BalancedQualityUsesRoleEffort(t *testing.T) {
 
 	files, err := a.generateAgents(cfg)
 	require.NoError(t, err)
+	require.Len(t, files, len(nativeBalancedCodexTOML))
 
-	byPath := make(map[string]string, len(files))
 	for _, f := range files {
-		byPath[f.TargetPath] = string(f.Content)
+		name := filepath.Base(f.TargetPath)
+		want, ok := nativeBalancedCodexTOML[name]
+		require.True(t, ok, "unexpected managed agent %q", name)
+		assertCodexRenderedProfile(t, string(f.Content), want)
 	}
-
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model_reasoning_effort = "max"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "planner.toml")], `model = "gpt-6-astra"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model_reasoning_effort = "xhigh"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "reviewer.toml")], `model = "gpt-5.6-sol"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model_reasoning_effort = "xhigh"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "executor.toml")], `model = "gpt-5.6-sol"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model_reasoning_effort = "medium"`)
-	assert.Contains(t, byPath[filepath.Join(".codex", "agents", "tester.toml")], `model = "gpt-5.6-terra"`)
 }
 
 func TestGenerateAgents_UltraQualityUsesFableAndOpusProfiles(t *testing.T) {

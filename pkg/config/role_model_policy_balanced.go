@@ -1,12 +1,10 @@
 package config
 
-// The balanced built-in profile is an explicit OMP role matrix instead of a
-// projection of the quality presets. OMP routes each agent through exactly one
-// model at exactly one thinking level, so an absent model or an unsupported
-// thinking level must block activation rather than quietly landing the agent
-// on a weaker rung. Every agent follows the selected anchor family, review
-// included: multi-provider review is an orchestra setting and never a routing
-// concern, which is why this profile leaves family diversity off.
+// Standard balanced placement shares this matrix across OMP and the native
+// Claude/Codex adapters. OMP projects one exact candidate per agent; native
+// adapters use NativeBalancedAgentCandidate while preserving custom tiers.
+// Every standard role follows its selected family, including ordinary review.
+// Multi-provider review remains an independent orchestra setting.
 
 // balancedRoleRung groups the canonical agents by the depth their work needs.
 type balancedRoleRung int

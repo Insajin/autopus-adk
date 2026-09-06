@@ -52,7 +52,7 @@ func TestRuntimeGlobalQualityOverridesPersistedProviderModes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "balanced", effective.Quality.Default)
 	assert.Empty(t, effective.Quality.Providers)
-	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexAstraModel, config.CodexEffortXHigh)
+	assertCodexProfileInArgs(t, effective.Orchestra.Providers["codex"].Args, config.CodexAstraModel, config.CodexEffortMax)
 
 	disk, err := os.ReadFile(filepath.Join(dir, "autopus.yaml"))
 	require.NoError(t, err)

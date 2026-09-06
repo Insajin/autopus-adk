@@ -30,31 +30,29 @@ func TestQualityConfCodexSupervisorProfile(t *testing.T) {
 	}
 }
 
+// Orchestra runs the anchor model at max in both modes: the subprocess never
+// auto-delegates, so ultra's delegation effort has nothing to drive there,
+// while the supervisor keeps the per-mode split.
 func TestQualityConfCodexOrchestraProfile(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t,
-		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh},
-		(QualityConf{Default: "balanced"}).CodexOrchestraProfile(),
-	)
-	assert.Equal(t,
-		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax},
-		(QualityConf{Default: "ultra"}).CodexOrchestraProfile(),
-	)
+	want := CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}
+	assert.Equal(t, want, (QualityConf{Default: "balanced"}).CodexOrchestraProfile())
+	assert.Equal(t, want, (QualityConf{Default: "ultra"}).CodexOrchestraProfile())
+	assert.Equal(t, CodexEffortXHigh, (QualityConf{Default: "balanced"}).CodexSupervisorEffort())
+	assert.Equal(t, CodexEffortUltra, (QualityConf{Default: "ultra"}).CodexSupervisorEffort())
 }
 
+// The relative tier ladder still carries every agent that has no native
+// balanced placement: non-canonical roles, custom quality presets, and ultra.
+// Canonical balanced placement lives in codex_native_balanced_test.go.
 func TestQualityConfCodexAgentProfile(t *testing.T) {
 	t.Parallel()
 
 	balanced := QualityConf{
 		Default: "balanced",
 		Presets: map[string]QualityPreset{
-			"balanced": {Agents: map[string]string{
-				"planner":  "fable",
-				"reviewer": "opus",
-				"executor": "sonnet",
-				"explorer": "haiku",
-			}},
+			"balanced": {Agents: map[string]string{"custom-mid": "sonnet"}},
 		},
 	}
 	ultra := DefaultFullConfig("profile").Quality
@@ -68,20 +66,19 @@ func TestQualityConfCodexAgentProfile(t *testing.T) {
 		declaredEffort string
 		want           CodexProfile
 	}{
-		{name: "balanced fable", quality: balanced, agent: "planner", fallbackTier: "sonnet", declaredEffort: "low", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
-		{name: "balanced opus", quality: balanced, agent: "reviewer", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "balanced sonnet", quality: balanced, agent: "executor", fallbackTier: "opus", declaredEffort: "medium", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
-		{name: "balanced haiku", quality: balanced, agent: "explorer", fallbackTier: "opus", declaredEffort: "low", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortLow}},
-		{name: "fable fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "fable", declaredEffort: "low", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
-		{name: "haiku fallback tier", quality: balanced, agent: "unmapped", fallbackTier: "haiku", declaredEffort: "high", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortHigh}},
-		{name: "invalid effort defaults medium", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "invalid", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
-		{name: "balanced agents clamp declared ultra to max", quality: balanced, agent: "executor", fallbackTier: "sonnet", declaredEffort: "ultra", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMax}},
+		{name: "fable tier", quality: balanced, agent: "synthetic", fallbackTier: "fable", declaredEffort: "low", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "opus tier", quality: balanced, agent: "synthetic", fallbackTier: "opus", declaredEffort: "high", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
+		{name: "sonnet tier", quality: balanced, agent: "synthetic", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
+		{name: "haiku tier", quality: balanced, agent: "synthetic", fallbackTier: "haiku", declaredEffort: "low", want: CodexProfile{Model: CodexLunaModel, Effort: CodexEffortLow}},
+		{name: "preset tier beats fallback tier", quality: balanced, agent: "custom-mid", fallbackTier: "fable", declaredEffort: "high", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortHigh}},
+		{name: "invalid effort defaults medium", quality: balanced, agent: "synthetic", fallbackTier: "sonnet", declaredEffort: "invalid", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium}},
+		{name: "ladder clamps declared ultra to max", quality: balanced, agent: "synthetic", fallbackTier: "sonnet", declaredEffort: "ultra", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMax}},
 		{name: "ultra planner keeps fable", quality: ultra, agent: "planner", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
 		{name: "ultra executor keeps opus", quality: ultra, agent: "executor", fallbackTier: "sonnet", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
 		{name: "ultra underscore security name keeps fable", quality: ultra, agent: "security_auditor", fallbackTier: "sonnet", declaredEffort: "medium", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
 		{name: "ultra unknown agent floors sonnet fallback", quality: ultra, agent: "custom-agent", fallbackTier: "sonnet", declaredEffort: "max", want: CodexProfile{Model: CodexSolModel, Effort: CodexEffortXHigh}},
-		{name: "invalid quality follows balanced", quality: QualityConf{Default: "invalid"}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortHigh}},
-		{name: "custom quality uses its role tier", quality: QualityConf{Default: "custom", Presets: map[string]QualityPreset{"custom": {Agents: map[string]string{"executor": "fable"}}}}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
+		{name: "invalid quality follows balanced", quality: QualityConf{Default: "invalid"}, agent: "synthetic", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexTerraModel, Effort: CodexEffortHigh}},
+		{name: "custom quality preset uses its role tier", quality: QualityConf{Default: "custom", Presets: map[string]QualityPreset{"custom": {Agents: map[string]string{"executor": "fable"}}}}, agent: "executor", fallbackTier: "sonnet", declaredEffort: "high", want: CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}},
 	}
 
 	for _, tt := range tests {
@@ -254,25 +251,17 @@ func TestResolveCodexProfileCatalogUnknown(t *testing.T) {
 	}
 }
 
+// The managed orchestra provider entry is mode-independent: both quality modes
+// run the anchor model at max.
 func TestCodexProviderEntryForQuality(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name       string
-		quality    QualityConf
-		wantModel  string
-		wantEffort string
-	}{
-		{name: "balanced", quality: QualityConf{Default: "balanced"}, wantModel: CodexAstraModel, wantEffort: CodexEffortXHigh},
-		{name: "ultra", quality: QualityConf{Default: "ultra"}, wantModel: CodexAstraModel, wantEffort: CodexEffortMax},
-	}
+	wantArgs := []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="max"`}
+	wantPaneArgs := []string{"-m", CodexAstraModel, "-c", `model_reasoning_effort="max"`}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			entry := CodexProviderEntryForQuality(tt.quality)
-			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", tt.wantModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, entry.Args)
-			assert.Equal(t, []string{"-m", tt.wantModel, "-c", `model_reasoning_effort="` + tt.wantEffort + `"`}, entry.PaneArgs)
-		})
+	for _, mode := range []string{"balanced", "ultra"} {
+		entry := CodexProviderEntryForQuality(QualityConf{Default: mode})
+		assert.Equal(t, wantArgs, entry.Args, mode)
+		assert.Equal(t, wantPaneArgs, entry.PaneArgs, mode)
 	}
 }

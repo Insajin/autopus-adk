@@ -16,7 +16,7 @@ func TestMigrateOrchestraConfig_V05066AutoPinnedModelOnlyCodex_RepairsToQuality(
 		quality    string
 		wantEffort string
 	}{
-		{name: "balanced", quality: "balanced", wantEffort: CodexEffortXHigh},
+		{name: "balanced", quality: "balanced", wantEffort: CodexEffortMax},
 		{name: "ultra", quality: "ultra", wantEffort: CodexEffortMax},
 	}
 	for _, tt := range tests {

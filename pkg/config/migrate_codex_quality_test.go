@@ -11,13 +11,14 @@ import (
 func TestMigrateOrchestraConfig_MarksExactHistoricalCodexDefaultsQualityManaged(t *testing.T) {
 	t.Parallel()
 
+	// Both modes project onto Astra/max; what varies is only whether the
+	// migration recognizes the historical argv as quality-managed at all.
 	tests := []struct {
 		name    string
 		quality string
-		effort  string
 	}{
-		{name: "balanced", quality: "balanced", effort: CodexEffortXHigh},
-		{name: "ultra", quality: "ultra", effort: CodexEffortMax},
+		{name: "balanced", quality: "balanced"},
+		{name: "ultra", quality: "ultra"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,8 +45,8 @@ func TestMigrateOrchestraConfig_MarksExactHistoricalCodexDefaultsQualityManaged(
 
 			got := cfg.Orchestra.Providers["codex"]
 			assert.Equal(t, ProviderModelPolicyQuality, got.ModelPolicy)
-			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="` + tt.effort + `"`}, got.Args)
-			assert.Equal(t, []string{"-m", CodexAstraModel, "-c", `model_reasoning_effort="` + tt.effort + `"`}, got.PaneArgs)
+			assert.Equal(t, []string{"exec", "--json", "--sandbox", "workspace-write", "-m", CodexAstraModel, "-c", `model_reasoning_effort="max"`}, got.Args)
+			assert.Equal(t, []string{"-m", CodexAstraModel, "-c", `model_reasoning_effort="max"`}, got.PaneArgs)
 		})
 	}
 }

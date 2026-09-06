@@ -174,10 +174,10 @@ func TestCodexProfilesUseCodexProviderMode(t *testing.T) {
 		CodexProfile{Model: CodexAstraModel, Effort: CodexEffortXHigh},
 		ultraGlobalCodexBalanced.CodexSupervisorProfile(),
 	)
-	// tester stays on the mid tier under balanced, so it still distinguishes the
-	// codex-scoped preset from the ultra global default.
+	// tester takes the native balanced placement even though the global default
+	// is ultra, so the codex-scoped preset is what decided the policy.
 	assert.Equal(t,
-		CodexProfile{Model: CodexTerraModel, Effort: CodexEffortMedium},
+		CodexProfile{Model: CodexLunaModel, Effort: CodexEffortMax},
 		ultraGlobalCodexBalanced.CodexAgentProfile("tester", "opus", "medium"),
 	)
 }

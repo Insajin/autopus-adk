@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/pkg/cost"
 	"github.com/insajin/autopus-adk/pkg/workflow"
 )
@@ -18,7 +19,7 @@ const teamQualityArgsKey = "quality"
 // no binding entry, so OverlayPhases keeps their schema baseline.
 var teamPhaseRoles = map[string][]string{
 	"planning":       {"planner"},
-	"test_scaffold":  {"test_scaffold"},
+	"test_scaffold":  {"tester"},
 	"implementation": {"executor"},
 	"annotation":     {"annotator"},
 	"testing":        {"tester"},
@@ -27,13 +28,13 @@ var teamPhaseRoles = map[string][]string{
 
 // resolveTeamQualityBinding computes the complete per-phase quality binding for
 // the team route from a quality tier and optional complexity (T18, REQ-015, S20).
-// The model comes from cost.ModelForAgent (no fork), and the effort comes from
-// ResolveEffort (the canonical resolver, no fork). Depth fields are applied only
-// to the phases that own them: implementation gets the fan-out cap, review gets
-// the verify-vote count and synthesis toggle.
+// Standard balanced phases use the shared native role matrix. Other modes keep
+// cost.ModelForAgent and ResolveEffort. Depth fields remain phase-specific:
+// implementation owns fan-out, while review owns votes and synthesis.
 func resolveTeamQualityBinding(quality, complexity string) workflow.QualityBinding {
 	depth := workflow.ResolveDepth(quality)
 	phases := make(map[string]workflow.PhaseBinding, len(teamPhaseRoles))
+	qualityConf := config.QualityConf{Default: quality}
 
 	for phase, roles := range teamPhaseRoles {
 		primaryRole := roles[0]
@@ -47,6 +48,12 @@ func resolveTeamQualityBinding(quality, complexity string) workflow.QualityBindi
 		pb := workflow.PhaseBinding{
 			Model:  model,
 			Effort: string(effRes.Effort),
+		}
+		if quality == "balanced" {
+			if candidate, standard := qualityConf.NativeBalancedAgentCandidate(config.QualityProviderClaude, primaryRole); standard {
+				pb.Model = strings.TrimPrefix(candidate.Selector, "anthropic/")
+				pb.Effort = candidate.Thinking
+			}
 		}
 		switch phase {
 		case "implementation":

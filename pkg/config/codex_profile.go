@@ -68,19 +68,26 @@ func (q QualityConf) CodexSupervisorModel() string { return q.CodexSupervisorPro
 
 func (q QualityConf) CodexSupervisorEffort() string { return q.CodexSupervisorProfile().Effort }
 
-// CodexOrchestraProfile returns the managed Codex subprocess profile.
+// CodexOrchestraProfile returns the managed Codex subprocess profile. Both
+// quality modes run the anchor model at max: the subprocess never auto-
+// delegates, so ultra's delegation effort has nothing to drive, and balanced's
+// xhigh left the orchestra reasoning below the agents it coordinates.
 func (q QualityConf) CodexOrchestraProfile() CodexProfile {
-	profile := q.CodexSupervisorProfile()
-	profile.Effort = normalizeManagedCodexEffort(profile.Effort)
-	return profile
+	return CodexProfile{Model: CodexAstraModel, Effort: CodexEffortMax}
 }
 
 func (q QualityConf) CodexOrchestraModel() string { return q.CodexOrchestraProfile().Model }
 
 func (q QualityConf) CodexOrchestraEffort() string { return q.CodexOrchestraProfile().Effort }
 
-// CodexAgentProfile maps an agent's effective tier and declared effort to Codex.
+// CodexAgentProfile maps an agent onto its managed Codex model and effort. A
+// canonical agent under the standard native balanced placement takes both from
+// the shared role matrix; everyone else keeps the relative tier ladder that
+// Ultra, custom presets, and non-canonical agents resolve through.
 func (q QualityConf) CodexAgentProfile(agentName, fallbackTier, declaredEffort string) CodexProfile {
+	if profile, ok := q.nativeBalancedCodexProfile(agentName); ok {
+		return profile
+	}
 	tier := q.codexAgentTier(agentName, fallbackTier)
 	if q.codexQualityMode() == "ultra" && tier != "fable" && tier != "opus" {
 		tier = "opus"
@@ -94,6 +101,28 @@ func (q QualityConf) CodexAgentProfile(agentName, fallbackTier, declaredEffort s
 	default:
 		return CodexProfile{Model: CodexModelForTier(tier), Effort: normalizeManagedCodexEffort(declaredEffort)}
 	}
+}
+
+// nativeBalancedCodexProfile projects the shared native balanced candidate for
+// one agent onto Codex's own vocabulary. The candidate selector carries its
+// provider prefix ("openai-codex/gpt-6-astra") while Codex names the model
+// alone. A candidate whose selector or thinking level does not translate is
+// declined rather than approximated, so a malformed matrix entry falls back to
+// the tier ladder instead of emitting an unusable model.
+func (q QualityConf) nativeBalancedCodexProfile(agentName string) (CodexProfile, bool) {
+	candidate, ok := q.NativeBalancedAgentCandidate(QualityProviderCodex, agentName)
+	if !ok {
+		return CodexProfile{}, false
+	}
+	model := candidate.Selector
+	if _, bare, split := strings.Cut(model, "/"); split {
+		model = bare
+	}
+	effort := strings.ToLower(strings.TrimSpace(candidate.Thinking))
+	if model == "" || codexEffortRank(effort) < 0 {
+		return CodexProfile{}, false
+	}
+	return CodexProfile{Model: model, Effort: normalizeManagedCodexEffort(effort)}, true
 }
 
 func (q QualityConf) CodexAgentModel(agentName, fallbackTier string) string {

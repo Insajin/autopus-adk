@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **표준 Balanced 역할 배치를 Claude Code와 Codex 네이티브 에이전트까지 통일한다** (2026-09-06): OMP의 기존 역할표를 재사용해 핵심 7개 역할(planner, architect, spec-writer, reviewer, security-auditor, debugger, deep-worker)은 Claude Fable 5.1/max와 Codex Astra/max로 생성한다. 나머지 Codex 역할은 Luna/max, Claude 구현·테스트는 Sonnet 5/max, 탐색·주석·검증은 Sonnet 5/high다. 기본 balanced 티어와 정확히 일치하는 이전 기본 배치는 새 표준을 따르며, 명시적으로 다른 역할 티어나 사용자 품질 프리셋은 보존한다. Claude YAML의 model/effort와 Codex TOML의 model/model_reasoning_effort를 실제 생성 파일에서 확인했다. Codex는 카탈로그를 읽지 못하면 요청 모델을 유지하고 미검증을 알리며, 관측한 카탈로그에서 모델·추론 강도가 거부되면 파일을 쓰기 전에 차단한다. 네이티브 멀티프로바이더 리뷰 기본값은 품질 모드와 관계없이 Fable 5.1/max와 Astra/max다. 정확한 과거 Claude 기본 argv만 갱신하며 사용자 pin·추가 플래그·backend:omp와 Ultra·주 세션 모델은 보존한다.
+
 - **OMP 모델 설정을 `auto quality` 대화형 메뉴로 단순화한다** (2026-09-06): 긴 `platform omp profile apply` 명령 대신 `auto quality`에서 OMP, balanced/ultra, GPT/Claude를 차례로 고르고 16개 에이전트의 모델·추론 강도 표를 확인한 뒤 적용할 수 있다. `y`/`yes`를 입력하기 전에는 설정을 쓰지 않으며 Enter·`n`·EOF는 취소한다. 기존 프로필 검증과 적용·rollback 경로를 재사용하고, 공통 quality·멀티프로바이더 리뷰·에이전트별 지정값은 유지한다. OMP가 없는 프로젝트의 기존 quality 메뉴와 고급 명령도 유지한다. 실제 PTY에서 GPT 미리보기 취소와 Claude 적용·16역할 readback을 검증했다.
 
 - **OMP readiness의 빠른 종료 시 RPC 응답 누락을 수정한다** (2026-09-06): 원격 CI의 mixed-install 검사에서 provider-free RPC 프레임이 누락됐다. `StdoutPipe`·`StderrPipe`를 직접 읽는 goroutine보다 `cmd.Wait()`가 먼저 끝나 pipe를 닫는 경합을 로컬 회귀 테스트로 재현했다. 빈 응답으로 실패한 실행은 0.04초여서 timeout을 늘려 해결할 문제가 아니었다. 출력 writer를 `exec.Cmd`에 연결해 `Wait`가 복사를 끝낸 뒤 반환하도록 바꿨다. process-group 종료, 출력 제한과 250ms `WaitDelay`는 유지한다. 수정 전 실패한 fast-exit 회귀 테스트는 수정 후 10회 실행의 총 320개 subprocess에서 원본 RPC 응답을 그대로 보존했다.
