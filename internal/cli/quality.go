@@ -83,6 +83,7 @@ func runQualityShow(cmd *cobra.Command, _ []string) error {
 	writeQualityProviderStatus(out, cfg.Quality, config.QualityProviderClaude)
 	writeQualityProviderStatus(out, cfg.Quality, config.QualityProviderCodex)
 	fmt.Fprintf(out, "quality.supervisor_model_policy = %s\n", cfg.Quality.EffectiveSupervisorModelPolicy())
+	writeOMPRoleModelPolicyStatus(out, cfg.RoleModelPolicy)
 	fmt.Fprintf(out, "config = %s\n", filepath.Join(dir, "autopus.yaml"))
 	fmt.Fprintf(out, "available = %s\n", strings.Join(orderedQualityPresets(cfg), ", "))
 	return nil

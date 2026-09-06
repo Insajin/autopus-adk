@@ -31,11 +31,6 @@ func TestOMPModelIntegration_S12S14_FailsClosedBeforeProjectWrite(t *testing.T) 
 			profile.Capabilities["deep_reasoning"] = route
 			cfg.RoleModelPolicy.Profiles["p1"] = profile
 		}, "required_route_unresolved"},
-		{"family diversity disabled", func(_ *modelIntegrationFakeRunner, cfg *config.HarnessConfig) {
-			profile := cfg.RoleModelPolicy.Profiles["p1"]
-			profile.FamilyDiversity.Enabled = false
-			cfg.RoleModelPolicy.Profiles["p1"] = profile
-		}, "family_diversity_required"},
 		{"agent override mismatch", func(_ *modelIntegrationFakeRunner, cfg *config.HarnessConfig) {
 			profile := cfg.RoleModelPolicy.Profiles["p1"]
 			profile.Agents = map[string]config.RoleAgentOverrideConf{

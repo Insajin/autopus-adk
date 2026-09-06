@@ -77,12 +77,9 @@ func compileOMPIntegratedOverlay(
 		return nil, err
 	}
 	claims := append([]OMPManagedKeyClaim{{
-		Path: "retry.modelFallback", Value: true, Complete: true,
-		PriorFingerprint: OMPMissingManagedValueFingerprint(),
+		Path: "retry.modelFallback", Value: ompIntegratedModelFallback(projection),
+		Complete: true, PriorFingerprint: OMPMissingManagedValueFingerprint(),
 	}}, ompIntegratedSafetyClaims(safety)...)
-	if len(claims) == 0 {
-		return data, nil
-	}
 	merged, err := MergeOMPProjectManagedConfig(OMPProjectManagedInput{
 		Existing: data, Mode: 0o600, Claims: claims,
 	})
@@ -90,6 +87,20 @@ func compileOMPIntegratedOverlay(
 		return nil, err
 	}
 	return merged.Bytes, nil
+}
+
+// ompIntegratedModelFallback reports whether OMP may retry a role on another
+// model. It is enabled only when the projection actually emitted a nonempty
+// fallback chain: a profile whose agents each declare one exact candidate must
+// block on an unavailable model instead of silently landing on a weaker one,
+// so the key is written as false rather than left to the runtime default.
+func ompIntegratedModelFallback(projection OMPModelOverlayProjection) bool {
+	for _, chain := range projection.FallbackChains {
+		if len(chain) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func ompIntegratedExpectedValues(
@@ -103,7 +114,7 @@ func ompIntegratedExpectedValues(
 	values := map[string]any{
 		"modelRoles":           projection.ModelRoles,
 		"retry.fallbackChains": fallbacks,
-		"retry.modelFallback":  true,
+		"retry.modelFallback":  ompIntegratedModelFallback(projection),
 	}
 	if safety.ApprovalMode != "" {
 		values["tools.approvalMode"] = safety.ApprovalMode

@@ -18,12 +18,15 @@ const (
 
 // RoleModelPolicyConf is an opt-in, provider-neutral OMP role routing policy.
 // Family and ConfigMode apply only when a selected built-in profile is derived.
+// Agents is a concise per-agent overlay on the selected profile, built-in or
+// custom: it pins a single agent's route without restating the profile.
 type RoleModelPolicyConf struct {
-	Version    string                          `yaml:"version,omitempty"`
-	Profile    string                          `yaml:"profile,omitempty"`
-	Family     string                          `yaml:"family,omitempty"`
-	ConfigMode string                          `yaml:"config_mode,omitempty"`
-	Profiles   map[string]RoleModelProfileConf `yaml:"profiles,omitempty"`
+	Version    string                           `yaml:"version,omitempty"`
+	Profile    string                           `yaml:"profile,omitempty"`
+	Family     string                           `yaml:"family,omitempty"`
+	ConfigMode string                           `yaml:"config_mode,omitempty"`
+	Agents     map[string]RoleAgentOverrideConf `yaml:"agents,omitempty"`
+	Profiles   map[string]RoleModelProfileConf  `yaml:"profiles,omitempty"`
 }
 
 // RoleModelProfileConf owns capability routes, per-agent overrides, and
@@ -66,6 +69,13 @@ type RoleAgentOverrideConf struct {
 	Role       string                   `yaml:"role,omitempty"`
 	Capability string                   `yaml:"capability,omitempty"`
 	Candidates []RoleModelCandidateConf `yaml:"candidates,omitempty"`
+}
+
+// detached returns a copy whose candidate slice is not shared with the source
+// config, so a resolved profile can never write back into it.
+func (c RoleAgentOverrideConf) detached() RoleAgentOverrideConf {
+	c.Candidates = append([]RoleModelCandidateConf(nil), c.Candidates...)
+	return c
 }
 
 // FamilyDiversityPolicyConf selects agent roles that prefer a distinct model family.
@@ -150,13 +160,37 @@ func (c RoleModelPolicyConf) SelectedRoleModelProfile() (string, RoleModelProfil
 }
 
 // SelectedRoleModelProfileForQuality resolves the selected profile, falling
-// back to the quality-derived built-in profile of the same name when the
-// config defines none. An explicit definition always wins.
+// back to the built-in profile of the same name when the config defines none.
+// An explicit definition always wins. The root per-agent overlay is applied
+// last, to a copy: resolving the same policy for several families or presets
+// never leaks one resolution into the next or into the source config.
 func (c RoleModelPolicyConf) SelectedRoleModelProfileForQuality(quality QualityConf) (string, RoleModelProfileConf, bool) {
 	name, profile, ok := c.SelectedRoleModelProfile()
-	if ok || name == "" {
-		return name, profile, ok
+	if !ok && name != "" {
+		profile, ok = BuiltinRoleModelProfile(name, quality, c.Family, c.ConfigMode)
 	}
-	profile, ok = BuiltinRoleModelProfile(name, quality, c.Family, c.ConfigMode)
-	return name, profile, ok
+	if !ok {
+		return name, RoleModelProfileConf{}, false
+	}
+	return name, profile.withRootAgentOverlay(c.Agents), true
+}
+
+// withRootAgentOverlay returns the profile with the policy's root per-agent
+// overrides layered over its own. The receiver's maps and slices are only
+// read; the result shares nothing that the overlay touched.
+func (c RoleModelProfileConf) withRootAgentOverlay(
+	overlay map[string]RoleAgentOverrideConf,
+) RoleModelProfileConf {
+	if len(overlay) == 0 {
+		return c
+	}
+	agents := make(map[string]RoleAgentOverrideConf, len(c.Agents)+len(overlay))
+	for agent, override := range c.Agents {
+		agents[agent] = override
+	}
+	for agent, override := range overlay {
+		agents[agent] = override.detached()
+	}
+	c.Agents = agents
+	return c
 }

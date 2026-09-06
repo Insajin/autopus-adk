@@ -456,8 +456,8 @@ Oh My Pi 참고:
 
 ```bash
 auto platform omp models                 # 설치된 모델 카탈로그
-auto platform omp profile init --name omp-balanced --plan
-auto platform omp profile apply omp-balanced
+auto platform omp profile apply balanced --family gpt --plan
+auto platform omp profile apply balanced --family gpt
 auto platform omp explain
 auto status --platform omp
 ```
@@ -468,7 +468,51 @@ auto status --platform omp
 
 `auto init`은 관리 대상 OMP 에이전트 정의 16개를 항상 생성합니다. 역할 프로필을 선택하지 않으면 모든 에이전트가 부모 세션 모델을 상속합니다. `auto platform omp explain`과 `auto status --platform omp`는 16개 agent→role→capability 행과 manifest/checksum 설치 무결성을 함께 표시합니다. 생성 파일이 없거나 수정되면 readiness를 차단합니다.
 
-OMP 정책은 특정 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. 기존 설정을 직접 소유하지 않는 `overlay` 모드를 우선 사용하세요. semantic catalog metadata가 있으면 strict 모드를 사용하고, 운영자가 exact selector, family, capability, thinking을 직접 검토한 명시적 저장 프로필에만 operator-attested 모드를 사용하세요.
+#### OMP balanced: GPT형과 Claude형 선택
+
+`profile apply balanced --family gpt|claude`로 OMP 모드와 계열을 함께 선택합니다.
+설정에는 각각 `openai`, `anthropic`으로 저장하며 이 이름으로도 선택할 수 있습니다.
+`--plan`은 16개 에이전트의 요청·실제 모델, 추론 강도, 후보 순서, fallback 시도와
+차단 사유를 보여 줍니다. 설정을 쓰거나 프로필을 활성화하지 않습니다.
+적용할 때는 같은 경로를 설치된 OMP 카탈로그와 provider-free RPC로 검증합니다.
+
+| 에이전트 그룹 | GPT형 balanced | Claude형 balanced |
+|---|---|---|
+| planner, architect, spec-writer, reviewer, security-auditor, **debugger, deep-worker** | GPT-6 Astra `max` | Claude Fable 5.1 `max` |
+| executor, tester, devops, frontend-specialist, perf-engineer | GPT-5.6 Luna `max` | Claude Sonnet 5 `max` |
+| explorer, annotator, validator, ux-validator | GPT-5.6 Luna `max` | Claude Sonnet 5 `high` |
+
+일반 reviewer도 선택한 계열을 따릅니다. 멀티프로바이더 리뷰는 별도의
+`orchestra.providers` 정책이며, 이 프로필을 바꿔도 리뷰 모델과 judge는 유지합니다.
+최상위 리뷰 설정은 Fable `max`, Astra `max`, 선택한 Gemini 모델의 최고 지원
+추론 강도를 사용하세요. Gemini 3.1 Pro는 `max`가 없으므로 `high`를 사용합니다.
+
+Balanced는 낮은 모델로 자동 전환하지 않습니다. 모델이 없거나 추론 강도가 지원되지
+않으면 설정을 쓰기 전에 적용을 차단합니다. 미리보기도 에이전트별 사유를 보여 주고
+실패 코드로 종료합니다. 명시적인 fallback 체인이 없으면 `retry.modelFallback`은 false입니다.
+
+전체 프로필을 복사하지 않고 특정 에이전트만 바꿀 수 있습니다.
+
+```bash
+auto platform omp profile apply balanced --family gpt --agent executor=openai-codex/gpt-6-astra:max --plan
+auto platform omp profile apply balanced --family gpt --agent executor=openai-codex/gpt-6-astra:max
+auto platform omp profile apply balanced --agent executor=inherit
+```
+
+여러 에이전트를 바꾸려면 `--agent`를 반복합니다. 지정값은
+`role_model_policy.agents.<name>.candidates`에 저장하며, 프로필이나 계열을 바꿔도
+유지합니다. `=inherit`로 지우면 선택한 프로필의 기본 배치로 돌아갑니다.
+의미 메타데이터가 없는 native 카탈로그에서는 내장 프로필이나 선택한 사용자 프로필에
+해당 selector의 family가 명시돼 있어야 합니다. 선언되지 않은 모델을 임의로 추측하지 않습니다.
+
+이 표는 OMP 전용입니다. 공통 `quality.presets.balanced.agents` 티어는 더 이상
+내장 OMP balanced 배치를 결정하지 않습니다. Ultra와 사용자 프로필의 동작은 유지합니다.
+`role_model_policy.profiles.balanced`에 명시적 정의가 있으면 내장 프로필보다 우선합니다.
+이 경우 `--family`는 조용히 무시하지 않고 오류로 처리합니다.
+OMP 프로필 선택은 `quality.default`, 독립 Claude/Codex 설정, 주 세션의 native 모델 역할을
+바꾸지 않습니다. `auto quality show`에서 OMP 선택을 별도로 확인할 수 있습니다.
+
+OMP 정책은 특정 프로바이더에 종속되지 않으며 이름 있는 프로필을 선택하기 전에는 활성화되지 않습니다. 기존 설정을 직접 소유하지 않는 `overlay` 모드를 우선 사용하세요. 내장 프로필은 배포된 operator-attested 선언과 설치된 카탈로그의 교집합으로 검증합니다. 사용자 프로필은 의미 메타데이터가 있으면 strict 모드를 사용하고, 없으면 정확한 selector·family·capability·thinking을 검토한 뒤 operator-attested 모드를 선택하세요. 사용자 프로필 예시:
 
 ```yaml
 role_model_policy:
@@ -517,7 +561,7 @@ role_model_policy:
               thinking: medium
       family_diversity:
         enabled: true
-        roles: [advisor]
+        roles: [autopus_reviewer, autopus_security_auditor]
 ```
 
 - candidate 순서가 fallback 순서입니다. strict 모드에서는 `selector`, `family`, `thinking`이 관측된 semantic catalog metadata와 일치해야 합니다. operator-attested 모드에서는 bounded native catalog에 selector가 있어야 하며, family/capability/thinking은 명시적 프로필에서만 가져옵니다. 이 모드는 인증 성공을 보장하지 않습니다. 위 placeholder는 모델 추천이 아닙니다.

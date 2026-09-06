@@ -46,55 +46,30 @@ func TestBuiltinRoleModelProfile_UltraProjectsEachAgentTier(t *testing.T) {
 	assert.Equal(t, fableAnthropicCandidates(), profile.Capabilities[CapabilityCodingToolUse].Candidates)
 }
 
-func TestBuiltinRoleModelProfile_BalancedKeepsSiblingsUnpromoted(t *testing.T) {
-	t.Parallel()
-
-	quality := DefaultFullConfig("builtin-balanced-agents").Quality
-	profile, ok := BuiltinRoleModelProfile("balanced", quality, "", "")
-	require.True(t, ok)
-	require.NoError(t, validateRoleModelProfile("balanced", profile))
-
-	assert.Equal(t, fableAnthropicCandidates(), profile.Agents["planner"].Candidates)
-	assert.Equal(t, opusAnthropicCandidates(), profile.Agents["executor"].Candidates)
-	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["tester"].Candidates)
-	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["annotator"].Candidates)
-	assert.Equal(t, []RoleModelCandidateConf{
-		builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
-		builtinCandidate("openai-codex/"+CodexTerraModel, "medium", "openai"),
-	}, profile.Agents["reviewer"].Candidates)
-	assert.Equal(t, []RoleModelCandidateConf{
-		builtinCandidate("openai-codex/"+CodexAstraModel, "max", "openai"),
-		builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
-	}, profile.Agents["security-auditor"].Candidates)
-
-	// The capability default folds reviewer onto security-auditor's fable
-	// rung; the reviewer route itself does not.
-	dissent := profile.Capabilities[CapabilityIndependentDissent].Candidates
-	assert.Equal(t, "openai-codex/"+CodexAstraModel, dissent[0].Selector)
-	reviewer, err := profile.AgentCandidates("reviewer")
-	require.NoError(t, err)
-	assert.Equal(t, "openai-codex/"+CodexSolModel, reviewer[0].Selector)
-}
-
-func TestBuiltinRoleModelProfile_AgentsIgnoreSiblingTiers(t *testing.T) {
+// An ultra agent takes its own preset rung: sharing a capability with a higher
+// or lower sibling never moves it, and the capability default keeps max-wins
+// for hand-written profiles that drop the per-agent overrides.
+func TestBuiltinRoleModelProfile_UltraAgentsIgnoreSiblingTiers(t *testing.T) {
 	t.Parallel()
 
 	quality := QualityConf{
-		Default: "balanced",
-		Presets: map[string]QualityPreset{"balanced": {Agents: map[string]string{
-			"annotator": "haiku", "executor": "opus",
+		Default: "ultra",
+		Presets: map[string]QualityPreset{"ultra": {Agents: map[string]string{
+			"annotator": "haiku", "explorer": "sonnet",
+			"executor": "fable", "tester": "opus",
 		}}},
 	}
-	profile, ok := BuiltinRoleModelProfile("balanced", quality, "", "")
+	profile, ok := BuiltinRoleModelProfile("ultra", quality, "", "")
 	require.True(t, ok)
+	require.NoError(t, validateRoleModelProfile("ultra", profile))
 
 	haiku := []RoleModelCandidateConf{builtinCandidate("anthropic/"+ClaudeHaikuModel, "low", "anthropic")}
 	assert.Equal(t, haiku, profile.Agents["annotator"].Candidates, "haiku has no lower rung")
 	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["explorer"].Candidates, "sibling stays on its own tier")
-	assert.Equal(t, opusAnthropicCandidates(), profile.Agents["executor"].Candidates)
-	assert.Equal(t, sonnetAnthropicCandidates(), profile.Agents["tester"].Candidates, "no promotion by executor")
+	assert.Equal(t, fableAnthropicCandidates(), profile.Agents["executor"].Candidates)
+	assert.Equal(t, opusAnthropicCandidates(), profile.Agents["tester"].Candidates, "no promotion by executor")
 	assert.Equal(t, sonnetAnthropicCandidates(), profile.Capabilities[CapabilityFastValidation].Candidates, "default keeps max-wins")
-	assert.Equal(t, opusAnthropicCandidates(), profile.Capabilities[CapabilityCodingToolUse].Candidates)
+	assert.Equal(t, fableAnthropicCandidates(), profile.Capabilities[CapabilityCodingToolUse].Candidates)
 }
 
 func TestBuiltinRoleModelProfile_OpenAIAnchorAgentsUseCounterpartForDissent(t *testing.T) {

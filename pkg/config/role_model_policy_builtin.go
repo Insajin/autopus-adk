@@ -1,11 +1,14 @@
 package config
 
-// Built-in role-model profiles project quality presets onto OMP routes. Every
-// canonical agent receives its own preset tier as an agents.<name>.candidates
-// override, so no agent is promoted by a sibling sharing its capability. The
-// capability routes stay populated as defaults for hand-written profiles that
-// copy the derived capabilities without the agent overrides. Selection stays
-// opt-in, and an explicitly defined profile of the same name always wins.
+// Built-in role-model profiles serve OMP routes under a fixed name. The ultra
+// profile projects the quality presets onto its anchor family; the balanced
+// profile is an explicit role matrix that ignores the presets entirely (see
+// role_model_policy_balanced.go). Both give every canonical agent its own
+// agents.<name>.candidates override, so no agent is promoted by a sibling
+// sharing its capability, and both keep the capability routes populated as
+// defaults for hand-written profiles that copy the capabilities without the
+// agent overrides. Selection stays opt-in, and an explicitly defined profile
+// of the same name always wins.
 
 const (
 	builtinRoleModelFamilyAnthropic = "anthropic"
@@ -27,10 +30,14 @@ var builtinModelFamilies = map[string]builtinModelFamily{
 	},
 }
 
-var builtinRoleModelFallbackTier = map[string]string{
-	"balanced": "sonnet",
-	"ultra":    "opus",
-}
+const (
+	builtinRoleModelProfileBalanced = "balanced"
+	builtinRoleModelProfileUltra    = "ultra"
+
+	// builtinUltraFallbackTier is the rung an ultra agent takes when neither
+	// the ultra preset nor the caller names a tier for it.
+	builtinUltraFallbackTier = "opus"
+)
 
 var builtinThinkingByTier = map[string]string{
 	"fable":  "max",
@@ -46,23 +53,35 @@ var builtinLowerTier = map[string]string{
 // builtinTierRank orders relative tiers for the capability default rule.
 var builtinTierRank = map[string]int{"haiku": 0, "sonnet": 1, "opus": 2, "fable": 3}
 
-// IsBuiltinRoleModelProfileName reports whether a profile name is served by a
-// quality-derived profile when the config defines no profile under that name.
-func IsBuiltinRoleModelProfileName(name string) bool {
-	_, ok := builtinRoleModelFallbackTier[name]
+// RoleModelFamilies returns the canonical anchor family names in stable order.
+func RoleModelFamilies() []string {
+	return []string{builtinRoleModelFamilyAnthropic, builtinRoleModelFamilyOpenAI}
+}
+
+// IsValidRoleModelFamily reports whether a value names a canonical anchor
+// family. The empty string is not canonical; a caller that accepts an implicit
+// default resolves it before validating.
+func IsValidRoleModelFamily(family string) bool {
+	_, ok := builtinModelFamilies[family]
 	return ok
 }
 
-// BuiltinRoleModelProfile derives one closed, operator-attested profile from
-// the quality presets and the selected anchor family.
+// IsBuiltinRoleModelProfileName reports whether a profile name is served by a
+// built-in profile when the config defines no profile under that name.
+func IsBuiltinRoleModelProfileName(name string) bool {
+	return name == builtinRoleModelProfileBalanced || name == builtinRoleModelProfileUltra
+}
+
+// BuiltinRoleModelProfile returns one closed, operator-attested profile for a
+// built-in name under the selected anchor family. Only ultra consults the
+// quality presets; balanced carries its own explicit role matrix.
 func BuiltinRoleModelProfile(
 	name string,
 	quality QualityConf,
 	family string,
 	configMode string,
 ) (RoleModelProfileConf, bool) {
-	fallbackTier, ok := builtinRoleModelFallbackTier[name]
-	if !ok {
+	if !IsBuiltinRoleModelProfileName(name) {
 		return RoleModelProfileConf{}, false
 	}
 	anchorName, ok := effectiveBuiltinRoleModelFamily(family)
@@ -73,9 +92,19 @@ func BuiltinRoleModelProfile(
 	if !ok {
 		return RoleModelProfileConf{}, false
 	}
+	if name == builtinRoleModelProfileBalanced {
+		return balancedRoleModelProfile(anchorName, mode), true
+	}
+	return ultraRoleModelProfile(quality, anchorName, mode), true
+}
+
+// ultraRoleModelProfile projects the ultra quality preset onto the anchor
+// family's tier ladder, keeping an ordered lower rung per route so an
+// unavailable top model degrades instead of blocking the whole run.
+func ultraRoleModelProfile(quality QualityConf, anchorName, mode string) RoleModelProfileConf {
 	anchor := builtinModelFamilies[anchorName]
 	counterpart := builtinModelFamilies[counterpartBuiltinRoleModelFamily(anchorName)]
-	agentTiers := builtinAgentTiers(quality, name, fallbackTier)
+	agentTiers := builtinAgentTiers(quality, builtinRoleModelProfileUltra, builtinUltraFallbackTier)
 	capabilities := make(map[string]RoleCapabilityRouteConf, len(providerNeutralCapabilities))
 	for capability, tier := range builtinCapabilityTiers(agentTiers) {
 		capabilities[capability] = RoleCapabilityRouteConf{
@@ -95,7 +124,7 @@ func BuiltinRoleModelProfile(
 			Enabled: true,
 			Roles:   []string{OMPAgentRoleName("reviewer"), OMPAgentRoleName("security-auditor")},
 		},
-	}, true
+	}
 }
 
 // builtinLadder picks the model family for one capability: independent

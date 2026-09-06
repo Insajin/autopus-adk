@@ -117,9 +117,9 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 			},
 		},
 		// Quality presets map every canonical source agent to a relative tier.
-		// This is the single tier source: Claude frontmatter, Codex profiles, cost
-		// accounting, and the OMP role-model profiles all project from it, so the
-		// preset must stay exhaustive over config.CanonicalAgentNames().
+		// Claude frontmatter, Codex profiles, costs, and OMP ultra project from
+		// these exhaustive tiers. OMP balanced owns its explicit family matrix
+		// in role_model_policy_balanced.go.
 		Quality: QualityConf{
 			Default:               "balanced",
 			SupervisorModelPolicy: SupervisorModelPolicyInherit,

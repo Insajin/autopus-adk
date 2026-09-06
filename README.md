@@ -545,8 +545,8 @@ Operator commands:
 
 ```bash
 auto platform omp models                 # installed model catalog
-auto platform omp profile init --name omp-balanced --plan
-auto platform omp profile apply omp-balanced
+auto platform omp profile apply balanced --family gpt --plan
+auto platform omp profile apply balanced --family gpt
 auto platform omp explain
 auto status --platform omp
 ```
@@ -557,7 +557,50 @@ Activation verifies every projected `@role` through an OMP RPC `get_state` sessi
 
 `auto init` always emits the exact 16 managed OMP agent definitions. With no selected role profile they inherit the parent session model. `auto platform omp explain` and `auto status --platform omp` show all 16 agent→role→capability rows plus manifest/checksum installation integrity; a missing or modified generated definition blocks readiness.
 
-OMP policies are provider-neutral and inactive until a named profile is selected. Prefer the non-destructive `overlay` mode. Use strict mode when semantic catalog metadata is available; use operator-attested mode only for an explicitly stored profile whose exact selectors, families, capabilities, and thinking levels the operator has reviewed.
+#### OMP balanced: GPT or Claude family
+
+Select the OMP mode and family together with `profile apply balanced --family gpt|claude`.
+The stored family names are `openai` and `anthropic`; both canonical names are also accepted.
+`--plan` previews all 16 agents, their requested/effective model and thinking, candidate order,
+fallback attempts, and blockers without writing configuration or activating a profile.
+Apply verifies the same routes through the installed OMP catalog and provider-free RPC readback.
+
+| Agent group | GPT balanced | Claude balanced |
+|---|---|---|
+| planner, architect, spec-writer, reviewer, security-auditor, **debugger, deep-worker** | GPT-6 Astra `max` | Claude Fable 5.1 `max` |
+| executor, tester, devops, frontend-specialist, perf-engineer | GPT-5.6 Luna `max` | Claude Sonnet 5 `max` |
+| explorer, annotator, validator, ux-validator | GPT-5.6 Luna `max` | Claude Sonnet 5 `high` |
+
+Ordinary reviewers follow the selected family. Multi-provider review remains a separate
+`orchestra.providers` policy: changing this profile preserves its models and judge.
+For top-model review, keep Fable `max`, Astra `max`, and the selected Gemini model's highest
+supported thinking level (`high` for Gemini 3.1 Pro; it does not expose `max`).
+
+Balanced has no implicit lower-model fallback. Missing models or unsupported thinking block
+apply before writes, and a blocked preview returns nonzero with per-agent reasons.
+Native `retry.modelFallback` is false when the profile has no explicit fallback chains.
+
+Override one agent without copying the full profile:
+
+```bash
+auto platform omp profile apply balanced --family gpt --agent executor=openai-codex/gpt-6-astra:max --plan
+auto platform omp profile apply balanced --family gpt --agent executor=openai-codex/gpt-6-astra:max
+auto platform omp profile apply balanced --agent executor=inherit
+```
+
+Repeat `--agent` for multiple agents. Pins are stored in `role_model_policy.agents.<name>.candidates`
+and remain explicit overrides across profile/family changes until cleared with `=inherit`.
+On a native catalog without semantic metadata, a pin must have an exact family declaration
+in the shipped built-in profiles or the selected custom profile; arbitrary unknown models are rejected.
+
+This matrix is OMP-specific: shared `quality.presets.balanced.agents` tiers no longer determine
+the built-in OMP balanced routes. Ultra and custom profile definitions retain their existing behavior.
+An explicit `role_model_policy.profiles.balanced` definition still wins over the built-in;
+`--family` is rejected for such a custom definition instead of silently ignoring it.
+OMP profile selection does not change `quality.default`, standalone Claude/Codex settings,
+or the supervisor's native model roles. `auto quality show` reports OMP's independent selection.
+
+OMP policies are provider-neutral and inactive until a named profile is selected. Prefer the non-destructive `overlay` mode. The built-in profiles use shipped operator-attested declarations intersected with the installed catalog. For a custom profile, use strict mode when semantic catalog metadata is available; otherwise use operator-attested mode only after reviewing its exact selectors, families, capabilities, and thinking levels. Custom profile example:
 
 ```yaml
 role_model_policy:
@@ -606,7 +649,7 @@ role_model_policy:
               thinking: medium
       family_diversity:
         enabled: true
-        roles: [advisor]
+        roles: [autopus_reviewer, autopus_security_auditor]
 ```
 
 - Candidate order is the fallback order. In strict mode, `selector`, `family`, and `thinking` must match observed semantic catalog metadata. In operator-attested mode, selectors must exist in the bounded native catalog and family/capability/thinking come only from the explicit profile; this does not claim that authentication will succeed. The placeholders above are not model recommendations.

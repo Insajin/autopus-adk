@@ -3,7 +3,9 @@ package omp
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/insajin/autopus-adk/pkg/config"
@@ -12,11 +14,14 @@ import (
 )
 
 const (
-	builtinFable  = "anthropic/" + config.ClaudeFableModel + ":max"
-	builtinOpus   = "anthropic/" + config.ClaudeOpusModel + ":xhigh"
-	builtinSonnet = "anthropic/" + config.ClaudeSonnetModel + ":medium"
-	builtinAstra  = "openai-codex/" + config.CodexAstraModel + ":max"
-	builtinSol    = "openai-codex/" + config.CodexSolModel + ":xhigh"
+	builtinFable      = "anthropic/" + config.ClaudeFableModel + ":max"
+	builtinOpus       = "anthropic/" + config.ClaudeOpusModel + ":xhigh"
+	builtinSonnet     = "anthropic/" + config.ClaudeSonnetModel + ":medium"
+	builtinSonnetMax  = "anthropic/" + config.ClaudeSonnetModel + ":max"
+	builtinSonnetHigh = "anthropic/" + config.ClaudeSonnetModel + ":high"
+	builtinAstra      = "openai-codex/" + config.CodexAstraModel + ":max"
+	builtinSol        = "openai-codex/" + config.CodexSolModel + ":xhigh"
+	builtinLunaMax    = "openai-codex/" + config.CodexLunaModel + ":max"
 )
 
 // TestOMPModelIntegration_S5_UltraBuiltinProjectsEachAgentTier proves the
@@ -43,19 +48,89 @@ func TestOMPModelIntegration_S5_UltraBuiltinProjectsEachAgentTier(t *testing.T) 
 	}, builtinSelectorsByRole(integration.projection))
 }
 
-func TestOMPModelIntegration_S5_BalancedBuiltinKeepsSiblingTiersApart(t *testing.T) {
+// The balanced built-in is an explicit matrix: every agent lands on one exact
+// model at one exact thinking level in the selected family, review included.
+func TestOMPModelIntegration_BalancedBuiltinProjectsTheExplicitMatrix(t *testing.T) {
 	t.Parallel()
 
-	selectors := builtinSelectorsByRole(prepareBuiltinIntegration(t, "balanced").projection)
+	integration := prepareBuiltinIntegration(t, "balanced")
+	assert.False(t, integration.profile.FamilyDiversity.Enabled)
+	assert.Equal(t, map[string]string{
+		"autopus_architect": builtinFable, "autopus_debugger": builtinFable,
+		"autopus_deep_worker": builtinFable, "autopus_planner": builtinFable,
+		"autopus_reviewer": builtinFable, "autopus_security_auditor": builtinFable,
+		"autopus_spec_writer": builtinFable,
+		"autopus_devops":      builtinSonnetMax, "autopus_executor": builtinSonnetMax,
+		"autopus_frontend_specialist": builtinSonnetMax,
+		"autopus_perf_engineer":       builtinSonnetMax, "autopus_tester": builtinSonnetMax,
+		"autopus_annotator": builtinSonnetHigh, "autopus_explorer": builtinSonnetHigh,
+		"autopus_ux_validator": builtinSonnetHigh, "autopus_validator": builtinSonnetHigh,
+	}, builtinSelectorsByRole(integration.projection))
+}
+
+// A single exact candidate per agent must reach the emitted config as an
+// explicit refusal to retry on another model.
+func TestOMPModelIntegration_BalancedBuiltinDisablesModelFallback(t *testing.T) {
+	t.Parallel()
+
+	integration := prepareBuiltinIntegration(t, "balanced")
+	overlay, err := OMPModelOverlayFromProjection(integration.projection)
+	require.NoError(t, err)
+	require.Empty(t, overlay.FallbackChains, "exact candidates leave nothing to fall back to")
+	assert.False(t, ompIntegratedModelFallback(overlay))
+
+	activation, err := compileOMPIntegratedOverlay(overlay, integration.profile.Safety)
+	require.NoError(t, err)
+	assert.Contains(t, string(activation), "modelFallback: false")
+	assert.Equal(t, false, ompIntegratedExpectedValues(overlay, integration.profile.Safety)["retry.modelFallback"])
+
+	// Ultra still declares a lower rung per route, so it keeps retrying.
+	ultra := prepareBuiltinIntegration(t, "ultra")
+	ultraOverlay, err := OMPModelOverlayFromProjection(ultra.projection)
+	require.NoError(t, err)
+	require.NotEmpty(t, ultraOverlay.FallbackChains)
+	assert.True(t, ompIntegratedModelFallback(ultraOverlay))
+}
+
+// A balanced agent declares exactly one candidate, so an unsupported thinking
+// level has nothing to fall back to: activation must block and leave the
+// project untouched rather than quietly route the agent at a lower level.
+func TestOMPModelIntegration_BalancedBuiltinBlocksOnUnsupportedThinking(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	runner := newBuiltinTierIntegrationRunner()
+	runner.catalog = []byte(strings.Replace(
+		string(runner.catalog), `["medium","high","max"]`, `["medium","high"]`, 1))
+
+	_, err := NewWithRoot(root).WithModelIntegrationRunner(runner).
+		Generate(context.Background(), builtinIntegrationConfig("balanced"))
+	require.ErrorContains(t, err, "required_route_unresolved")
+	require.ErrorContains(t, err, "no_compatible_candidate")
+
+	entries, readErr := os.ReadDir(root)
+	require.NoError(t, readErr)
+	assert.Empty(t, entries, "a blocked balanced route must not touch the project")
+}
+
+// Selecting the openai family moves every agent, review included: dissent is
+// an orchestra provider setting, not a routing one.
+func TestOMPModelIntegration_BalancedBuiltinFollowsSelectedFamily(t *testing.T) {
+	t.Parallel()
+
+	integration := prepareBuiltinIntegrationForFamily(t, "balanced", "openai")
+	selectors := builtinSelectorsByRole(integration.projection)
 	require.Len(t, selectors, len(config.CanonicalAgentNames()))
-	// executor/tester and reviewer/security-auditor share a capability but
-	// sit on different preset rungs; each keeps its own.
-	assert.Equal(t, builtinOpus, selectors["autopus_executor"])
-	assert.Equal(t, builtinSonnet, selectors["autopus_tester"])
-	assert.Equal(t, builtinSol, selectors["autopus_reviewer"])
+	assert.Equal(t, builtinAstra, selectors["autopus_planner"])
+	assert.Equal(t, builtinAstra, selectors["autopus_debugger"])
+	assert.Equal(t, builtinAstra, selectors["autopus_deep_worker"])
+	assert.Equal(t, builtinAstra, selectors["autopus_reviewer"])
 	assert.Equal(t, builtinAstra, selectors["autopus_security_auditor"])
-	assert.Equal(t, builtinFable, selectors["autopus_planner"])
-	assert.Equal(t, builtinOpus, selectors["autopus_spec_writer"])
+	assert.Equal(t, builtinLunaMax, selectors["autopus_executor"])
+	assert.Equal(t, builtinLunaMax, selectors["autopus_validator"])
+	for role, selector := range selectors {
+		assert.True(t, strings.HasPrefix(selector, "openai-codex/"), role)
+	}
 }
 
 // TestOMPModelIntegration_S6_ProjectsAgentRolesOnly proves the rendered
@@ -145,20 +220,29 @@ func TestOMPModelIntegration_NoProfileIgnoresQualityPresets(t *testing.T) {
 }
 
 func builtinIntegrationConfig(preset string) *config.HarnessConfig {
-	cfg := config.DefaultFullConfig("builtin-omp-" + preset)
+	return builtinIntegrationConfigForFamily(preset, "anthropic")
+}
+
+func builtinIntegrationConfigForFamily(preset, family string) *config.HarnessConfig {
+	cfg := config.DefaultFullConfig("builtin-omp-" + preset + "-" + family)
 	cfg.Platforms = []string{"omp"}
 	cfg.Quality.Default = preset
 	cfg.RoleModelPolicy = config.RoleModelPolicyConf{
 		Version: config.RoleModelPolicyVersionV1,
 		Profile: preset,
-		Family:  "anthropic",
+		Family:  family,
 	}
 	return cfg
 }
 
 func prepareBuiltinIntegration(t *testing.T, preset string) *ompModelIntegration {
 	t.Helper()
-	cfg := builtinIntegrationConfig(preset)
+	return prepareBuiltinIntegrationForFamily(t, preset, "anthropic")
+}
+
+func prepareBuiltinIntegrationForFamily(t *testing.T, preset, family string) *ompModelIntegration {
+	t.Helper()
+	cfg := builtinIntegrationConfigForFamily(preset, family)
 	require.NoError(t, cfg.Validate())
 	integration, err := NewWithRoot(t.TempDir()).
 		WithModelIntegrationRunner(newBuiltinTierIntegrationRunner()).
@@ -182,10 +266,10 @@ func newBuiltinTierIntegrationRunner() *modelIntegrationFakeRunner {
 	return &modelIntegrationFakeRunner{catalog: []byte(`{"models":[
 {"provider":"anthropic","id":"` + config.ClaudeFableModel + `","selector":"anthropic/` + config.ClaudeFableModel + `","thinking":["max"]},
 {"provider":"anthropic","id":"` + config.ClaudeOpusModel + `","selector":"anthropic/` + config.ClaudeOpusModel + `","thinking":["xhigh"]},
-{"provider":"anthropic","id":"` + config.ClaudeSonnetModel + `","selector":"anthropic/` + config.ClaudeSonnetModel + `","thinking":["medium"]},
+{"provider":"anthropic","id":"` + config.ClaudeSonnetModel + `","selector":"anthropic/` + config.ClaudeSonnetModel + `","thinking":["medium","high","max"]},
 {"provider":"anthropic","id":"` + config.ClaudeHaikuModel + `","selector":"anthropic/` + config.ClaudeHaikuModel + `","thinking":["low"]},
 {"provider":"openai-codex","id":"` + config.CodexAstraModel + `","selector":"openai-codex/` + config.CodexAstraModel + `","thinking":["max"]},
 {"provider":"openai-codex","id":"` + config.CodexSolModel + `","selector":"openai-codex/` + config.CodexSolModel + `","thinking":["xhigh"]},
 {"provider":"openai-codex","id":"` + config.CodexTerraModel + `","selector":"openai-codex/` + config.CodexTerraModel + `","thinking":["medium"]},
-{"provider":"openai-codex","id":"` + config.CodexLunaModel + `","selector":"openai-codex/` + config.CodexLunaModel + `","thinking":["low"]}]}`)}
+{"provider":"openai-codex","id":"` + config.CodexLunaModel + `","selector":"openai-codex/` + config.CodexLunaModel + `","thinking":["low","max"]}]}`)}
 }

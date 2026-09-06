@@ -32,7 +32,7 @@ func TestPlatformOMPProfileApply_UsesExistingOperatorAttestedProfile(t *testing.
 	runner := &ompCLIFakeRunner{catalog: ompCLIAttestedAvailableCatalogJSON()}
 	activationCalls := 0
 	payload, err := applyOMPProfile(
-		context.Background(), root, "balanced", runner,
+		context.Background(), root, ompProfileApplyOptions{name: "balanced"}, runner,
 		func(_ context.Context, _ string, applied *config.HarnessConfig) error {
 			activationCalls++
 			name, selected, ok := applied.RoleModelPolicy.SelectedRoleModelProfile()

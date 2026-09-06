@@ -56,16 +56,13 @@ func TestPlatformOMPProfileApplyPersistsAndRollsBackAtomically(t *testing.T) {
 	original = append(original, []byte("operator_extension:\n  credential_ref: ${OMP_SECRET}\n")...)
 	require.NoError(t, os.WriteFile(configPath, original, 0o640))
 	require.NoError(t, os.Chmod(configPath, 0o640))
-	runner := &ompCLIFakeRunner{catalog: ompCLIReadyCatalogJSON()}
+	runner := &ompCLIFakeRunner{catalog: ompCLIBalancedCatalogJSON()}
 	activated := false
 	deps := normalizeOMPPlatformDependencies(ompPlatformDependencies{
 		newRunner: func() omp.OMPModelCatalogRunner { return runner },
-		activate: func(_ context.Context, _ string, applied *config.HarnessConfig) error {
+		activate: func(_ context.Context, _ string, _ *config.HarnessConfig) error {
 			activated = true
-			name, profile, ok := applied.RoleModelPolicy.SelectedRoleModelProfile()
-			require.True(t, ok)
-			assert.Equal(t, "balanced", name)
-			return preflightOMPProfile(name, profile, mustOMPCatalog(t, runner.catalog))
+			return nil
 		},
 	})
 	dir := root
@@ -73,7 +70,7 @@ func TestPlatformOMPProfileApplyPersistsAndRollsBackAtomically(t *testing.T) {
 	assert.True(t, activated)
 	loaded, err := config.LoadPreview(root)
 	require.NoError(t, err)
-	name, _, selected := loaded.RoleModelPolicy.SelectedRoleModelProfile()
+	name, _, selected := loaded.RoleModelPolicy.SelectedRoleModelProfileForQuality(loaded.Quality)
 	assert.True(t, selected)
 	assert.Equal(t, "balanced", name)
 	persisted, err := os.ReadFile(configPath)
@@ -84,7 +81,7 @@ func TestPlatformOMPProfileApplyPersistsAndRollsBackAtomically(t *testing.T) {
 	before, err := os.ReadFile(configPath)
 	require.NoError(t, err)
 	_, err = applyOMPProfile(
-		context.Background(), root, "second", runner,
+		context.Background(), root, ompProfileApplyOptions{name: "second"}, runner,
 		func(context.Context, string, *config.HarnessConfig) error { return errors.New("activation failed") },
 	)
 	require.Error(t, err)

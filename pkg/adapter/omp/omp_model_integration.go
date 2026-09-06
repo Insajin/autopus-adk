@@ -31,7 +31,7 @@ func (a *Adapter) WithModelIntegrationClock(clock func() time.Time) *Adapter {
 	return a
 }
 
-// @AX:WARN [AUTO]: model integration preparation contains 10 if branches.
+// @AX:WARN [AUTO]: model integration preparation contains 9 if branches.
 // @AX:REASON [AUTO]: policy opt-in, probe evidence, catalog normalization, routing, projection, and receipt preparation are fail-closed.
 func (a *Adapter) prepareModelIntegration(
 	ctx context.Context,
@@ -46,9 +46,6 @@ func (a *Adapter) prepareModelIntegration(
 	profileName, profile, ok := cfg.RoleModelPolicy.SelectedRoleModelProfileForQuality(cfg.Quality)
 	if !ok {
 		return nil, fmt.Errorf("role_model_policy.profile_unknown: %q", profileName)
-	}
-	if !profile.FamilyDiversity.Enabled {
-		return nil, fmt.Errorf("family_diversity_required")
 	}
 	if err := validateOMPIntegrationOverrides(profile); err != nil {
 		return nil, err

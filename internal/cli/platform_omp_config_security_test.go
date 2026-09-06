@@ -23,7 +23,7 @@ func TestApplyOMPProfileRejectsRolePolicyPlaceholderBeforePreview(t *testing.T) 
 	activated := false
 
 	_, err = applyOMPProfile(
-		context.Background(), root, "balanced", runner,
+		context.Background(), root, ompProfileApplyOptions{name: "balanced"}, runner,
 		func(context.Context, string, *config.HarnessConfig) error {
 			activated = true
 			return nil
@@ -50,7 +50,10 @@ func TestApplyOMPProfileRejectsSymlinkWorkspaceAndConfig(t *testing.T) {
 			t.Skipf("workspace symlink unavailable: %v", err)
 		}
 
-		_, err = applyOMPProfile(context.Background(), linkedRoot, "balanced", runner, noOpOMPProfileActivation)
+		_, err = applyOMPProfile(
+			context.Background(), linkedRoot, ompProfileApplyOptions{name: "balanced"}, runner,
+			noOpOMPProfileActivation,
+		)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "workspace_root_unsafe")
 		assert.Empty(t, runner.calls)
@@ -70,7 +73,10 @@ func TestApplyOMPProfileRejectsSymlinkWorkspaceAndConfig(t *testing.T) {
 		before, err := os.ReadFile(realConfig)
 		require.NoError(t, err)
 
-		_, err = applyOMPProfile(context.Background(), root, "balanced", runner, noOpOMPProfileActivation)
+		_, err = applyOMPProfile(
+			context.Background(), root, ompProfileApplyOptions{name: "balanced"}, runner,
+			noOpOMPProfileActivation,
+		)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "autopus_config_unsafe")
 		assert.Empty(t, runner.calls)
@@ -89,7 +95,7 @@ func TestApplyOMPProfileFailsClosedWhenWorkspaceOrConfigSwapsDuringActivation(t 
 		attacker := []byte("platforms: [omp]\nattacker: true\n")
 
 		_, err := applyOMPProfile(
-			context.Background(), root, "balanced", runner,
+			context.Background(), root, ompProfileApplyOptions{name: "balanced"}, runner,
 			func(context.Context, string, *config.HarnessConfig) error {
 				require.NoError(t, os.Rename(root, movedRoot))
 				require.NoError(t, os.Mkdir(root, 0o700))
@@ -111,7 +117,7 @@ func TestApplyOMPProfileFailsClosedWhenWorkspaceOrConfigSwapsDuringActivation(t 
 		attacker := []byte("platforms: [omp]\nattacker: true\n")
 
 		_, err := applyOMPProfile(
-			context.Background(), root, "balanced", runner,
+			context.Background(), root, ompProfileApplyOptions{name: "balanced"}, runner,
 			func(context.Context, string, *config.HarnessConfig) error {
 				require.NoError(t, os.Rename(configPath, movedConfig))
 				require.NoError(t, os.WriteFile(configPath, attacker, 0o640))
@@ -134,7 +140,7 @@ func writeOMPApplySecurityFixture(t *testing.T, root string) (string, *ompCLIFak
 	require.NoError(t, config.Save(root, cfg))
 	configPath := filepath.Join(root, "autopus.yaml")
 	require.NoError(t, os.Chmod(configPath, 0o640))
-	return configPath, &ompCLIFakeRunner{catalog: ompCLIReadyCatalogJSON()}
+	return configPath, &ompCLIFakeRunner{catalog: ompCLIBalancedCatalogJSON()}
 }
 
 func noOpOMPProfileActivation(context.Context, string, *config.HarnessConfig) error {

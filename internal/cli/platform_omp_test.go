@@ -16,7 +16,10 @@ func TestPlatformOMPHelpSurfacesCommandsAndExactFlags(t *testing.T) {
 	assertCommandHelpContains(t, []string{"platform", "omp", "--help"}, "models", "profile", "explain", "--dir")
 	assertCommandHelpContains(t, []string{"platform", "omp", "models", "--help"}, "--json", "--format")
 	assertCommandHelpContains(t, []string{"platform", "omp", "profile", "init", "--help"}, "--name", "--plan", "--json", "--format")
-	assertCommandHelpContains(t, []string{"platform", "omp", "profile", "apply", "--help"}, "apply <name>", "--json", "--format")
+	assertCommandHelpContains(
+		t, []string{"platform", "omp", "profile", "apply", "--help"},
+		"apply <name>", "--family", "--plan", "--agent", "--json", "--format",
+	)
 	assertCommandHelpContains(t, []string{"platform", "omp", "explain", "--help"}, "--json", "--format")
 	assertCommandHelpContains(t, []string{"status", "--help"}, "--platform", "--dir", "--json", "--format")
 }

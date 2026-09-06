@@ -49,7 +49,7 @@ func TestOMPModelDoctor_GeneratedOverlayAndProjectSourcesDetectMutation(t *testi
 			}
 			data, err := os.ReadFile(configPath)
 			require.NoError(t, err)
-			mutated := strings.Replace(string(data), "modelFallback: true", "modelFallback: false", 1)
+			mutated := strings.Replace(string(data), "modelFallback: false", "modelFallback: true", 1)
 			require.NotEqual(t, string(data), mutated)
 			require.NoError(t, os.WriteFile(configPath, []byte(mutated), 0o600))
 

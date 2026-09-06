@@ -13,7 +13,9 @@ type wantBuiltinRoute struct {
 	candidates []RoleModelCandidateConf
 }
 
-func TestBuiltinRoleModelProfile_BalancedProjectsPresetTiers(t *testing.T) {
+// The balanced route matrix itself lives in role_model_policy_balanced_test.go;
+// this covers reaching it through the harness config with no profile defined.
+func TestBuiltinRoleModelProfile_BalancedSelectsWithoutADefinition(t *testing.T) {
 	t.Parallel()
 
 	cfg := DefaultFullConfig("builtin-balanced")
@@ -25,27 +27,12 @@ func TestBuiltinRoleModelProfile_BalancedProjectsPresetTiers(t *testing.T) {
 	assert.Equal(t, "balanced", name)
 	assert.Equal(t, RoleModelConfigModeOverlay, profile.ConfigMode)
 	assert.Equal(t, RoleModelCatalogTrustOperatorAttested, profile.CatalogTrust)
-	assert.Equal(t, builtinDiversityPolicy(), profile.FamilyDiversity)
+	assert.Equal(t, FamilyDiversityPolicyConf{}, profile.FamilyDiversity,
+		"balanced routes every agent on the selected family")
 	assert.Empty(t, profile.ManagedKeys)
 	require.NoError(t, validateRoleModelProfile(name, profile))
-
-	assertBuiltinRoutes(t, profile, []wantBuiltinRoute{
-		{CapabilityDeepReasoning, []RoleModelCandidateConf{
-			builtinCandidate("anthropic/"+ClaudeFableModel, "max", "anthropic"),
-			builtinCandidate("anthropic/"+ClaudeOpusModel, "xhigh", "anthropic"),
-		}},
-		{CapabilityCodingToolUse, []RoleModelCandidateConf{
-			builtinCandidate("anthropic/"+ClaudeOpusModel, "xhigh", "anthropic"),
-			builtinCandidate("anthropic/"+ClaudeSonnetModel, "medium", "anthropic"),
-		}},
-		{CapabilityIndependentDissent, []RoleModelCandidateConf{
-			builtinCandidate("openai-codex/"+CodexAstraModel, "max", "openai"),
-			builtinCandidate("openai-codex/"+CodexSolModel, "xhigh", "openai"),
-		}},
-		{CapabilityFastValidation, sonnetAnthropicCandidates()},
-		{CapabilityVisionDesign, sonnetAnthropicCandidates()},
-		{CapabilityDeterministicTransform, sonnetAnthropicCandidates()},
-	})
+	assert.Equal(t, balancedAnthropicRoutes()["planner"],
+		profile.Capabilities[CapabilityDeepReasoning].Candidates[0])
 }
 
 func TestBuiltinRoleModelProfile_UltraProjectManagedUsesClosedMixedFamilyRoutes(t *testing.T) {
@@ -97,11 +84,11 @@ role_model_policy:
 	})
 }
 
-func TestBuiltinRoleModelProfile_OpenAIAnchorUsesAnthropicAdvisor(t *testing.T) {
+func TestBuiltinRoleModelProfile_UltraOpenAIAnchorUsesAnthropicAdvisor(t *testing.T) {
 	t.Parallel()
 
 	policy := RoleModelPolicyConf{
-		Version: RoleModelPolicyVersionV1, Profile: "balanced", Family: "openai",
+		Version: RoleModelPolicyVersionV1, Profile: "ultra", Family: "openai",
 	}
 	name, profile, ok := policy.SelectedRoleModelProfileForQuality(DefaultFullConfig("openai-anchor").Quality)
 	require.True(t, ok)
@@ -124,20 +111,23 @@ func TestBuiltinRoleModelProfile_OpenAIAnchorUsesAnthropicAdvisor(t *testing.T) 
 	}
 }
 
-// Capability routes keep the max-wins fold as defaults for hand-written
+// Ultra capability routes keep the max-wins fold as defaults for hand-written
 // profiles; per-agent routes are covered in role_model_policy_builtin_agents_test.go.
-func TestBuiltinRoleModelProfile_CapabilityDefaultsTakeHighestAgentTier(t *testing.T) {
+func TestBuiltinRoleModelProfile_UltraCapabilityDefaultsTakeHighestAgentTier(t *testing.T) {
 	t.Parallel()
 
 	quality := QualityConf{
-		Default: "balanced",
-		Presets: map[string]QualityPreset{"balanced": {Agents: map[string]string{
+		Default: "ultra",
+		Presets: map[string]QualityPreset{"ultra": {Agents: map[string]string{
 			"annotator": "haiku", "explorer": "haiku", "validator": "haiku",
-			"executor": "opus",
+			"executor": "opus", "planner": "sonnet", "architect": "sonnet",
+			"spec-writer": "sonnet", "ux-validator": "sonnet",
+			"frontend-specialist": "sonnet", "reviewer": "sonnet",
+			"security-auditor": "sonnet",
 		}}},
 	}
 
-	profile, ok := BuiltinRoleModelProfile("balanced", quality, "", "")
+	profile, ok := BuiltinRoleModelProfile("ultra", quality, "", "")
 	require.True(t, ok)
 	assertBuiltinRoutes(t, profile, []wantBuiltinRoute{
 		{CapabilityFastValidation, []RoleModelCandidateConf{builtinCandidate("anthropic/"+ClaudeHaikuModel, "low", "anthropic")}},
@@ -152,19 +142,16 @@ func TestBuiltinRoleModelProfile_CapabilityDefaultsTakeHighestAgentTier(t *testi
 	})
 }
 
-func TestBuiltinRoleModelProfile_UsesModeTierWhenPresetIsAbsent(t *testing.T) {
+// Ultra borrows nothing from the balanced preset: a missing ultra preset
+// resolves to ultra's own characteristic rung.
+func TestBuiltinRoleModelProfile_UltraUsesModeTierWhenPresetIsAbsent(t *testing.T) {
 	t.Parallel()
 
 	onlyBalanced := QualityConf{Presets: map[string]QualityPreset{
 		"balanced": {Agents: map[string]string{"planner": "sonnet", "executor": "sonnet"}},
 	}}
-	onlyUltra := QualityConf{Presets: map[string]QualityPreset{
-		"ultra": {Agents: map[string]string{"planner": "fable", "executor": "fable"}},
-	}}
 
 	ultra, ok := BuiltinRoleModelProfile("ultra", onlyBalanced, "", "")
-	require.True(t, ok)
-	balanced, ok := BuiltinRoleModelProfile("balanced", onlyUltra, "", "")
 	require.True(t, ok)
 
 	for _, capability := range OMPProviderNeutralCapabilities() {
@@ -172,7 +159,6 @@ func TestBuiltinRoleModelProfile_UsesModeTierWhenPresetIsAbsent(t *testing.T) {
 			continue
 		}
 		assert.Equal(t, "anthropic/"+ClaudeOpusModel, ultra.Capabilities[capability].Candidates[0].Selector, capability)
-		assert.Equal(t, "anthropic/"+ClaudeSonnetModel, balanced.Capabilities[capability].Candidates[0].Selector, capability)
 	}
 }
 

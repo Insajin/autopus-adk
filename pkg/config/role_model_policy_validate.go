@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/hex"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -21,7 +20,7 @@ func (c RoleModelPolicyConf) Validate() error {
 
 func (c RoleModelPolicyConf) validateForQuality(quality QualityConf) error {
 	if c.Version == "" && c.Profile == "" && c.Family == "" &&
-		c.ConfigMode == "" && len(c.Profiles) == 0 {
+		c.ConfigMode == "" && len(c.Profiles) == 0 && len(c.Agents) == 0 {
 		return nil
 	}
 	if c.EffectiveVersion() != RoleModelPolicyVersionV1 {
@@ -33,18 +32,19 @@ func (c RoleModelPolicyConf) validateForQuality(quality QualityConf) error {
 	if _, ok := effectiveBuiltinRoleModelConfigMode(c.ConfigMode); !ok {
 		return fmt.Errorf("role_model_policy.config_mode_invalid: %q", c.ConfigMode)
 	}
+	if err := c.validateRootAgentOverlay(); err != nil {
+		return err
+	}
 	if c.Profile != "" {
-		if _, ok := c.Profiles[c.Profile]; !ok {
-			if !IsBuiltinRoleModelProfileName(c.Profile) {
-				return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
-			}
-			profile, derived := BuiltinRoleModelProfile(c.Profile, quality, c.Family, c.ConfigMode)
-			if !derived {
-				return fmt.Errorf("role_model_policy.profile_unknown: %q", c.Profile)
-			}
-			if err := validateRoleModelProfile(c.Profile, profile); err != nil {
-				return err
-			}
+		// The overlaid profile is what OMP consumes, so trust, attestation,
+		// and route closure are checked against it rather than the profile as
+		// written.
+		name, effective, ok := c.SelectedRoleModelProfileForQuality(quality)
+		if !ok {
+			return fmt.Errorf("role_model_policy.profile_unknown: %q", name)
+		}
+		if err := validateRoleModelProfile(name, effective); err != nil {
+			return err
 		}
 	}
 	for name, profile := range c.Profiles {
@@ -81,7 +81,7 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 			return err
 		}
 	}
-	for _, agent := range sortedAgentOverrides(profile) {
+	for _, agent := range sortedRoleAgentOverrides(profile.Agents) {
 		if err := validateAgentOverride(name, agent, profile.Agents[agent]); err != nil {
 			return err
 		}
@@ -103,34 +103,6 @@ func validateRoleModelProfile(name string, profile RoleModelProfileConf) error {
 	return nil
 }
 
-// sortedAgentOverrides orders override validation so error reports are stable.
-func sortedAgentOverrides(profile RoleModelProfileConf) []string {
-	agents := make([]string, 0, len(profile.Agents))
-	for agent := range profile.Agents {
-		agents = append(agents, agent)
-	}
-	sort.Strings(agents)
-	return agents
-}
-
-// validateAgentOverride requires a matrix agent, rejects role or capability
-// assertions that disagree with the matrix, and applies the capability
-// candidate rules to override candidates.
-func validateAgentOverride(profile, agent string, override RoleAgentOverrideConf) error {
-	capability, err := OMPAgentCapability(agent)
-	if err != nil {
-		return fmt.Errorf("role_model_policy.profiles[%s].%w", profile, err)
-	}
-	scope := fmt.Sprintf("role_model_policy.profiles[%s].agents[%s]", profile, agent)
-	if role := OMPAgentRoleName(agent); override.Role != "" && override.Role != role {
-		return fmt.Errorf("%s.role_capability_mismatch: role %q, want %q", scope, override.Role, role)
-	}
-	if override.Capability != "" && override.Capability != capability {
-		return fmt.Errorf("%s.role_capability_mismatch: capability %q, want %q", scope, override.Capability, capability)
-	}
-	return validateRouteCandidates(scope, override.Candidates)
-}
-
 // validateOperatorAttestedRoutes requires closed capability routes and applies
 // the attestation candidate rules to capability and agent override candidates
 // alike, sharing one selector-to-family ledger across all of them.
@@ -146,7 +118,7 @@ func validateOperatorAttestedRoutes(name string, profile RoleModelProfileConf) e
 			return err
 		}
 	}
-	for _, agent := range sortedAgentOverrides(profile) {
+	for _, agent := range sortedRoleAgentOverrides(profile.Agents) {
 		scope := fmt.Sprintf("role_model_policy.profiles[%s].agents[%s]", name, agent)
 		if err := validateOperatorAttestedCandidates(scope, profile.Agents[agent].Candidates, families); err != nil {
 			return err

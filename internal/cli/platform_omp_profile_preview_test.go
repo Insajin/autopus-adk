@@ -1,0 +1,239 @@
+package cli
+
+import (
+	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/insajin/autopus-adk/pkg/config"
+)
+
+// executeOMPSubcommandExpectingError drives one OMP subcommand that must fail
+// and returns everything the operator saw before the nonzero exit.
+func executeOMPSubcommandExpectingError(t *testing.T, cmd *cobra.Command, args ...string) (string, error) {
+	t.Helper()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	cmd.SetArgs(args)
+	err := cmd.Execute()
+	require.Error(t, err, out.String())
+	return out.String(), err
+}
+
+func planOMPProfileJSON(
+	t *testing.T,
+	root string,
+	runner *ompCLIFakeRunner,
+	args ...string,
+) ompProfileApplyPreviewPayload {
+	t.Helper()
+	dir := root
+	deps := ompBalancedDeps(runner, nil)
+	encoded := executeOMPSubcommand(
+		t, newPlatformOMPProfileApplyCmd(&dir, deps), append(args, "--plan", "--json")...,
+	)
+	var envelope ompCLIJSONEnvelope
+	require.NoError(t, json.Unmarshal([]byte(encoded), &envelope))
+	require.Equal(t, jsonStatusOK, envelope.Status)
+	var payload ompProfileApplyPreviewPayload
+	require.NoError(t, json.Unmarshal(envelope.Data, &payload))
+	return payload
+}
+
+func TestOMPProfilePlanPreviewsEverySelectedAgentWithoutWrites(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+	before, err := os.ReadFile(filepath.Join(root, autopusConfigName))
+	require.NoError(t, err)
+	entriesBefore, err := os.ReadDir(root)
+	require.NoError(t, err)
+
+	payload := planOMPProfileJSON(t, root, runner, "balanced")
+
+	assert.Equal(t, "plan", payload.Mode)
+	assert.Empty(t, payload.Writes)
+	assert.Empty(t, payload.Blockers)
+	assert.Equal(t, ompProfileSourceBuiltin, payload.Source)
+	assert.False(t, payload.Persisted.ProfileDefinition)
+	assert.Len(t, payload.Agents, len(config.CanonicalAgentNames()))
+	for _, row := range payload.Agents {
+		assert.Equal(t, ompProfileAvailabilityAvailable, row.Availability, row.Agent)
+		assert.NotEmpty(t, row.RequestedSelector, row.Agent)
+		assert.NotEmpty(t, row.Candidates, row.Agent)
+		assert.Equal(t, row.RequestedSelector, row.EffectiveSelector, row.Agent)
+		assert.Equal(t, row.RequestedThinking, row.EffectiveThinking, row.Agent)
+	}
+
+	after, err := os.ReadFile(filepath.Join(root, autopusConfigName))
+	require.NoError(t, err)
+	assert.Equal(t, before, after)
+	entriesAfter, err := os.ReadDir(root)
+	require.NoError(t, err)
+	assert.Len(t, entriesAfter, len(entriesBefore))
+}
+
+func TestOMPProfilePlanPinsTopAgentsToHighestModelAtMaxInBothFamilies(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+
+	anthropic := planOMPProfileJSON(t, root, runner, "balanced")
+	for _, agent := range []string{"debugger", "deep-worker", "planner", "architect", "spec-writer", "reviewer", "security-auditor"} {
+		row := agentPreviewRow(t, anthropic, agent)
+		assert.Equal(t, "anthropic/claude-fable-5-1", row.EffectiveSelector, agent)
+		assert.Equal(t, "max", row.EffectiveThinking, agent)
+	}
+	for _, row := range anthropic.Agents {
+		assert.Equal(t, "anthropic", row.EffectiveFamily, row.Agent)
+	}
+
+	openai := planOMPProfileJSON(t, root, runner, "balanced", "--family", "gpt")
+	assert.Equal(t, "openai", openai.FamilyStored)
+	for _, agent := range []string{"debugger", "deep-worker", "planner", "architect", "spec-writer", "reviewer", "security-auditor"} {
+		row := agentPreviewRow(t, openai, agent)
+		assert.Equal(t, "openai-codex/gpt-6-astra", row.EffectiveSelector, agent)
+		assert.Equal(t, "max", row.EffectiveThinking, agent)
+	}
+	for _, row := range openai.Agents {
+		assert.Equal(t, "openai", row.EffectiveFamily, row.Agent)
+	}
+	for _, agent := range []string{"executor", "tester", "devops", "frontend-specialist", "perf-engineer", "explorer", "annotator", "validator", "ux-validator"} {
+		row := agentPreviewRow(t, openai, agent)
+		assert.Equal(t, "openai-codex/gpt-5.6-luna", row.EffectiveSelector, agent)
+		assert.Equal(t, "max", row.EffectiveThinking, agent)
+	}
+}
+
+func TestOMPProfilePlanOffersSingleCandidatePerBalancedAgent(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+
+	payload := planOMPProfileJSON(t, root, runner, "balanced")
+
+	for _, row := range payload.Agents {
+		assert.Len(t, row.Candidates, 1, row.Agent)
+	}
+}
+
+func TestOMPProfilePlanBlocksWhenPinnedModelIsMissingFromCatalog(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+	runner.catalog = ompCLIBalancedCatalogWithout(t, "anthropic/claude-fable-5-1")
+	before, err := os.ReadFile(filepath.Join(root, autopusConfigName))
+	require.NoError(t, err)
+	dir := root
+
+	text, err := executeOMPSubcommandExpectingError(
+		t, newPlatformOMPProfileApplyCmd(&dir, ompBalancedDeps(runner, nil)), "balanced", "--plan",
+	)
+	assert.Contains(t, text, "agent=debugger")
+	assert.Contains(t, text, "reason=model_unknown")
+	assert.Contains(t, err.Error(), "omp_profile_candidate_unavailable")
+
+	after, readErr := os.ReadFile(filepath.Join(root, autopusConfigName))
+	require.NoError(t, readErr)
+	assert.Equal(t, before, after)
+}
+
+func TestOMPProfilePlanBlocksWhenPinnedThinkingIsUnsupported(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+	runner.catalog = bytes.ReplaceAll(
+		ompCLIBalancedCatalogJSON(), []byte(`"thinking":["high","max"]`), []byte(`"thinking":["high"]`),
+	)
+	dir := root
+
+	text, err := executeOMPSubcommandExpectingError(
+		t, newPlatformOMPProfileApplyCmd(&dir, ompBalancedDeps(runner, nil)), "balanced", "--plan",
+	)
+	assert.Contains(t, text, "reason=thinking_unsupported")
+	assert.Contains(t, err.Error(), "omp_profile_candidate_unavailable")
+}
+
+func TestOMPProfilePlanRejectsUnavailableChoiceInJSONWithoutFakeSuccess(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+	runner.catalog = ompCLIBalancedCatalogWithout(t, "openai-codex/gpt-6-astra")
+	dir := root
+
+	out, _ := executeOMPSubcommandExpectingError(
+		t, newPlatformOMPProfileApplyCmd(&dir, ompBalancedDeps(runner, nil)),
+		"balanced", "--family", "openai", "--plan", "--json",
+	)
+	var envelope struct {
+		Status jsonEnvelopeStatus            `json:"status"`
+		Error  jsonErrorPayload              `json:"error"`
+		Data   ompProfileApplyPreviewPayload `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(out), &envelope))
+	assert.Equal(t, jsonStatusError, envelope.Status)
+	assert.Equal(t, "omp_profile_unavailable", envelope.Error.Code)
+	assert.NotEmpty(t, envelope.Data.Blockers)
+	row := agentPreviewRow(t, envelope.Data, "planner")
+	assert.Equal(t, ompProfileAvailabilityUnavailable, row.Availability)
+	require.Len(t, row.FallbackAttempts, 1)
+	assert.Equal(t, "openai-codex/gpt-6-astra:max", row.FallbackAttempts[0].Selector)
+	assert.Equal(t, "model_unknown", row.FallbackAttempts[0].Reason)
+	assert.Empty(t, row.EffectiveSelector)
+}
+
+func TestOMPProfilePlanReportsAgentOverrideSourceForRootPin(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+
+	payload := planOMPProfileJSON(
+		t, root, runner, "balanced", "--agent", "validator=anthropic/claude-sonnet-5:max",
+	)
+
+	overridden := agentPreviewRow(t, payload, "validator")
+	assert.Equal(t, ompProfileSourceAgent, overridden.Source)
+	assert.Equal(t, "anthropic/claude-sonnet-5", overridden.EffectiveSelector)
+	assert.Equal(t, "max", overridden.EffectiveThinking)
+	assert.Equal(t, []string{"validator"}, payload.Persisted.Agents)
+	assert.Equal(t, ompProfileSourceBuiltin, agentPreviewRow(t, payload, "executor").Source)
+}
+
+func TestOMPProfilePlanKeepsExplicitCustomProfileAndItsFallbackVisible(t *testing.T) {
+	root, runner, profile := writeSelectedOMPProfile(t)
+	route := profile.Capabilities[config.CapabilityCodingToolUse]
+	route.Candidates = []config.RoleModelCandidateConf{
+		{Selector: "openai/disabled-coder", Thinking: "high", Family: "openai"},
+		{Selector: "openai/beta-coder", Thinking: "high", Family: "openai"},
+	}
+	profile.Capabilities[config.CapabilityCodingToolUse] = route
+	cfg, err := config.LoadPreview(root)
+	require.NoError(t, err)
+	cfg.RoleModelPolicy.Profiles["balanced"] = profile
+	require.NoError(t, config.Save(root, cfg))
+
+	payload := planOMPProfileJSON(t, root, runner, "balanced")
+
+	assert.Equal(t, ompProfileSourceCustom, payload.Source)
+	assert.True(t, payload.Persisted.ProfileDefinition)
+	row := agentPreviewRow(t, payload, "executor")
+	require.Len(t, row.Candidates, 2)
+	assert.Equal(t, "openai/disabled-coder", row.Candidates[0].Selector)
+	assert.Equal(t, "openai/beta-coder", row.EffectiveSelector)
+	reasons := make([]string, 0, len(row.FallbackAttempts))
+	for _, attempt := range row.FallbackAttempts {
+		reasons = append(reasons, attempt.Reason)
+	}
+	assert.Contains(t, reasons, "disabled")
+}
+
+func TestOMPProfilePlanTextListsOrderedCandidatesAndSources(t *testing.T) {
+	root, runner := writeOMPBalancedProject(t)
+	dir := root
+
+	text := executeOMPSubcommand(
+		t, newPlatformOMPProfileApplyCmd(&dir, ompBalancedDeps(runner, nil)), "balanced", "--plan",
+	)
+
+	assert.Contains(t, text, "Writes: 0")
+	assert.Contains(t, text, "Blockers: none")
+	assert.Contains(t, text, "agent=debugger")
+	assert.Contains(t, text, "candidates=anthropic/claude-fable-5-1:max")
+	assert.Equal(t, len(config.CanonicalAgentNames()), strings.Count(text, "\n  candidates="))
+}

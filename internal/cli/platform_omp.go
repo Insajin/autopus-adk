@@ -125,9 +125,12 @@ func newPlatformOMPProfileInitCmd(dir *string, deps ompPlatformDependencies) *co
 func newPlatformOMPProfileApplyCmd(dir *string, deps ompPlatformDependencies) *cobra.Command {
 	var jsonOutput bool
 	var format string
+	var family string
+	var plan bool
+	var agents []string
 	cmd := &cobra.Command{
 		Use:   "apply <name>",
-		Short: "Persist, select, and activate an OMP model profile",
+		Short: "Select, persist, and activate an OMP model profile",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			jsonMode, err := resolveOMPOutputMode(cmd, jsonOutput, format)
@@ -138,11 +141,22 @@ func newPlatformOMPProfileApplyCmd(dir *string, deps ompPlatformDependencies) *c
 			if err != nil {
 				return err
 			}
-			return runOMPProfileApplyCommand(
-				cmd, root, args[0], jsonMode, deps.newRunner(), deps.activate,
-			)
+			opts, err := newOMPProfileApplyOptions(args[0], family, agents, plan, jsonMode)
+			if err != nil {
+				return writeOMPProfilePlanFailure(cmd, jsonMode, err)
+			}
+			return runOMPProfileApplyCommand(cmd, root, opts, deps.newRunner(), deps.activate)
 		},
 	}
+	cmd.Flags().StringVar(
+		&family, "family", "",
+		"Anchor model family for a built-in profile (anthropic|openai; aliases claude|gpt)",
+	)
+	cmd.Flags().BoolVar(&plan, "plan", false, "Preview every agent route without writing any file")
+	cmd.Flags().StringArrayVar(
+		&agents, "agent", nil,
+		"Pin one agent: <agent>=<provider/model>:<thinking>, or <agent>=inherit to clear the override",
+	)
 	addJSONFlags(cmd, &jsonOutput, &format)
 	return cmd
 }
