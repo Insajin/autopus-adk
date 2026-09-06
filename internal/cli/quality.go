@@ -14,20 +14,25 @@ import (
 )
 
 func newQualityCmd() *cobra.Command {
+	return newQualityCmdWithOMPDependencies(defaultOMPPlatformDependencies())
+}
+
+func newQualityCmdWithOMPDependencies(deps ompPlatformDependencies) *cobra.Command {
+	deps = normalizeOMPPlatformDependencies(deps)
 	var apply bool
 	cmd := &cobra.Command{
 		Use:   "quality [preset]",
-		Short: "Show or change global/provider quality and Codex supervisor ownership",
+		Short: "Choose quality modes and OMP agent models",
 		Long: "Show or change quality.default, quality.providers, and quality.supervisor_model_policy in autopus.yaml.\n\n" +
 			"Use `auto quality <preset> --apply` for the global fallback, " +
 			"`auto quality provider <provider> <preset|inherit> --apply` for one provider, " +
-			"or run without arguments to choose the global fallback interactively.",
+			"or run `auto quality` without arguments for guided quality and OMP model selection.",
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 1 {
 				return runQualitySet(cmd, args[0], apply)
 			}
-			return runQualityInteractive(cmd, apply)
+			return runQualityInteractive(cmd, apply, deps)
 		},
 	}
 	cmd.PersistentFlags().BoolVar(&apply, "apply", false, "Apply the saved quality or supervisor policy to this project's harness files")
@@ -128,10 +133,19 @@ func runQualitySupervisorSet(cmd *cobra.Command, policy string, apply bool) erro
 	return nil
 }
 
-func runQualityInteractive(cmd *cobra.Command, apply bool) error {
+func runQualityInteractive(cmd *cobra.Command, apply bool, deps ompPlatformDependencies) error {
 	dir, cfg, err := loadQualityConfig(cmd)
 	if err != nil {
 		return err
+	}
+	if containsOMPString(cfg.Platforms, "omp") {
+		target, err := chooseQualityTarget(cmd)
+		if err != nil {
+			return err
+		}
+		if target == "omp" {
+			return runOMPQualityInteractive(cmd, dir, cfg, deps)
+		}
 	}
 	options := orderedQualityPresets(cfg)
 	if len(options) == 0 {

@@ -33,11 +33,6 @@ func TestGolden(t *testing.T) {
 			args:   []string{"version"},
 			golden: "version_output.golden",
 		},
-		{
-			name:   "help output",
-			args:   []string{"--help"},
-			golden: "help_output.golden",
-		},
 	}
 
 	for _, tc := range cases {

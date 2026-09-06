@@ -3,7 +3,6 @@
 package e2e
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -31,7 +30,7 @@ func TestCLI_Help(t *testing.T) {
 	// --help exits 0 for cobra commands.
 	assert.Equal(t, 0, r.ExitCode, "--help should exit 0")
 	combined := r.Stdout + r.Stderr
-	assert.True(t, strings.Contains(combined, "auto"), "--help output should mention 'auto'")
+	assert.Regexp(t, `(?m)^\s+quality\s+`, combined, "model setup must be discoverable from root help")
 }
 
 func TestCLI_Doctor_RequiresProject(t *testing.T) {

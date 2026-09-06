@@ -541,7 +541,20 @@ Oh My Pi note:
 
 ### OMP role routing and context optimization (opt-in)
 
-Operator commands:
+For everyday model setup, run:
+
+```bash
+auto quality
+```
+
+In an OMP-enabled project, choose **OMP → balanced/ultra → GPT/Claude**.
+Review the compact agent/model/thinking table and type `y` to apply.
+Enter, `n`, or EOF at confirmation cancels without changes; `--apply` is not required.
+Existing agent overrides and multi-provider review settings are preserved.
+An explicitly defined custom profile keeps its own model families.
+Start a new OMP session after applying.
+
+Advanced and automation commands remain available:
 
 ```bash
 auto platform omp models                 # installed model catalog
