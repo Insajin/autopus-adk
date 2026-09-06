@@ -49,12 +49,9 @@ esac
 `, argsPath, inputPath, rpcOutput)
 	require.NoError(t, os.WriteFile(executable, []byte(script), 0o755))
 
-	// The contract under test is frame parsing and capability derivation, not
-	// latency. ProbeOMPReadiness defaults to a 5s budget because `auto doctor`
-	// needs a UX bound, and that budget lost to a shared CI runner spawning
-	// /bin/sh plus cat: every capability came back response_missing while the
-	// same fixture passed locally. Pin a generous budget so a saturated runner
-	// cannot turn a parsing contract into a timing one.
+	// This contract exercises frame parsing and capability derivation, not
+	// latency. Fast-exit output draining has a separate process-boundary
+	// regression; this fixture keeps a generous host scheduling budget.
 	report := omp.ProbeOMPReadiness(context.Background(), omp.OMPReadinessOptions{
 		Executable: executable,
 		Root:       root,

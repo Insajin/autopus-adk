@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -31,18 +30,18 @@ func runOMPReadinessRPCCommand(
 	if err != nil {
 		return nil, err
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return nil, err
+	if cmd.Stdout != nil || cmd.Stderr != nil {
+		return nil, errors.New("OMP readiness output is already configured")
 	}
 
 	limit := newOMPReadinessLimitSignal()
 	capture := newOMPReadinessRPCStreamCapture(maxOutput, limit)
 	stderrCapture := &ompReadinessCountWriter{limit: maxOutput, signal: limit}
+	// Let exec.Cmd own both copy goroutines: Wait must drain their output
+	// before closing the pipes. StdoutPipe plus a concurrent Wait can discard
+	// the final frames of a fast-exiting provider-free process.
+	cmd.Stdout = capture
+	cmd.Stderr = stderrCapture
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.WaitDelay = 250 * time.Millisecond
 	var terminateOnce sync.Once
@@ -61,29 +60,15 @@ func runOMPReadinessRPCCommand(
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
-	stdoutDone := make(chan struct{})
-	stderrDone := make(chan struct{})
-	go func() {
-		_, _ = io.Copy(capture, stdout)
-		close(stdoutDone)
-	}()
-	go func() {
-		_, _ = io.Copy(stderrCapture, stderr)
-		close(stderrDone)
-	}()
 	if _, err := stdin.Write(input); err != nil {
 		_ = stdin.Close()
 		terminate()
 		_ = cmd.Wait()
-		<-stdoutDone
-		<-stderrDone
 		return capture.Bytes(), err
 	}
 	if err := stdin.Close(); err != nil {
 		terminate()
 		_ = cmd.Wait()
-		<-stdoutDone
-		<-stderrDone
 		return capture.Bytes(), err
 	}
 
@@ -94,8 +79,6 @@ func runOMPReadinessRPCCommand(
 		select {
 		case waitErr := <-wait:
 			_ = stdin.Close()
-			<-stdoutDone
-			<-stderrDone
 			if waitErr != nil {
 				terminate()
 			}
@@ -109,14 +92,10 @@ func runOMPReadinessRPCCommand(
 		case <-limit.Done():
 			terminate()
 			waitErr := <-wait
-			<-stdoutDone
-			<-stderrDone
 			return capture.Bytes(), errors.Join(processprobe.ErrOutputLimit, waitErr)
 		case <-ctx.Done():
 			terminate()
 			waitErr := <-wait
-			<-stdoutDone
-			<-stderrDone
 			return capture.Bytes(), errors.Join(ctx.Err(), waitErr)
 		}
 	}
