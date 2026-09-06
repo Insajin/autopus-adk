@@ -178,8 +178,7 @@ func preflightWorkspaceUpdateTarget(ctx context.Context, cmd *cobra.Command, tar
 		return fmt.Errorf("설정 로드 실패: %w", err)
 	}
 	appendDetectedPlatforms(cfg)
-	// Keep migrations in-memory only. The real local update persists them after
-	// all workspace targets have passed this preflight.
+	// Keep migrations in memory until every workspace target passes preflight.
 	if _, migrateErr := config.MigrateOrchestraConfig(cfg); migrateErr != nil {
 		return fmt.Errorf("orchestra 마이그레이션 실패: %w", migrateErr)
 	}
@@ -193,6 +192,7 @@ func preflightWorkspaceUpdateTarget(ctx context.Context, cmd *cobra.Command, tar
 		if _, supported := lookupPlatformDescriptor(platform); !supported {
 			continue
 		}
+		fmt.Fprintf(cmd.OutOrStdout(), "  → Checking [%s] %s...\n", target.Path, updatePlatformLabel(platform))
 		if _, _, previewErr := buildPlatformPreview(ctx, target.AbsPath, effectiveCfg, platform); previewErr != nil {
 			return previewErr
 		}

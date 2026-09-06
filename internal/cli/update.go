@@ -228,7 +228,9 @@ func newUpdateCmd() *cobra.Command {
 			var platformErrors []string
 			codexUpdated := false
 
+			reportUpdateTargets(cmd.OutOrStdout(), cfg.Platforms, addedPlatforms)
 			for _, p := range cfg.Platforms {
+				fmt.Fprintf(cmd.OutOrStdout(), "  → Updating %s...\n", updatePlatformLabel(p))
 				supported, updateErr := updateHarnessPlatform(ctx, dir, p, effectiveCfg)
 				if !supported {
 					fmt.Fprintf(cmd.OutOrStdout(), "  경고: 알 수 없는 플랫폼 %q, 건너뜀\n", p)

@@ -58,6 +58,7 @@ func updateDetectedHarnessPlatforms(
 			platformErrors = append(platformErrors, fmt.Sprintf("%s: unsupported platform", platform))
 			continue
 		}
+		fmt.Fprintf(out, "  → Updating %s...\n", updatePlatformLabel(platform))
 		candidate, err := cloneHarnessConfig(current)
 		if err == nil {
 			candidate.Platforms = append(candidate.Platforms, platform)
