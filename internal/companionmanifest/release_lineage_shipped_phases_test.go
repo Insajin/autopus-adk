@@ -1,0 +1,122 @@
+package companionmanifest
+
+// A22 이후의 좌표 행이다. 여기가 릴리즈마다 자라는 쪽이라 frozenReleasePhases와 분리했다.
+// 발행된 행은 덮지 않고, 새 phase를 그 아래에 더한다.
+var shippedReleasePhases = []releasePhase{
+	{
+		phase: "A22", tag: "v0.50.109", version: "0.50.109",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "b86fab067599f457261287552c5a9dd86460d7f4",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"ADK_KEY_ROTATION_VERIFIED",
+			"release-tag-signing-2026-q3-r2.pub",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsLinuxArchives: true, pinsReleaseID: true,
+	},
+	{
+		phase: "A23", tag: "v0.50.111", version: "0.50.111",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "67f3def5d4a0a11aadd9e103389de6cc1cafc34e",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+	{
+		// v0.50.112 is absent on purpose. It was armed as A24, tagged, and pushed,
+		// but CI failed at the tagged commit so the release job never ran and the
+		// coordinate was burned. A burned coordinate never enters this table, which
+		// is why v0.50.110 and v0.50.75..76 are absent too. A24 is v0.50.113.
+		phase: "A24", tag: "v0.50.113", version: "0.50.113",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "954f60a77acb59fd4106537020693fdcadb3d640",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+	{
+		// A25 shipped on omp/17.2.7. Its first attempt carried omp/18.1.5 and
+		// failed closed in the cohort at call 6 of 42 before any tag existed, so
+		// the coordinate survived and the pin went back to the contract version.
+		phase: "A25", tag: "v0.50.114", version: "0.50.114",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "bc2147a875b49e9fca75db4307455f83512837d6",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+	{
+		// A26 follows the published A25 on the same omp/17.2.7 oracle; the
+		// predecessor pins are measured from immutable release 382345734.
+		phase: "A26", tag: "v0.50.115", version: "0.50.115",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "a6d199fb5a7b27721026916fcd75dffb58a4e228",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+	{
+		// A27 follows the published A26 on the same omp/17.2.7 oracle; the
+		// predecessor pins are measured from immutable release 383249963.
+		phase: "A27", tag: "v0.50.116", version: "0.50.116",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "77ae668bf7e9eb8d0dae177d1c9b7e41a5d51ef6",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+	{
+		// A28 follows the published A27 on the same omp/17.2.7 oracle; the
+		// predecessor pins are measured from immutable release 383500138.
+		phase: "A28", tag: "v0.50.117", version: "0.50.117",
+		acceptedField: "source-tree",
+		rejects:       "unsignedTag",
+		ancestorSHA:   "fbe502c05f84d5eeb81b089b2344c47329ab4543",
+		extraSourceGates: []string{
+			"COMPANION_RELEASE_TAG_SIGNATURE_REQUIRED",
+			"release-tag-signing-2026-q3-r2.pub",
+			"SHA256:7FISPXCi8p7cFEdh4Fcyyp8RPQbXYZwmo3Mxi5+YjrQ",
+			`verify-tag "refs/tags/$GITHUB_REF_NAME"`,
+		},
+		pinsRepository: true, pinsEvidenceSource: true, pinsTagObject: true,
+		pinsReleaseID: true, callerTreeSHA: true, callerReleaseID: true,
+		bridgePredecessor: true,
+	},
+}
