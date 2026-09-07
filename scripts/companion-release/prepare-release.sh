@@ -11,7 +11,7 @@ USAGE
 }
 readonly repository='Insajin/autopus-adk'
 readonly environment_name='adk-companion-release'
-readonly release_tag='v0.50.117'
+readonly release_tag='v0.50.118'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_go_toolchain='go1.26.6'
 readonly expected_omp_sha256='a4c5c9cc5b8222184d0d7429b0bb6ac2a92bbe45dd11bf68e4b1360050791909'
@@ -165,17 +165,17 @@ release_present=0; evidence_present=0
 [[ -n "$evidence_remote" ]] && evidence_present=1
 if [[ "$release_present" -eq 0 ]]; then
   scripts/companion-release/verify-release-tag-ruleset.sh --armed ||
-    fail 'exact armed v0.50.117 tag ruleset or environment is unavailable'
+    fail 'exact armed v0.50.118 tag ruleset or environment is unavailable'
   ruleset_state=armed
 elif scripts/companion-release/verify-release-tag-ruleset.sh --sealed; then
   ruleset_state=sealed
 elif scripts/companion-release/verify-release-tag-ruleset.sh --armed; then
   ruleset_state=armed-reconciliation-required
 else
-  fail 'committed v0.50.117 tag ruleset is neither exact sealed nor reconcilable armed state'
+  fail 'committed v0.50.118 tag ruleset is neither exact sealed nor reconcilable armed state'
 fi
 releases=$(gh api --paginate --slurp "repos/${repository}/releases?per_page=100") || fail 'cannot inspect GitHub Release state'
-release_count=$(jq '[.[][] | select(.tag_name == "v0.50.117")] | length' <<<"$releases") || fail 'GitHub Release state is malformed'
+release_count=$(jq '[.[][] | select(.tag_name == "v0.50.118")] | length' <<<"$releases") || fail 'GitHub Release state is malformed'
 [[ "$release_count" == '0' || "$release_count" == '1' ]] || fail 'GitHub Release state is ambiguous'
 [[ "$release_count" == '0' || "$release_present" -eq 1 || -n "$retained_lock_commit" ]] ||
   fail 'GitHub Release exists without its source tag or retained prep lock'
