@@ -144,12 +144,21 @@ provider=$(sed -n 's/.*"provider":"\([^"]*\)".*/\1/p' <<<"$active_policy")
 [[ "$provider" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] ||
   fail 'active static policy has no usable provider id'
 
-model=$(awk -F'"' '/^model[[:space:]]*=/ { print $2; exit }' "${HOME}/.codex/config.toml")
+# The canary runs on the pinned OMP, whose model catalog lags the operator's
+# Codex default. ADK_RELEASE_MODEL overrides ~/.codex/config.toml for one run;
+# either way the model must exist in the pinned OMP catalog, otherwise the
+# canary fails only after sudo with an opaque startup error.
+model=${ADK_RELEASE_MODEL:-$(awk -F'"' '/^model[[:space:]]*=/ { print $2; exit }' "${HOME}/.codex/config.toml")}
 model_context_window=$(awk -F'=' '/^model_context_window[[:space:]]*=/ { gsub(/[^0-9]/, "", $2); print $2; exit }' \
   "${HOME}/.codex/config.toml")
-[[ -n "$model" ]] || fail 'cannot read the configured model from ~/.codex/config.toml'
+[[ -n "$model" ]] || fail 'cannot read the configured model from ~/.codex/config.toml (or set ADK_RELEASE_MODEL)'
 [[ "$model_context_window" =~ ^[0-9]+$ && "$model_context_window" -ge 8192 ]] ||
   fail 'configured model context window is missing or below the required minimum'
+known_models=$("$omp_executable" models "$provider" --json --no-extensions 2>/dev/null |
+  jq -r '[.. | objects | select(has("id")) | .id] | unique | join(" ")') || known_models=''
+[[ -n "$known_models" ]] || fail "pinned OMP ${omp_version} lists no ${provider} models; run '${omp_executable} models refresh'"
+[[ " $known_models " == *" $model "* ]] ||
+  fail "model ${model} is not in the pinned OMP ${omp_version} ${provider} catalog (${known_models}); set ADK_RELEASE_MODEL to one of them"
 
 r2_key="$key_store/release-tag-signing-2026-q3-r2"
 k3_key="$key_store/omp-context-promotion-2026-q3-k3.b64"
