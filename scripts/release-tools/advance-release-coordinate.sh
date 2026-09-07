@@ -80,6 +80,15 @@ readonly -a history_files=(
   'scripts/companion-release/verify-public-key-lineage-coordinates.sh'
 )
 
+# Phase-keyed accumulators: these files list every phase a rule applies to
+# ('A27' || 'A28' ...), so they carry no version string and the history check
+# above cannot see them. A published FROM keeps its entry and gains TO; an
+# unpublished FROM moves in place. A28 was appended by hand once because this
+# file was in neither list.
+readonly -a phase_list_files=(
+  'scripts/companion-release/verify-public-key-lineage.sh'
+)
+
 # Test files are deliberately absent from the list above. Each of them mixes
 # shipped-release pins with predecessor references in the same file — the
 # accumulate assertion for the previous phase, the predecessor Cask digests, a
@@ -97,7 +106,7 @@ readonly -a review_targets=(
 for target in "${replace_targets[@]}"; do
   [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target $target"
 done
-for target in "${history_files[@]}"; do
+for target in "${history_files[@]}" "${phase_list_files[@]}"; do
   [[ -f "$target" && ! -L "$target" ]] || fail "missing or unsafe target $target"
 done
 
@@ -123,10 +132,24 @@ if [[ "$from_published" -eq 1 ]]; then
       "  immutable release, not derived from a version string. See" \
       "  docs/runbooks/omp-pin-advance.md for the measurement pattern.")"
   done
+  for target in "${phase_list_files[@]}"; do
+    if grep -qF -- "'${to_phase}'" "$target"; then
+      printf '  present  %s already lists %s\n' "$target" "$to_phase"
+      continue
+    fi
+    fail "$(printf '%s\n' \
+      "${target} does not list ${to_phase} and ${from_tag} is published." \
+      "  Append '${to_phase}' beside '${from_phase}' in each accumulating phase list;" \
+      "  the ${from_phase} entry stays because its release is still verifiable.")"
+  done
 else
   printf '  history  %s was never published; moving its rows in place\n' "$from_tag"
   for target in "${history_files[@]}"; do
     perl -pi -e "s/\Q${from_tag}\E/${to_tag}/g; s/\Q${from_version}\E/${to_version}/g" "$target"
+    printf '  updated  %s\n' "$target"
+  done
+  for target in "${phase_list_files[@]}"; do
+    perl -pi -e "s/'\Q${from_phase}\E'/'${to_phase}'/g" "$target"
     printf '  updated  %s\n' "$target"
   done
 fi

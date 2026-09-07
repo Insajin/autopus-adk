@@ -49,9 +49,9 @@ manifests, tag object, commit, tree) and from the live tap head `6a53f34d`
 (cask blob `1961f988` reproduced byte-for-byte by `render_homebrew_cask`).
 The `upgrade-canary.yaml` predecessor block was re-measured to A27 as the
 v0.50.115 runbook asked. `verify-public-key-lineage.sh` holds three
-accumulating phase lists that are in neither the replace nor the review list
-of the advance script; A28 was appended by hand and the script should list
-that file under `review_targets`.
+accumulating phase lists that were in neither list of the advance script; A28
+was appended by hand, and the script now carries the file as a phase-keyed
+accumulator (`phase_list_files`) that is checked or moved like the history files.
 
 ## Next release
 
@@ -70,8 +70,7 @@ model `gpt-6-astra` is absent from the pinned `omp/17.2.7` catalog
 
 - Run `advance-release-coordinate.sh v0.50.117 A28 v0.50.118 A29` and add the
   A28 predecessor pins by measurement from release `383826825`.
-- Include `verify-public-key-lineage.sh` and the `upgrade-canary.yaml`
-  predecessor block in the measurement table.
+- Include the `upgrade-canary.yaml` predecessor block in the measurement table.
 - The OMP pin stays at `omp/17.2.7` until `docs/runbooks/omp-pin-advance.md`
   clears an 18.x candidate at the cohort; until then `ADK_RELEASE_MODEL` must
   name a model the pinned catalog lists.
