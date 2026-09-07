@@ -59,6 +59,7 @@ fi
 
 section "content gates"
 if [[ -z "$(gofmt -l pkg internal cmd templates)" ]]; then pass 'gofmt clean'; else bad 'gofmt reports files'; fi
+if go mod tidy -diff >/dev/null 2>&1; then pass 'go.mod and go.sum are tidy'; else bad 'go mod tidy would change go.mod or go.sum'; fi
 oversized=$(go run ./cmd/source-lines --max 300 --ext .go pkg internal cmd 2>&1 | grep -v '^source-lines:' || true)
 if [[ -z "$oversized" ]]; then pass 'no source file over 300 code lines'; else bad "over 300 code lines: $oversized"; fi
 before_generate=$(git status --porcelain)
