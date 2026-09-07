@@ -55,9 +55,23 @@ that file under `review_targets`.
 
 ## Next release
 
+`v0.50.117` (A28) shipped 2026-09-07: release `383826825` (immutable, 15
+assets, published `2026-09-07T05:18:04Z`), tag object `edcd4eb98f4e`, source
+commit `620e29a44d00`, tree `fce0d047ae8c`, evidence tag `62fa28194cbe`,
+report `6c7213d04761…`, attestation `e0c48a051ce6…`, ruleset `22415096`
+sealed, deployment policy `59291706`, tap head `f6b06e4ad58c` (cask blob
+`99df4d8bdc20`), upgrade canary run `34086372717` admitted `0.50.116 ->
+0.50.117` on Darwin/arm64. Two apply attempts failed before the tag existed
+and left no remote state: `go.sum` lacked chroma's test-dependency hashes
+(preflight now runs `go mod tidy -diff`), and the operator's Codex default
+model `gpt-6-astra` is absent from the pinned `omp/17.2.7` catalog
+(`release-prep.sh` now checks the catalog before `sudo` and honours
+`ADK_RELEASE_MODEL`; the canary ran on `gpt-5.6-sol`).
+
 - Run `advance-release-coordinate.sh v0.50.117 A28 v0.50.118 A29` and add the
-  A28 predecessor pins by measurement from the v0.50.117 release.
+  A28 predecessor pins by measurement from release `383826825`.
 - Include `verify-public-key-lineage.sh` and the `upgrade-canary.yaml`
   predecessor block in the measurement table.
 - The OMP pin stays at `omp/17.2.7` until `docs/runbooks/omp-pin-advance.md`
-  clears an 18.x candidate at the cohort.
+  clears an 18.x candidate at the cohort; until then `ADK_RELEASE_MODEL` must
+  name a model the pinned catalog lists.
