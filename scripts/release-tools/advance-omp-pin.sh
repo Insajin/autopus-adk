@@ -16,6 +16,8 @@ set -euo pipefail
 #
 # usage: advance-omp-pin.sh TO_VERSION            # e.g. 18.1.4
 #        advance-omp-pin.sh TO_VERSION --dry-run
+#        advance-omp-pin.sh TO_VERSION --measure  # move an unmeasured version so the
+#                                                 # next release-prep.sh --apply measures it
 
 readonly repository='can1357/oh-my-pi'
 readonly declaration='scripts/companion-release/prepare-release.sh'
@@ -23,11 +25,13 @@ readonly declaration='scripts/companion-release/prepare-release.sh'
 fail() { printf 'advance omp pin: %s\n' "$1" >&2; exit 1; }
 note() { printf '  %s\n' "$1"; }
 
-[[ $# -ge 1 ]] || fail 'usage: advance-omp-pin.sh TO_VERSION [--dry-run]'
+[[ $# -ge 1 ]] || fail 'usage: advance-omp-pin.sh TO_VERSION [--dry-run|--measure]'
 readonly to_version="${1#v}"
-readonly dry_run="${2-}"
+readonly mode="${2-}"
 [[ "$to_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "TO_VERSION must be N.N.N, got ${to_version}"
-[[ -z "$dry_run" || "$dry_run" == '--dry-run' ]] || fail 'second argument must be --dry-run'
+[[ -z "$mode" || "$mode" == '--dry-run' || "$mode" == '--measure' ]] ||
+  fail 'second argument must be --dry-run or --measure'
+readonly dry_run="$mode"
 [[ -f "$declaration" && ! -L "$declaration" ]] || fail "run from the repository root; ${declaration} is missing"
 
 from_version=$(awk -F"'" "/== 'omp\// { split(\$2, p, \"/\"); print p[2]; exit }" "$declaration")
@@ -54,9 +58,14 @@ fi
 #   omp/18.1.2  emits "snapcompact would not reduce context locally." (6x)
 #   omp/18.1.5  2 compactions, median reduction 0 bp              -> refused
 #
-# Clearing a refusal is a measurement, not an edit: run the standalone cohort
-# from docs/runbooks/omp-pin-advance.md and move the verdict here with its
-# numbers.
+# Clearing a refusal is a measurement, not an edit. The measurement is the
+# release canary itself: move the pin with --measure, advance the coordinate,
+# and run release-prep.sh --apply. The 40-call cohort runs before any tag or
+# remote mutation, so a failing verdict leaves nothing behind but the number to
+# record here (docs/runbooks/omp-pin-advance.md, "Measuring an unmeasured
+# version"). Versions measured bad are refused even under --measure; only an
+# upstream change that plausibly alters compaction (a newer version) is worth a
+# cohort.
 case "$to_version" in
   17.2.7)
     : # the pin in use; measured good
@@ -72,14 +81,20 @@ case "$to_version" in
       "  See docs/runbooks/omp-pin-advance.md for the full comparison.")"
     ;;
   *)
-    fail "$(printf '%s\n' \
-      "omp/${to_version} has not been measured against the reduction floor." \
-      "  The handshake probe proves the launch contract only. omp/18.1.x passed" \
-      "  that probe and still delivered 0 bp of median reduction, so passing it" \
-      "  is not evidence of anything the promotion report claims." \
-      "  Measure first with the standalone cohort in" \
-      "  docs/runbooks/omp-pin-advance.md, then add the verdict above with its" \
-      "  numbers. A release attempt is the expensive way to learn this.")"
+    if [[ "$mode" == '--measure' || "$mode" == '--dry-run' ]]; then
+      note "omp/${to_version} is unmeasured; ${mode#--} only proves the launch contract"
+      note 'the next release-prep.sh --apply is the measurement; record its verdict in this table'
+    else
+      fail "$(printf '%s\n' \
+        "omp/${to_version} has not been measured against the reduction floor." \
+        "  The handshake probe proves the launch contract only. omp/18.1.x passed" \
+        "  that probe and still delivered 0 bp of median reduction, so passing it" \
+        "  is not evidence of anything the promotion report claims." \
+        "  Measure it: advance-omp-pin.sh ${to_version} --measure, advance the" \
+        "  coordinate, then release-prep.sh --apply. The cohort runs before the tag," \
+        "  so a failing verdict costs provider calls, not a coordinate. Record the" \
+        "  numbers in this table either way (docs/runbooks/omp-pin-advance.md).")"
+    fi
     ;;
 esac
 

@@ -308,6 +308,34 @@ refusal is a measurement rather than an edit:
 anything else     -> refused as unmeasured, with the command to measure it
 ```
 
+## Measuring an unmeasured version
+
+The "standalone cohort" above was the release canary with the pin moved. It is
+not a separate instrument: the cohort needs the release lane's gateway,
+credential locator, policy identity (which embeds the pin), producer identity,
+and the isolated-UID sandbox, and the policy identity lives in Go code, so the
+pin must move before anything can be measured. The guard therefore has an
+explicit measurement mode:
+
+```bash
+scripts/release-tools/advance-omp-pin.sh 18.1.13 --dry-run   # launch contract only
+scripts/release-tools/advance-omp-pin.sh 18.1.13 --measure   # move an unmeasured pin
+go test ./internal/cli/ -run TestWorkflowContextImplementationIdentityCommand  # re-pin the digest
+scripts/release-tools/advance-release-coordinate.sh <from> <A> <to> <B>
+scripts/release-tools/release-prep.sh --apply                # the measurement
+```
+
+The cohort runs before the tag, the evidence tag, and every remote mutation, so
+a failing verdict leaves nothing behind. Either way, move the number into the
+verdict table in `advance-omp-pin.sh`: a pass makes the version the pin in use,
+a fail makes it a refused row. Versions already measured bad stay refused even
+under `--measure`; a new cohort is worth its 40 provider calls only when
+upstream shipped a change that plausibly alters compaction. For 18.1.13 that
+change is v18.1.8: "Fixed context compaction incorrectly accepting archived
+history that was larger because of opaque reasoning data, allowing the next
+compaction strategy to run instead" — a candidate explanation for the 0 bp
+measured on 18.1.5.
+
 ## Why not drop the pin and measure at release time
 
 Because then nothing in the repository states which executable the evidence will
