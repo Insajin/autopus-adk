@@ -58,6 +58,12 @@ fi
 #   omp/18.1.2  emits "snapcompact would not reduce context locally." (6x)
 #   omp/18.1.5  2 compactions, median reduction 0 bp              -> refused
 #
+# Measured 2026-09-07, same workload and model, A29 release attempt (no tag):
+#
+#   omp/18.1.13 2 compactions, median reduction 895 bp / 2000     -> refused
+#               (v18.1.8 fixed the opaque-reasoning refusal: 0 bp became
+#               895 bp, still under the floor, still 2 compactions vs 8)
+#
 # Clearing a refusal is a measurement, not an edit. The measurement is the
 # release canary itself: move the pin with --measure, advance the coordinate,
 # and run release-prep.sh --apply. The 40-call cohort runs before any tag or
@@ -79,6 +85,15 @@ case "$to_version" in
       "  reduction, so admitting this version would attest zero as reduction." \
       "  That is an upstream question about snapcompact, not a harness change." \
       "  See docs/runbooks/omp-pin-advance.md for the full comparison.")"
+    ;;
+  18.1.13)
+    fail "$(printf '%s\n' \
+      "omp/${to_version} was measured on 2026-09-07 and reduces context below the floor." \
+      "  A29 release attempt, identical workload and model to the omp/17.2.7 run:" \
+      "    compactions=2/2 median_reduction_bp=895/2000" \
+      "  Every other gate passed. 18.1.13 compacts (18.1.5 gave 0 bp) but clears" \
+      "  under half the attested floor with a quarter of the compaction cycles." \
+      "  See docs/runbooks/omp-pin-advance.md, 'Measured 2026-09-07'.")"
     ;;
   *)
     if [[ "$mode" == '--measure' || "$mode" == '--dry-run' ]]; then

@@ -305,8 +305,46 @@ refusal is a measurement rather than an edit:
 ```
 17.2.7            -> in use, measured good
 18.1.2 | 18.1.5   -> refused with compactions=2/2 median_reduction_bp=0/2000
-anything else     -> refused as unmeasured, with the command to measure it
+18.1.13           -> refused with compactions=2/2 median_reduction_bp=895/2000
+anything else     -> refused as unmeasured; --measure moves it for one cohort
 ```
+
+## Measured 2026-09-07: omp/18.1.13 compacts, but under half the floor
+
+The A29 (`v0.50.118`) release attempt ran the cohort on omp/18.1.13 with the
+same plan generator, the same 20 task pairs, the same gateway and the same
+model (`gpt-5.6-sol`) as the passing omp/17.2.7 runs. It completed 42/42
+records and failed at the evidence gate; no tag or remote state was created:
+
+```
+pairs=20/20 ab=10/10 ba=10/10 observed_ab=10 observed_ba=10 compactions=2/2
+integrity_failures=0 security_failures=0 quality_regressions=0
+fallback_verified=true rollback_verified=true median_reduction_bp=895/2000
+```
+
+| | omp/17.2.7 | omp/18.1.5 | omp/18.1.13 |
+|---|---|---|---|
+| compaction cycles | 8 | 2 | 2 |
+| median reduction | passed 2000 bp | 0 bp | **895 bp** |
+| every other gate | pass | pass | pass |
+
+Two things this settles. The 0 bp on 18.1.5 was real and upstream fixed part of
+it: v18.1.8 ("context compaction incorrectly accepting archived history that
+was larger because of opaque reasoning data") moved the same workload from
+0 bp to 895 bp. And 18.1.x still compacts a quarter as often and clears under
+half the floor, so the pin stays at omp/17.2.7 on merit: the promotion
+evidence attests a 20% median reduction, and 18.1.13 delivers 9%.
+
+One hypothesis worth carrying to upstream rather than into the oracle: since
+v18.1.6 Codex "provider-native compaction continues to use catalog-selected
+Responses Lite" — if 18.1.x hands part of the reduction to remote compaction,
+the local transcript measurement would not see it. That is a question for
+`can1357/oh-my-pi`, with the three-column table above as the evidence.
+
+The first 18.1.13 attempt lost its verdict: the error frame was body-free by
+contract and the transcript died with the temp dir. The frame now carries
+`gate_diagnostic` (counts and basis points only) and the canary failure
+receipt prints it, so a cohort costs one run to learn, not two.
 
 ## Measuring an unmeasured version
 
