@@ -25,19 +25,17 @@ import (
 // @AX:REASON: Worktree isolation, fallback override, audit, auth, and provider fields coordinate desktop worker safety behavior.
 // LoopConfig holds configuration for the WorkerLoop.
 type LoopConfig struct {
-	BackendURL    string
-	WorkerName    string
-	MemoryAgentID string
-	Skills        []string
-	Providers     []string
-	Provider      adapter.ProviderAdapter
-	MCPConfig     string          // path to worker-mcp.json
-	WorkDir       string          // working directory for subprocesses
-	AuthToken     string          // bearer token for backend auth
-	Router        *routing.Router // optional model router (nil = no routing)
-	// Deprecated: use CredentialStore instead. Kept for backward compatibility.
-	CredentialsPath   string                // path to credentials.json for token refresh
-	CredentialStore   setup.CredentialStore // Secure credential storage (Keychain/encrypted file). If nil and CredentialsPath is set, falls back to plain file mode.
+	BackendURL        string
+	WorkerName        string
+	MemoryAgentID     string
+	Skills            []string
+	Providers         []string
+	Provider          adapter.ProviderAdapter
+	MCPConfig         string                // path to worker-mcp.json
+	WorkDir           string                // working directory for subprocesses
+	AuthToken         string                // bearer token for backend auth
+	Router            *routing.Router       // optional model router (nil = no routing)
+	CredentialStore   setup.CredentialStore // Secure credential storage (Keychain/encrypted file); nil skips JWT token refresh.
 	AuditLogPath      string                // audit log file path (default: {WorkDir}/.autopus/audit.jsonl)
 	AuditMaxSize      int64                 // max log size before rotation (default: 10MB)
 	AuditMaxAge       time.Duration         // max age of rotated files (default: 7 days)

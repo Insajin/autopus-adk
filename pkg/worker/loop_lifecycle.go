@@ -35,8 +35,8 @@ func (wl *WorkerLoop) startServices(ctx context.Context) {
 	}
 
 	// 2. TokenRefresher + Reconnector: JWT mode only — API Key mode skips token refresh.
-	// CredentialStore path (preferred): uses secure Keychain/encrypted-file storage.
-	// CredentialsPath path (deprecated): plain JSON file, kept for backward compatibility.
+	// Requires a CredentialStore (Keychain/encrypted file); without one the loop keeps
+	// the initial bearer token and never refreshes it.
 	isAPIKeyMode := strings.HasPrefix(wl.config.AuthToken, "acos_worker_")
 	if !isAPIKeyMode {
 		if wl.config.CredentialStore != nil {

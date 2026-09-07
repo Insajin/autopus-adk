@@ -59,7 +59,6 @@ func (cfg RuntimeConfig) LoopConfig() worker.LoopConfig {
 		MCPConfig:                      cfg.MCPConfigPath,
 		WorkDir:                        cfg.WorkDir,
 		AuthToken:                      cfg.AuthToken,
-		CredentialsPath:                cfg.CredentialsPath,
 		CredentialStore:                cfg.CredentialStore,
 		WorkspaceID:                    cfg.WorkspaceID,
 		MaxConcurrency:                 cfg.MaxConcurrency,
