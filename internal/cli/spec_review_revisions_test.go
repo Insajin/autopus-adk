@@ -33,18 +33,25 @@ func TestLoopAwareMaxRevisions_NoLoopUnchanged(t *testing.T) {
 	assert.Equal(t, 2, loopAwareMaxRevisions(2, false))
 }
 
-// S11 (REQ-003): resolveSpecReviewMaxRevisions consumes both the gate config and
-// the LoopMode flag, including the default fallback for a non-positive setting.
-func TestResolveSpecReviewMaxRevisions_GateAndLoopMode(t *testing.T) {
+// S11 (REQ-003): resolveSpecReviewMaxRevisions consumes the gate config, the
+// LoopMode flag and --single-pass, and tells an omitted max_revisions apart from
+// an explicitly configured zero (issue #187).
+func TestResolveSpecReviewMaxRevisions_GateLoopModeAndSinglePass(t *testing.T) {
 	t.Parallel()
 
 	require.Equal(t, 3, defaultMaxRevisions)
-	assert.Equal(t, 5, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: 2}, true),
+	assert.Equal(t, 5, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: new(2)}, true, false),
 		"configured 2 raised to floor 5")
-	assert.Equal(t, 5, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: 0}, true),
-		"configured 0 falls back to default 3 then floor 5")
-	assert.Equal(t, 2, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: 2}, false),
+	assert.Equal(t, 5, resolveSpecReviewMaxRevisions(config.ReviewGateConf{}, true, false),
+		"omitted max_revisions falls back to default 3 then floor 5")
+	assert.Equal(t, 2, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: new(2)}, false, false),
 		"LoopMode false preserves configured 2")
+	assert.Equal(t, 3, resolveSpecReviewMaxRevisions(config.ReviewGateConf{}, false, false),
+		"omitted max_revisions falls back to the default budget")
+	assert.Equal(t, 0, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: new(0)}, false, false),
+		"an explicitly configured zero means no additional revisions, not the default")
+	assert.Equal(t, 0, resolveSpecReviewMaxRevisions(config.ReviewGateConf{MaxRevisions: new(3)}, true, true),
+		"--single-pass overrides both max_revisions and the --loop floor")
 }
 
 // S9 (REQ-005): wrapSpecLoadError preserves the cause and SPEC ID without

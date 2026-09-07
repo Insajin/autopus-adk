@@ -128,9 +128,11 @@ This step is OPTIONAL if the text-based signals are unambiguous. Skip if `--auto
 |-----------|-------------------|------------------|
 | **IDEA** | Exploratory question; "고민", "어떻게 하면", "가능할까"; feasibility check; brainstorm; no clear implementation target | `/auto idea "{desc}"` — brainstorm and evaluate |
 | **LOW** | Single file change; bug fix with known location; config/doc edit; ≤ 1 package affected | `/auto fix "{desc}"` — direct fix, no SPEC |
-| **MEDIUM** | 2-3 files; existing feature extension; single-package refactor; test additions | `/auto plan "{desc}" --skip-prd` — SPEC only, no PRD |
+| **MEDIUM** | 2-3 files; existing feature extension; single-package refactor | `/auto plan "{desc}" --skip-prd` — SPEC only, no PRD. Test additions or a small UI change under an existing SPEC take the compact change contract instead (see below). |
 | **HIGH** | 3+ files across packages; new feature/module; API design; architecture change; multi-domain impact | `/auto idea "{desc}" --multi` — multi-provider brainstorm → ICE 검증 → plan 체이닝 |
 | **CRITICAL** | Security vulnerability; urgent production fix | `/auto fix "{desc}"` + recommend `/auto secure` after |
+
+Low-risk work against an existing SPEC does not need a new SPEC set. When the request is test additions, a docs edit, a small UI change, or a bug fix inside an existing contract, and an approved SPEC already covers the outcome, route to `auto spec change <SPEC-ID> --class <class> --ac <AC-ID,...> --surface <path,...> --verify "<command>"` and implement against that `change.md`. Escalate to `/auto plan` only when the command reports `escalate_to_full_spec`, when no SPEC covers the work, or when the class is `feature`, `multi_domain`, or `security_or_data`.
 
 #### Step 4: Triage Display and Confirmation
 
@@ -748,6 +750,17 @@ Global flags (`--auto`, `--loop`, `--multi`, `--quality`) are already stripped. 
 - `MULTI_FLAG` ← inherited from global `--multi`
 - Remaining text → `FEATURE_DESC`
 
+#### [REQUIRED] Step 1.1: Compact Path Gate
+
+Before authoring any document, decide whether this work needs a SPEC set at all.
+
+1. Classify the request as one of `test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`, `feature`, `multi_domain`, `security_or_data`.
+2. WHEN the class is low risk (the first four) AND an existing SPEC already covers the outcome, run `auto spec change <SPEC-ID> --class <class> --ac <AC-ID,...> --surface <path,...> --verify "<command>" [--json]`, stop the plan pipeline, report the written `change.md`, and route the user to `/auto go <SPEC-ID>`.
+3. WHEN that command reports `escalate_to_full_spec`, record the reason and continue with the full pipeline below.
+4. WHEN the class is `feature`, `multi_domain`, or `security_or_data`, or no SPEC covers the outcome, continue with the full pipeline. High-risk work additionally requires at least one executable `## Risk-First Integration Probe` row before broad implementation.
+
+Risk is never decided by file count: an auth/billing/data/migration/security path, production code spanning two module roots, or a new exported API or contract escalates on its own. The safety gates are identical on both paths — `security`, `validation`, `data_loss`, `deterministic_oracle`, plus `accessibility`/`ux_verification` for a UI surface and the race and coverage thresholds.
+
 #### [REQUIRED] Step 1.25: Direct Intent Ledger Gate
 
 WHEN `FROM_IDEA` is empty, build an inline `Clarification Ledger` before PRD generation:
@@ -1135,6 +1148,16 @@ The `go` workflow never edits SPEC status directly.
 ```
 
 **Anti-recursion guard**: The SPEC Quality Loop runs INSIDE a single `go` invocation. It does NOT auto-chain to `/auto go` after PASS — Step 2 entry is sequential within the same invocation. `--continue` after a circuit break is the only way to re-enter.
+
+### Step 1.9: Change Class and Gate Applicability
+
+Run `auto spec gates {SPEC_ID} --base <ref> [--change-class <class>] [--new-contract] --json` before Phase 1 and carry every gate decision into each worker prompt. Omitting `--change-class` derives the class from the change set, so it can never be understated.
+
+- `{SPEC_DIR}/change.md`, or `.autopus/specs/CHG-<id>/change.md` referencing this SPEC, is a compact change contract: its `## Intended Surface` bounds the implementation and its `## Verification Plan` bounds the verification. Do not author a SPEC set for it.
+- `change_risk.risk_tier: low` leaves `spec_authoring` and `risk_first_probe` `not_applicable`. `high` makes both `required`: run the Phase 1.9 probe before the Phase 2 fan-out.
+- `change_risk.decision: escalate_to_full_spec` stops the run. Report the escalation reason and route to `/auto plan`.
+- Independent tasks with disjoint ownership fan out in parallel. The full build, race, coverage, security, and Phase 4 review run **once** over the union change set, with a verdict and an evidence ref per acceptance-criteria id — a batch PASS without per-criterion rows is an incomplete receipt.
+- The review loop ends on `loop_status`: `converged`, `awaiting_changes` (the reviewed input did not change — resolve or explicitly defer the named blocking findings instead of re-reviewing), `revisions_exhausted`, or `provider_unavailable`.
 
 ### Step 2: Route to Pipeline
 
@@ -1525,9 +1548,10 @@ WHEN Phase 1.8 completes (or is skipped), THE SYSTEM SHALL consume the `## Risk-
 3. **Keep honest not-run**: a row that stays `not-run` keeps its reason and travels into the handoff as an explicit limitation; it is never reported as `PASS`
 4. **Bounded re-plan**: on `FAIL` for a high or critical assumption, return to planning and revise `plan.md`; this is bounded to 1 re-plan, and a second `FAIL` surfaces to the user instead of a third attempt
 
-Gate applicability comes from the receipt, not from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
+Gate applicability comes from the receipt, not from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `spec_authoring, risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
 
-- `risk_first_probe` is `required` whenever the change touches an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep one `not-run` row with the reason `no integration boundary`; `blocked` when the fixture or environment is missing.
+- `spec_authoring` is `not_applicable` for a low-risk declared class (`test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`) whose compact `change.md` replaces the four-document SPEC set, and `required` for `feature`, `multi_domain`, or `security_or_data`.
+- `risk_first_probe` is `required` whenever a high-risk change touches an integration boundary; `not_applicable` for a doc-only change set or a low-risk declared class, which still keeps one `not-run` row with the reason `no integration boundary`; `blocked` when the fixture or environment is missing.
 - `reusable` is now a valid value, but only when the receipt grants it: a prior `{SPEC_DIR}/gates/evidence-<gate>.json` whose `input_closure_sha256` still matches the current tree, with `status: pass`, `complete: true`, and `observed_at` inside `--max-age` (default 168h). Its `input_globs` are re-expanded, so an added file invalidates evidence exactly like an edit. Any dependency change, `fail`, `partial`, missing input, or stale receipt returns `required` with the failed condition named. Never self-assign `reusable`.
 - After each real build/test/UX execution, record evidence with `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`, so the next run reuses exact-input evidence instead of repeating the work.
 - Mandatory safety gates (`security`, `validation`, `data_loss`, `deterministic_oracle`) can never be `not_applicable`. `accessibility` and `ux_verification` are `required` when the change set contains UI paths and `not_applicable` with the reason `no UI surface in change set` otherwise — only the classifier decides that.
@@ -2365,6 +2389,12 @@ Usage: `/auto canary`, `/auto canary --url https://example.com`, `/auto canary -
 @.claude/skills/debugging/SKILL.md
 
 Reproduce the bug and fix it with minimal changes. Uses a Reproduction-First approach.
+
+### Change Contract Boundary
+
+A bug fix inside an existing contract is `bugfix_existing_contract`: low risk, no SPEC set. When an approved SPEC covers the behaviour, record the contract with `auto spec change <SPEC-ID> --class bugfix_existing_contract --ac <AC-ID,...> --surface <path,...> --verify "<command>"` so the fix carries a referenced acceptance criterion and a verification plan instead of an implicit scope.
+
+Escalate to `/auto plan` when the fix touches an auth, billing, data, migration, or security path, when production code spans two module roots, or when it changes a new exported API or contract. `auto spec change` reports `escalate_to_full_spec` with the reason in each case and writes no contract; the safety gates stay `required` either way.
 
 ### Pipeline
 

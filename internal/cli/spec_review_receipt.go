@@ -49,6 +49,11 @@ type specReviewPromotionReceipt struct {
 	RepeatDiscoveryCount    int                    `json:"repeat_discovery_count,omitempty"`
 	SameInputReReview       bool                   `json:"same_input_rereview,omitempty"`
 	DiscoveryRepeatDetected bool                   `json:"discovery_repeat_detected,omitempty"`
+
+	// Verdict-consistency evidence (issue #187). LoopStatus tells the operator
+	// how the revision loop ended, BlockingReasons why a REVISE/REJECT happened.
+	LoopStatus      string                `json:"loop_status,omitempty"`
+	BlockingReasons []spec.BlockingReason `json:"blocking_reasons,omitempty"`
 }
 
 type specReviewRuntimeEvidence struct {
@@ -68,6 +73,35 @@ func applySpecReviewRepeatDiscovery(receipt *specReviewPromotionReceipt, result 
 	receipt.RepeatDiscoveryCount = len(result.RepeatDiscoveries)
 	receipt.SameInputReReview = result.SameInputReReview
 	receipt.DiscoveryRepeatDetected = receipt.RepeatDiscoveryCount > 0 || receipt.SameInputReReview
+}
+
+// applySpecReviewLoopEvidence projects the loop termination state and the stated
+// blockers onto the promotion receipt, so a reader can tell why a REVISE
+// happened and whether re-running without edits is pointless.
+func applySpecReviewLoopEvidence(receipt *specReviewPromotionReceipt, result *spec.ReviewResult) {
+	if receipt == nil || result == nil {
+		return
+	}
+	receipt.LoopStatus = result.LoopStatus
+	receipt.BlockingReasons = append([]spec.BlockingReason(nil), result.BlockingReasons...)
+}
+
+// blockingPolicySummary joins the distinct policies that blocked, for one-line
+// operator output.
+func blockingPolicySummary(reasons []spec.BlockingReason) string {
+	if len(reasons) == 0 {
+		return "none"
+	}
+	seen := make(map[string]struct{}, len(reasons))
+	policies := make([]string, 0, len(reasons))
+	for _, reason := range reasons {
+		if _, ok := seen[reason.Policy]; ok {
+			continue
+		}
+		seen[reason.Policy] = struct{}{}
+		policies = append(policies, reason.Policy)
+	}
+	return strings.Join(policies, ", ")
 }
 
 func persistSpecReviewPromotionReceipt(specDir string, receipt specReviewPromotionReceipt) (string, error) {

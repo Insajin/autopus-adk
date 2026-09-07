@@ -32,6 +32,15 @@ SPEC 문서를 기반으로 코드를 구현합니다.
 @auto-go SPEC-ID
 ```
 
+## Change Class and Gate Applicability
+
+- Phase 1 전에 `auto spec gates <SPEC-ID> --base <ref> [--change-class <class>] [--new-contract] --json`을 실행하고 모든 gate 결정을 각 worker 프롬프트에 전달합니다. `--change-class`를 생략하면 change set에서 클래스를 유도하므로 과소 선언이 불가능합니다.
+- `{SPEC_DIR}/change.md` 또는 이 SPEC을 참조하는 `.autopus/specs/CHG-<id>/change.md`가 있으면 compact change contract입니다. `## Intended Surface`가 구현 범위를, `## Verification Plan`이 검증 범위를 한정하며 SPEC 세트를 새로 작성하지 않습니다.
+- `change_risk.risk_tier: low`이면 `spec_authoring`과 `risk_first_probe`가 `not_applicable`, `high`이면 둘 다 `required`입니다. 고위험이면 Phase 2 fan-out 전에 Phase 1.9 probe를 실행합니다.
+- `change_risk.decision: escalate_to_full_spec`이면 실행을 중단하고 승격 이유를 보고한 뒤 `@auto-plan`으로 넘깁니다.
+- 소유 경로가 분리된 독립 태스크는 병렬 실행하고, 전체 build/race/coverage/security/Phase 4 review는 통합 후 union change set에 대해 한 번만 실행합니다. receipt에는 acceptance ID별 verdict와 evidence를 남기며 per-criterion 행이 없는 batch PASS는 불완전합니다.
+- review loop는 `loop_status`로 종료합니다: `converged`, `awaiting_changes`(입력이 그대로이므로 재검토 대신 blocking finding을 해결하거나 이유와 함께 defer), `revisions_exhausted`, `provider_unavailable`.
+
 ## 구현 절차
 
 {{if .IsFullMode}}{{if eq .Methodology.Mode "tdd"}}
@@ -68,8 +77,9 @@ Run in the main session after Phase 1.8 and before the Phase 2 fan-out. This gat
 - A row that stays `not-run` keeps its reason and travels into the handoff as an explicit limitation; never report it as `PASS`.
 - On `FAIL` for a high or critical assumption, return to planning and revise `plan.md`. Bounded to 1 re-plan; a second `FAIL` surfaces to the user.
 - An implementer-introduced constraint broader than the requirement (new ACL, compatibility limit, security limit) is a scope expansion: probe it against the existing runtime before fan-out.
-- Gate applicability comes from the receipt, never from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
-- `risk_first_probe` is `required` at an integration boundary, `not_applicable` only for a doc-only or low-risk SPEC that keeps one `not-run` row reasoned `no integration boundary`, and `blocked` when the fixture or environment is missing.
+- Gate applicability comes from the receipt, never from the agent. Run `auto spec gates {SPEC_ID} --base <ref>` (or `--changed p1,p2,...`) here, before the Phase 2 fan-out: it writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `spec_authoring, risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`, and every worker prompt carries those decisions as `gate: applicability — reason`.
+- `spec_authoring` is `not_applicable` for a low-risk declared class (`test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`) whose compact `change.md` replaces the four-document SPEC set, and `required` for `feature`, `multi_domain`, or `security_or_data`.
+- `risk_first_probe` is `required` when a high-risk change touches an integration boundary, `not_applicable` for a doc-only change set or a low-risk declared class that keeps one `not-run` row reasoned `no integration boundary`, and `blocked` when the fixture or environment is missing.
 - `reusable` is valid only when the receipt grants it: a prior `{SPEC_DIR}/gates/evidence-<gate>.json` whose `input_closure_sha256` still matches the current tree, with `status: pass`, `complete: true`, and `observed_at` inside `--max-age` (default 168h). Its `input_globs` are re-expanded, so an added file invalidates evidence exactly like an edit. Any dependency change, `fail`, `partial`, missing input, or stale receipt returns `required` with the failed condition named. Never self-assign `reusable`.
 - After each real build/test/UX execution, record evidence with `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]` so the next run reuses exact-input evidence.
 - `security`, `validation`, `data_loss`, and `deterministic_oracle` can never be `not_applicable`. `accessibility` and `ux_verification` are `required` when the change set has UI paths and `not_applicable` reasoned `no UI surface in change set` otherwise; only the classifier decides that.

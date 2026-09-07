@@ -80,10 +80,10 @@ func TestOMP002_WorkflowParity_GenerateEmitsCanonicalCommandsAndSkills(t *testin
 					// A no-growth ratchet on the OMP-native core coordination skills:
 					// injected into every OMP session, so the bound equals the current
 					// emitted size and moves only when a runtime contract is genuinely
-					// added. Raised from 345 for the `auto spec gates` receipts (which
-					// re-introduce `reusable`), no-capture oracles, repeat-discovery
-					// re-review, and `auto telemetry` records, compressed 54 -> 47 first.
-					assert.LessOrEqual(t, strings.Count(body, "\n"), 392,
+					// added. Raised from 392 for the compact change-contract path
+					// (`auto spec change`, the `spec_authoring` gate, declared change
+					// classes) plus merged final verification and `loop_status`.
+					assert.LessOrEqual(t, strings.Count(body, "\n"), 423,
 						"OMP-native core coordination skills must stay bounded")
 					for _, token := range []string{
 						"sonnet", "haiku", `model: "opus"`, "Opus-tier",

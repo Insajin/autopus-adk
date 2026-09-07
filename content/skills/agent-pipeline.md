@@ -131,7 +131,7 @@ The terminal handoff must include a concise receipt of important choices, for ex
 
 ## Gate Applicability
 
-Every phase gate records its applicability in the handoff as `gate: applicability — reason`, drawn from `required | reusable | not_applicable | blocked`. Applicability is a deterministic classifier decision, never an agent judgement: `auto spec gates <SPEC-ID> --base <ref>` (or `--changed p1,p2,...`) writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`.
+Every phase gate records its applicability in the handoff as `gate: applicability — reason`, drawn from `required | reusable | not_applicable | blocked`. Applicability is a deterministic classifier decision, never an agent judgement: `auto spec gates <SPEC-ID> --base <ref>` (or `--changed p1,p2,...`) writes `{SPEC_DIR}/gate-applicability.json` over the closed gate set `spec_authoring, risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`.
 
 - `required`: the gate applies and must return a verdict from a real execution.
 - `reusable`: valid only when `gate-applicability.json` says so. The classifier grants it when a prior `{SPEC_DIR}/gates/evidence-<gate>.json` receipt carries the same `input_closure_sha256` recomputed from the current tree, `status: pass`, `complete: true`, and an `observed_at` inside `--max-age` (default 168h). The receipt's `input_globs` are re-expanded against the current tree, so an added file invalidates evidence just like an edit or a deletion. Any dependency change, `fail`, `partial`, missing input, or stale receipt yields `required` whose reason names the failed condition — `no prior evidence`, `input closure changed`, `prior status fail`, `prior evidence partial`, `evidence older than max-age`, or `missing input <path>`. Agents never self-assign `reusable`.
@@ -145,16 +145,43 @@ Supervisor duties around the receipt:
 1. Run `auto spec gates <SPEC-ID> --base <ref>` before the Phase 2 fan-out and carry the resulting decisions into every worker prompt.
 2. After each real build/test/UX execution, record its evidence with `auto spec gates record <SPEC-ID> --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`, so the next run can reuse exact-input evidence instead of repeating the work.
 3. Mirror every decision into telemetry with `auto telemetry record --spec-id <SPEC-ID> --action gate --gate <id> --applicability <value> [--resolved]`.
+4. Pass `--change-class <class>` when a change contract declares one, so `spec_authoring` and `risk_first_probe` follow the declared class instead of the derived one. Without the flag the class is derived from the change set and can never be understated.
+
+## Change Contract Path
+
+Low-risk work takes a compact change contract by default. Only high-risk work authors the full four-document SPEC set.
+
+`auto spec change <SPEC-ID> --class <class> --ac <AC-ID,...> --surface <path,...> --verify "<command>" [--change-id <id>] [--new-contract] [--json]` writes one `change.md` that references an existing SPEC and its acceptance-criteria ids. It refuses when the referenced SPEC or any acceptance-criteria id does not exist, and it never restates requirements: the SPEC stays the single source of them.
+
+| Declared class | Risk | Authoring path |
+|---|---|---|
+| `test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract` | low | compact `change.md`; `spec_authoring` and `risk_first_probe` are `not_applicable` |
+| `feature`, `multi_domain`, `security_or_data` | high | full SPEC set plus the Phase 1.9 risk-first integration probe; both gates are `required` |
+
+Risk is never decided by file count. A path under an auth, billing, data, migration, or security glob raises the class to `security_or_data`. Production code spanning two module roots raises it to `multi_domain`; documentation and test material never raise that signal on their own. A new exported API or contract — declared with `--new-contract`, or detected on an IDL file or a public API root — raises it to `feature`.
+
+When the declared class is contradicted by the intended surface — `test_only` including non-test source, `docs_only` including code, `small_ui` including non-UI source — the command reports `escalate_to_full_spec` with the reason, writes no `change.md`, and exits non-zero. Escalation is a routing decision, not a warning to read past: author the full SPEC set and run the probe.
+
+The safety gates are retained on every path. `security`, `validation`, `data_loss`, and `deterministic_oracle` are never `not_applicable`; `accessibility` and `ux_verification` stay `required` whenever the surface has UI paths; race and coverage checks keep their thresholds. The compact path removes SPEC authoring, not verification.
+
+## Merged Final Verification
+
+Independent tasks with disjoint ownership run in parallel. Each worker verifies only its own surface. The full build, race, integration, coverage, security, and Phase 4 review then run **once**, after integration, over the union change set — never once per worker.
+
+One merged run is not one verdict. The completion receipt records a verdict and an evidence ref per `spec_id` plus acceptance-criteria id. A Must criterion without its own evidence row is not closed by a sibling PASS, and a failing slice is never offset by the number of passing ones.
+
+The review loop terminates on `loop_status`: `converged` when the verdict is PASS with no active findings, `awaiting_changes` when the reviewed input is unchanged from the previous revision, `revisions_exhausted` at the revision bound, and `provider_unavailable` when no usable provider review exists. `awaiting_changes` stops the loop before re-dispatching providers and returns the previous findings; it means the author must change something, because re-running the same input is not progress. The receipt names the blocking finding ids and the policy that blocked them.
 
 ## Pipeline Overview
 
 ```
+Phase 0.5: Change Class    → main session (auto spec change / auto spec gates --change-class; compact contract or escalate)
 Phase 0.7: Authenticity  → main session (subagent surface preflight and evidence counters)
 Phase 1:   Planning        → planner     (fable, plan)
 Phase 1.5: Test Scaffold   → tester      (sonnet, bypassPermissions) — skip if --skip-scaffold
 Gate 1:    Approval        → skipped if --auto
 Phase 1.8: Doc Fetch       → main session (Context7 MCP) — skip if no external libs detected
-Phase 1.9: Probe Gate      → main session (execute Risk-First Integration Probe rows before fan-out)
+Phase 1.9: Probe Gate      → main session (execute Risk-First Integration Probe rows before fan-out) — not_applicable for low-risk classes
 Phase 2:   Implementation  → executor×N  (sonnet, acceptEdits, parallel with worktree isolation)
 Phase 2.1: Worktree Merge  → main session (merge worktree branches into working branch)
 Gate 2:    Validation      → validator   (sonnet, plan)  — retry up to 3x on FAIL
@@ -162,7 +189,7 @@ Phase 2.5: Annotation      → annotator   (sonnet, bypassPermissions) — @AX t
 Phase 3:   Testing         → tester      (sonnet, acceptEdits)
 Gate 3:    Coverage        → verify 85%+ coverage
 Phase 3.5: UX Verify       → frontend-specialist (sonnet, bypassPermissions) — optional, frontend only
-Phase 4:   Review          → reviewer (fable) + security-auditor (fable), parallel + risk-tiered provider fan-out — retry up to 2x on REQUEST_CHANGES
+Phase 4:   Review          → reviewer (fable) + security-auditor (fable), parallel + risk-tiered provider fan-out — one merged run over the union change set; ends on loop_status
 ```
 
 > The assignments above are for Balanced mode. Ultra assigns its seven-role reasoning core to `fable` and every remaining role to `opus`.
@@ -379,7 +406,7 @@ Step 4: On FAIL for a high or critical assumption, return to planning and
 Step 5: Only then dispatch Phase 2
 ```
 
-Gate applicability: `required` for any change with an integration boundary; `not_applicable` only for doc-only or low-risk SPECs, which still keep the section with one `not-run` row and the reason `no integration boundary`. A probe that cannot run because its fixture or environment is missing is `blocked` with the reason recorded, not `not_applicable`. The verdict comes from `auto spec gates`, which the supervisor runs here — before the Phase 2 fan-out — so the `risk_first_probe` decision and every other gate decision in `{SPEC_DIR}/gate-applicability.json` can ride along in each worker prompt.
+Gate applicability: `required` for any high-risk change with an integration boundary; `not_applicable` for a doc-only change set or a low-risk declared class (`test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`), which still keeps the section with one `not-run` row and the reason `no integration boundary`. A probe that cannot run because its fixture or environment is missing is `blocked` with the reason recorded, not `not_applicable`. The verdict comes from `auto spec gates`, which the supervisor runs here — before the Phase 2 fan-out — so the `risk_first_probe` decision and every other gate decision in `{SPEC_DIR}/gate-applicability.json` can ride along in each worker prompt.
 
 At the first probe row that returns `PASS` — or, when every row is honestly `not-run`, at the first real integration execution later in the pipeline — record `auto telemetry record --spec-id <SPEC-ID> --action milestone --name first_vertical_slice`. That milestone is the lead-time anchor; recording it after the fact makes `time_to_first_slice` unmeasurable.
 

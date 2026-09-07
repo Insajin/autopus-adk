@@ -29,6 +29,16 @@ The five primary dimensions map 1:1 to `FindingCategory` values in `pkg/spec/typ
 - `style`
 - `security`
 
+## Change Contract Applicability
+
+This checklist reviews a four-document SPEC set. It does not apply to a compact change contract, and its absence is not a finding on that path.
+
+- `auto spec change <SPEC-ID> --class <class> --ac <AC-ID,...> --surface <path,...> --verify "<command>"` writes one `change.md` for low-risk work: `test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`. `auto spec gates` then reports `spec_authoring: not_applicable` with the low-risk reason, and `risk_first_probe: not_applicable`.
+- `feature`, `multi_domain`, and `security_or_data` work is high risk. It needs this full checklist plus at least one executable `## Risk-First Integration Probe` row; `spec_authoring` and `risk_first_probe` are both `required`.
+- Risk is never decided by file count. An auth, billing, data, migration, or security path raises the class to `security_or_data`; production code spanning two module roots raises it to `multi_domain`; a new exported API or contract raises it to `feature`.
+- A declared class contradicted by the surface — `test_only` including non-test source, `docs_only` including code, `small_ui` including non-UI source — is `escalate_to_full_spec`. Author the full set and answer this checklist.
+- Reviewing a compact contract means checking the referenced SPEC id, the referenced acceptance-criteria ids, the declared surface against the real diff, and the per-criterion evidence rows. `security`, `validation`, `data_loss`, and `deterministic_oracle` stay `required` on both paths, as do `accessibility` and `ux_verification` for a UI surface.
+
 ## N/A Status Guidance
 
 `N/A` is a first-class checklist status alongside `PASS` and `FAIL`. Use it when a dimension genuinely does not apply to the SPEC under review — never as an escape hatch to avoid analysis. SPEC-SPECREV-001 follow-up made the technical surface uniform: the orchestra parser (`pkg/orchestra/output_parser.go`), the self-verify CLI (`auto spec self-verify --status N/A`), and the persisted review.md `## Checklist Summary` section all accept and surface `N/A` as a distinct count separate from PASS/FAIL.

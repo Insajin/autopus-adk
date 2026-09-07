@@ -64,6 +64,17 @@
 - `--target <module>`
 - 글로벌 `--multi` / `--auto` / `--quality`
 
+### Step 1.1: Compact Path Gate
+
+문서를 작성하기 전에 이 작업이 SPEC 세트를 필요로 하는지 먼저 판정합니다.
+
+1. 변경 클래스를 `test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`, `feature`, `multi_domain`, `security_or_data` 중 하나로 분류합니다.
+2. 저위험 클래스(앞의 네 개)이고 기존 SPEC이 이미 그 결과를 담고 있으면 `auto spec change <SPEC-ID> --class <class> --ac <AC-ID,...> --surface <path,...> --verify "<command>" [--json]`을 실행하고 plan 파이프라인을 종료합니다. 생성된 `change.md`를 보고하고 `@auto go <SPEC-ID>`로 넘깁니다.
+3. 이 명령이 `escalate_to_full_spec`을 보고하면 그 이유를 기록하고 아래 전체 파이프라인을 계속합니다.
+4. 클래스가 `feature`, `multi_domain`, `security_or_data`이거나 해당 결과를 담은 SPEC이 없으면 전체 파이프라인을 진행합니다. 고위험 작업은 광범위한 구현 전에 실행 가능한 `## Risk-First Integration Probe` 행을 최소 하나 요구합니다.
+
+위험도는 파일 수로 결정하지 않습니다. auth/billing/data/migration/security 경로, production code가 두 개 module root에 걸치는 경우, 새 exported API/contract는 각각 단독 승격 사유입니다. 안전 게이트는 두 경로에서 동일하게 유지됩니다: `security`, `validation`, `data_loss`, `deterministic_oracle`, UI surface의 `accessibility`/`ux_verification`, race/coverage 임계값.
+
 ### Step 1.25: Direct Intent Ledger Gate
 
 `--from-idea`가 없으면 PRD 생성 전에 inline `Clarification Ledger`를 만듭니다. 이 gate는 `auto idea`의 Ledger와 같은 field/column/handoff contract를 사용합니다.

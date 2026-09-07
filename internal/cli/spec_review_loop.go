@@ -45,6 +45,19 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		}
 		repeats.beginRevision()
 
+		// Issue #187: re-reviewing byte-identical input against a stated content
+		// blocker cannot produce a different answer, so stop before spending a
+		// provider round on it. The prior findings and blocking reasons are what
+		// the author has to act on, so they are returned unchanged.
+		if revision > 0 && repeats.sameInput && reviewAwaitsAuthorChanges(finalResult) {
+			finalResult.SameInputReReview = true
+			finalResult.LoopStatus = spec.LoopStatusAwaitingChanges
+			fmt.Fprintf(os.Stderr,
+				"경고: SPEC 입력이 이전 리비전과 동일합니다 — 프로바이더를 재호출하지 않고 수정 대기 상태로 종료합니다 (SPEC: %s)\n",
+				p.specID)
+			break
+		}
+
 		prompt, staticFindings, err := buildSpecReviewProviderPrompt(p, doc, priorFindings, revision)
 		if err != nil {
 			return nil, fmt.Errorf("리뷰 필수 문서 전달 실패: %w", err)
@@ -146,9 +159,10 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 			ProviderStatuses:  providerStatuses,
 		}
 		// Judge precedence is fixed: a valid judge replaces verdict/findings;
-		// accepted critical/major findings downgrade PASS to REVISE; then verify
-		// scope lock and deterministic findings run before effectiveReviewVerdict.
-		// effectiveReviewVerdict may preserve REVISE because of a reviewer
+		// a judge PASS that accepted a non-hard-blocking finding defers it, so
+		// judge acceptance and the runtime blocker matrix agree; then verify
+		// scope lock and deterministic findings run before resolveReviewVerdict.
+		// resolveReviewVerdict may preserve REVISE because of a reviewer
 		// checklist FAIL, but it never turns a judge PASS into REVISE from the
 		// reviewer checklist alone.
 		applySpecReviewJudge(merged, result, reviewerResponses, p.gate.Judge, revision, priorFindings)
@@ -167,15 +181,16 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		}
 		merged.Findings = spec.MergeDeterministicFindings(merged.Findings, staticFindings, priorFindings, revision)
 		merged.Findings = spec.NormalizeAdvisoryFindings(merged.Findings)
-		merged.Verdict = effectiveReviewVerdict(merged.Verdict, reviews, merged.Findings)
+		merged.Verdict, merged.BlockingReasons = resolveReviewVerdict(merged, reviews)
 
-		// Issue #58: a REVISE verdict with zero findings means a merge path
-		// dropped the findings that justify the verdict. PersistFindings still
-		// writes a valid `[]`, but warn so the inconsistency is observable.
-		if merged.Verdict == spec.VerdictRevise && len(merged.Findings) == 0 {
+		// Issue #58/#187: a blocking verdict must name what blocks it. The
+		// verdict resolver normalizes an unexplained REVISE to PASS, so this can
+		// only fire when the reason set is verdict-scoped (provider/judge REJECT,
+		// checklist FAIL, no usable review) rather than finding-scoped.
+		if merged.Verdict != spec.VerdictPass && len(merged.Findings) == 0 {
 			fmt.Fprintf(os.Stderr,
-				"경고: REVISE verdict인데 findings가 비어 있습니다 (SPEC: %s, revision: %d) — 병합 경로에서 findings가 누락되었을 수 있습니다\n",
-				p.specID, revision)
+				"경고: %s verdict인데 findings가 비어 있습니다 (SPEC: %s, revision: %d) — 차단 사유: %s\n",
+				merged.Verdict, p.specID, revision, blockingPolicySummary(merged.BlockingReasons))
 		}
 
 		// SPEC-ADK-REVIEW-INTEGRITY-001: record per-document observation coverage
@@ -194,6 +209,7 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 		finalResult = merged
 
 		if noProviderReviewsSucceeded(reviews, providerStatuses) {
+			merged.LoopStatus = spec.LoopStatusProviderUnavailable
 			fmt.Fprintf(os.Stderr, "경고: 모든 provider review가 실패하여 리비전 반복을 중단합니다\n")
 			// REQ-009: when both execution paths produced zero raw responses
 			// (not just zero usable reviews after filtering), the operator cannot
@@ -213,17 +229,20 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 		// PASS: no open or regressed findings
 		if merged.Verdict == spec.VerdictPass && !hasActiveFindings(merged.Findings) {
+			merged.LoopStatus = spec.LoopStatusConverged
 			break
 		}
 
 		// Circuit breaker: halt if no progress
 		if revision > 0 && spec.ShouldTripCircuitBreaker(priorFindings, merged.Findings) {
+			merged.LoopStatus = spec.LoopStatusRevisionsExhausted
 			fmt.Fprintf(os.Stderr, "경고: 서킷 브레이커 작동 — 진행 없음, 리뷰 중단\n")
 			break
 		}
 
 		// Max revisions reached
 		if revision >= p.maxRevisions {
+			merged.LoopStatus = spec.LoopStatusRevisionsExhausted
 			fmt.Fprintf(os.Stderr, "경고: 최대 리비전 (%d) 도달\n", p.maxRevisions)
 			break
 		}
@@ -233,66 +252,4 @@ func runSpecReviewLoop(p specReviewLoopParams, doc *spec.SpecDocument, priorFind
 
 	printSpecReviewRepeatSummary(os.Stdout, finalResult)
 	return finalResult, nil
-}
-
-func noProviderReviewsSucceeded(reviews []spec.ReviewResult, statuses []spec.ProviderStatus) bool {
-	return len(reviews) == 0 && len(statuses) > 0 && spec.CountProviderStatus(statuses, "success") == 0
-}
-
-func effectiveReviewVerdict(verdict spec.ReviewVerdict, reviews []spec.ReviewResult, findings []spec.ReviewFinding) spec.ReviewVerdict {
-	if len(reviews) == 0 {
-		return spec.VerdictRevise
-	}
-	if verdict == spec.VerdictPass && hasActiveFindings(findings) {
-		return spec.VerdictRevise
-	}
-	if verdict != spec.VerdictRevise || hasActiveFindings(findings) {
-		return verdict
-	}
-	for _, r := range reviews {
-		if r.Verdict == spec.VerdictReject {
-			return verdict
-		}
-		if r.Verdict == spec.VerdictRevise && (reviewHasBlockingFindings(r.Findings) || reviewHasFailingChecklist(r.ChecklistOutcomes)) {
-			return verdict
-		}
-	}
-	return spec.VerdictPass
-}
-
-func reviewHasBlockingFindings(findings []spec.ReviewFinding) bool {
-	if len(findings) == 0 {
-		return true
-	}
-	for _, f := range findings {
-		if spec.IsActiveBlockingFinding(f) {
-			return true
-		}
-	}
-	return false
-}
-
-func reviewHasFailingChecklist(outcomes []spec.ChecklistOutcome) bool {
-	for _, outcome := range outcomes {
-		if outcome.Status == spec.ChecklistStatusFail {
-			return true
-		}
-	}
-	return false
-}
-
-// buildPromptOpts builds ReviewPromptOptions for the current revision.
-func buildPromptOpts(priorFindings []spec.ReviewFinding, revision int, specDir string, gate config.ReviewGateConf) spec.ReviewPromptOptions {
-	opts := spec.ReviewPromptOptions{
-		SpecDir:            specDir,
-		PassCriteria:       gate.PassCriteria,
-		DocContextMaxLines: gate.DocContextMaxLines,
-	}
-	if len(priorFindings) == 0 {
-		opts.Mode = spec.ReviewModeDiscover
-		return opts
-	}
-	opts.Mode = spec.ReviewModeVerify
-	opts.PriorFindings = priorFindings
-	return opts
 }

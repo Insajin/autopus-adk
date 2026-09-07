@@ -66,7 +66,7 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				// structured review; matches the orchestra command provider set.
 				Providers:          []string{"claude", "codex", "gemini"},
 				Judge:              "claude",
-				MaxRevisions:       2,
+				MaxRevisions:       new(2),
 				AutoCollectContext: true,
 				ContextMaxLines:    0,
 				VerdictThreshold:   0.67,

@@ -193,6 +193,16 @@ coordinator dispatch to builder {
 - All partial validation interactions are logged: `[P1-R3] builder → guardian: partial_validation (pkg/auth/token.go)`
 - Full Phase 4 review is always required regardless of partial reviews completed
 
+## Change Contract Review
+
+When the change carries a compact change contract, review it against the referenced SPEC — not against a SPEC set that was deliberately not written.
+
+- `spec_authoring: not_applicable` is a valid classifier decision for a low-risk class. A missing four-document set is not a finding on that path.
+- Verify the declared class against the actual diff. Non-test source under `test_only`, code under `docs_only`, non-UI source under `small_ui`, any auth/billing/data/migration/security path, production code across two module roots, or a new exported API or contract means `escalate_to_full_spec`: raise it as a blocking finding.
+- The safety gates are never waived by the compact path: `security`, `validation`, `data_loss`, `deterministic_oracle`, plus `accessibility` and `ux_verification` when the surface has UI paths, and the race and coverage thresholds.
+- One merged verification run must still show a verdict and evidence per referenced acceptance-criteria id. A batch `PASS` without per-criterion rows is an incomplete receipt, and passing slices never offset a failing one.
+- When the review loop reports `loop_status: awaiting_changes`, the reviewed input did not change. Do not re-review the same input: resolve the named blocking findings or defer them explicitly with a reason.
+
 ## 리뷰 출력 형식
 
 ```markdown

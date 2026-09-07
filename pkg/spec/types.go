@@ -180,8 +180,15 @@ type ReviewResult struct {
 	OverridePromotion bool          `json:"override_promotion,omitempty"` // true when --allow-degraded promoted a degraded PASS (REQ-RINT-OVERRIDE-07)
 
 	// Review-convergence fields (issue #186). RepeatDiscoveries lists verify-mode
-	// findings that restate an earlier finding; SameInputReReview marks a revision
-	// whose SPEC inputs are byte-identical to the previous one.
+	// findings that restate an earlier finding; SameInputReReview marks that the
+	// next revision's SPEC inputs are byte-identical to the ones just reviewed.
 	RepeatDiscoveries []RepeatDiscovery `json:"repeat_discoveries,omitempty"`
 	SameInputReReview bool              `json:"same_input_rereview,omitempty"`
+
+	// Verdict-consistency fields (issue #187). BlockingReasons states why a
+	// REVISE or REJECT cannot converge and is never empty for those verdicts;
+	// LoopStatus states how the revision loop ended (converged,
+	// awaiting_changes, revisions_exhausted, provider_unavailable).
+	BlockingReasons []BlockingReason `json:"blocking_reasons,omitempty"`
+	LoopStatus      string           `json:"loop_status,omitempty"`
 }

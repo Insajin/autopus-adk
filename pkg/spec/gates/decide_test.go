@@ -44,6 +44,17 @@ func TestDecide_SmallUIChange(t *testing.T) {
 	review := applicabilityOf(t, receipt, GateProviderReview)
 	assert.Equal(t, Required, review.Applicability)
 	assert.Contains(t, review.Reason, "code change set requires provider review")
+
+	authoring := applicabilityOf(t, receipt, GateSpecAuthoring)
+	assert.Equal(t, NotApplicable, authoring.Applicability, "a low-risk change may take the compact contract")
+	assert.Contains(t, authoring.Reason, "low-risk small_ui change")
+	assert.Contains(t, authoring.Reason, "compact change contract replaces the four-document SPEC set")
+	assert.Equal(t, RiskLow, receipt.ChangeRisk.Tier)
+	assert.Equal(t, DecisionCompact, receipt.ChangeRisk.Decision)
+
+	probe := applicabilityOf(t, receipt, GateRiskFirstProbe)
+	assert.Equal(t, NotApplicable, probe.Applicability, "a low-risk change does not require the probe")
+	assert.Contains(t, probe.Reason, "no integration boundary requiring a probe")
 }
 
 func TestDecide_SecurityDBChange(t *testing.T) {
@@ -61,6 +72,17 @@ func TestDecide_SecurityDBChange(t *testing.T) {
 	accessibility := applicabilityOf(t, receipt, GateAccessibility)
 	assert.Equal(t, NotApplicable, accessibility.Applicability)
 	assert.Equal(t, "no UI surface in change set", accessibility.Reason)
+
+	authoring := applicabilityOf(t, receipt, GateSpecAuthoring)
+	assert.Equal(t, Required, authoring.Applicability, "a security or data change needs the full SPEC set")
+	assert.Contains(t, authoring.Reason, "high-risk security_or_data change requires the full SPEC set")
+	assert.Contains(t, authoring.Reason, EscalationDeclaredHighRisk)
+
+	probe := applicabilityOf(t, receipt, GateRiskFirstProbe)
+	assert.Equal(t, Required, probe.Applicability, "a high-risk change needs the risk-first probe")
+	assert.Contains(t, probe.Reason, "integration boundary in change set")
+	assert.Equal(t, RiskHigh, receipt.ChangeRisk.Tier)
+	assert.Equal(t, DecisionEscalate, receipt.ChangeRisk.Decision)
 }
 
 func TestDecide_MultiDomainChange(t *testing.T) {
@@ -71,6 +93,28 @@ func TestDecide_MultiDomainChange(t *testing.T) {
 	assert.Equal(t, Required, integration.Applicability)
 	assert.Contains(t, integration.Reason, "multi_domain change set crosses an integration boundary")
 	assert.Equal(t, NotApplicable, applicabilityOf(t, receipt, GateUXVerification).Applicability)
+	assert.Equal(t, KindMultiDomain, receipt.ChangeRisk.EffectiveClass)
+	assert.Equal(t, DecisionEscalate, receipt.ChangeRisk.Decision)
+	assert.Equal(t, Required, applicabilityOf(t, receipt, GateSpecAuthoring).Applicability)
+	assert.Equal(t, Required, applicabilityOf(t, receipt, GateRiskFirstProbe).Applicability)
+}
+
+// A declared class contradicted by the change set escalates rather than
+// silently keeping the compact gate set.
+func TestDecide_DeclaredTestOnlyTouchingProductionSourceEscalates(t *testing.T) {
+	classification := Classify([]string{"pkg/foo/foo_test.go", "pkg/foo/foo.go"}, nil)
+	receipt := Decide(DecisionInput{
+		SpecID:         "SPEC-GATES-001",
+		Classification: classification,
+		Change:         AssessChange(KindTestOnly, classification, false),
+		Now:            decideNow,
+	})
+
+	assert.Equal(t, DecisionEscalate, receipt.ChangeRisk.Decision)
+	authoring := applicabilityOf(t, receipt, GateSpecAuthoring)
+	assert.Equal(t, Required, authoring.Applicability)
+	assert.Contains(t, authoring.Reason, EscalationTestOnlyCode)
+	assert.Equal(t, Required, applicabilityOf(t, receipt, GateRiskFirstProbe).Applicability)
 }
 
 // TestDecide_ScenariosDiffer pins acceptance box (1): the three issue

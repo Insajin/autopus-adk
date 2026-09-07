@@ -9,13 +9,17 @@ type SpecConf struct {
 
 // ReviewGateConf는 멀티-프로바이더 SPEC 리뷰 게이트 설정이다.
 type ReviewGateConf struct {
-	Enabled            bool     `yaml:"enabled"`
-	Strategy           string   `yaml:"strategy"`
-	Providers          []string `yaml:"providers,flow"`
-	Judge              string   `yaml:"judge"`
-	MaxRevisions       int      `yaml:"max_revisions"`
-	AutoCollectContext bool     `yaml:"auto_collect_context"`
-	ContextMaxLines    int      `yaml:"context_max_lines"`
+	Enabled   bool     `yaml:"enabled"`
+	Strategy  string   `yaml:"strategy"`
+	Providers []string `yaml:"providers,flow"`
+	Judge     string   `yaml:"judge"`
+	// MaxRevisions caps the revision rounds the SPEC review loop may add after
+	// the first review. nil (key omitted) falls back to the consumer default;
+	// an explicit 0 means no additional revisions, so the review runs exactly
+	// one provider round. A negative explicit value is clamped to 0.
+	MaxRevisions       *int `yaml:"max_revisions,omitempty"`
+	AutoCollectContext bool `yaml:"auto_collect_context"`
+	ContextMaxLines    int  `yaml:"context_max_lines"`
 	// ExcludeFailedFromDenom drops infra-failed providers from the supermajority
 	// denominator (SPEC-SPECREV-001 REQ-VERD-3). Default false preserves legacy
 	// behavior of dividing by the configured provider count.
@@ -38,4 +42,17 @@ type ReviewGateConf struct {
 	// derives the majority default (configured/2+1) via spec.DefaultMinProviders at
 	// the consumption site; a positive value overrides it.
 	MinProviders int `yaml:"min_providers,omitempty"`
+}
+
+// ResolveMaxRevisions returns the configured revision budget, falling back to
+// fallback only when the key was omitted. This keeps an explicitly configured
+// zero distinct from an unset key, which a plain int cannot express.
+func (c ReviewGateConf) ResolveMaxRevisions(fallback int) int {
+	if c.MaxRevisions == nil {
+		return fallback
+	}
+	if *c.MaxRevisions < 0 {
+		return 0
+	}
+	return *c.MaxRevisions
 }

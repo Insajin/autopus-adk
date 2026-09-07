@@ -156,7 +156,7 @@ func TestReceipts_RoundTripWithPrivatePermissions(t *testing.T) {
 	receipt.Decisions[0], receipt.Decisions[1] = receipt.Decisions[1], receipt.Decisions[0]
 	applicabilityPath, err := WriteApplicability(specDir, receipt)
 	require.NoError(t, err)
-	assert.Equal(t, GateBuild, receipt.Decisions[0].Gate, "the caller's slice is not reordered")
+	assert.Equal(t, Catalog[1].ID, receipt.Decisions[0].Gate, "the caller's slice is not reordered")
 	data, err := os.ReadFile(applicabilityPath)
 	require.NoError(t, err)
 	assert.Equal(t, ApplicabilityPath(specDir), applicabilityPath)
@@ -164,6 +164,6 @@ func TestReceipts_RoundTripWithPrivatePermissions(t *testing.T) {
 
 	reloaded, err := ReadApplicability(specDir)
 	require.NoError(t, err)
-	assert.Equal(t, GateRiskFirstProbe, reloaded.Decisions[0].Gate, "decisions are persisted in catalog order")
-	assert.Equal(t, GateBuild, reloaded.Decisions[1].Gate)
+	assert.Equal(t, Catalog[0].ID, reloaded.Decisions[0].Gate, "decisions are persisted in catalog order")
+	assert.Equal(t, Catalog[1].ID, reloaded.Decisions[1].Gate)
 }

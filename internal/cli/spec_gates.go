@@ -19,6 +19,8 @@ func newSpecGatesCmd() *cobra.Command {
 	var (
 		changed          string
 		base             string
+		changeClass      string
+		newContract      bool
 		jsonOutput       bool
 		maxAge           time.Duration
 		referenceMissing bool
@@ -31,7 +33,12 @@ func newSpecGatesCmd() *cobra.Command {
 required, reusable, not_applicable, or blocked, and writes
 {SPEC_DIR}/gate-applicability.json. Mandatory safety gates are never
 not_applicable. Previously recorded evidence (see "gates record") is reused
-only when its exact input closure still matches the current tree.`,
+only when its exact input closure still matches the current tree.
+
+The declared change class decides the risk tier. Without --change-class the
+class is derived from the change set, so it can never be understated. Low-risk
+classes leave spec_authoring and risk_first_probe not_applicable; high-risk
+classes require both.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, err := resolveGatesTarget(args[0])
@@ -50,9 +57,15 @@ only when its exact input closure still matches the current tree.`,
 			if err != nil {
 				return fmt.Errorf("load gate evidence: %w", err)
 			}
+			classification := gates.Classify(paths, cfg.Design.UIFileGlobs)
+			declared, err := resolveGatesChangeClass(changeClass)
+			if err != nil {
+				return err
+			}
 			receipt := gates.Decide(gates.DecisionInput{
 				SpecID:                     target.SpecID,
-				Classification:             gates.Classify(paths, cfg.Design.UIFileGlobs),
+				Classification:             classification,
+				Change:                     gates.AssessChange(declared, classification, newContract),
 				AnnotationReferenceMissing: referenceMissing,
 				Prior:                      prior,
 				Now:                        time.Now(),
@@ -72,6 +85,8 @@ only when its exact input closure still matches the current tree.`,
 
 	cmd.Flags().StringVar(&changed, "changed", "", "comma-separated changed paths relative to the project root (default: git working tree changes)")
 	cmd.Flags().StringVar(&base, "base", "", "git ref to diff against when --changed is not given (default HEAD)")
+	cmd.Flags().StringVar(&changeClass, "change-class", "", "declared change class: "+strings.Join(changeKindNames(), ", ")+" (default: derived from the change set)")
+	cmd.Flags().BoolVar(&newContract, "new-contract", false, "the change introduces a new exported API or contract (always escalates)")
 	cmd.Flags().BoolVar(&jsonOutput, "json", false, "print the applicability receipt as JSON")
 	cmd.Flags().DurationVar(&maxAge, "max-age", gates.DefaultMaxAge, "maximum age of evidence eligible for reuse")
 	cmd.Flags().BoolVar(&referenceMissing, "annotation-reference-missing", false, "mark the annotation gate blocked because the @AX reference source is absent")
@@ -140,6 +155,15 @@ func newSpecGatesRecordCmd() *cobra.Command {
 	return cmd
 }
 
+// resolveGatesChangeClass returns the declared change class, or the empty
+// class when none was given so Decide derives it from the change set.
+func resolveGatesChangeClass(value string) (gates.ChangeKind, error) {
+	if strings.TrimSpace(value) == "" {
+		return "", nil
+	}
+	return gates.ParseChangeKind(value)
+}
+
 func writeGatesJSON(w io.Writer, receipt gates.ApplicabilityReceipt) error {
 	data, err := json.MarshalIndent(receipt, "", "  ")
 	if err != nil {
@@ -151,6 +175,9 @@ func writeGatesJSON(w io.Writer, receipt gates.ApplicabilityReceipt) error {
 
 func printGateDecisions(w io.Writer, receipt gates.ApplicabilityReceipt, receiptPath string) {
 	fmt.Fprintf(w, "%s (%s): %d changed path(s)\n", receipt.SpecID, receipt.ChangeClass, len(receipt.ChangedPaths))
+	fmt.Fprintf(w, "change risk: %s %s (declared %s, effective %s)\n",
+		receipt.ChangeRisk.Tier, receipt.ChangeRisk.Decision,
+		receipt.ChangeRisk.DeclaredClass, receipt.ChangeRisk.EffectiveClass)
 	for _, decision := range receipt.Decisions {
 		fmt.Fprintf(w, "%s: %s — %s\n", decision.Gate, decision.Applicability, decision.Reason)
 	}

@@ -15,13 +15,14 @@ func codexGateApplicabilityContract() string {
 
 Every phase gate reports ` + "`gate: applicability — reason`" + ` from ` + "`required | reusable | not_applicable | blocked`" + `. The value is a deterministic classifier decision, never a worker judgement.
 
-- Before the Phase 2 fan-out, the main session runs ` + "`auto spec gates <SPEC-ID> --base <ref>`" + ` (or ` + "`--changed p1,p2,...`" + `), which writes ` + "`{SPEC_DIR}/gate-applicability.json`" + ` over the closed gate set ` + "`risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`" + `, and carries those decisions into every worker prompt.
+- Before the Phase 2 fan-out, the main session runs ` + "`auto spec gates <SPEC-ID> --base <ref>`" + ` (or ` + "`--changed p1,p2,...`" + `), which writes ` + "`{SPEC_DIR}/gate-applicability.json`" + ` over the closed gate set ` + "`spec_authoring, risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync`" + `, and carries those decisions into every worker prompt.
 - ` + "`reusable`" + ` comes only from that receipt: a prior ` + "`{SPEC_DIR}/gates/evidence-<gate>.json`" + ` whose ` + "`input_closure_sha256`" + ` still matches the current tree, with ` + "`status: pass`" + `, ` + "`complete: true`" + `, and ` + "`observed_at`" + ` inside ` + "`--max-age`" + ` (default 168h). Its ` + "`input_globs`" + ` are re-expanded, so an added file invalidates evidence exactly like an edit.
 - Any dependency change, ` + "`fail`" + `, ` + "`partial`" + `, missing input, or stale receipt returns ` + "`required`" + ` with the failed condition named. Workers never self-assign ` + "`reusable`" + `.
 - After each real build/test/UX execution, record its evidence with ` + "`auto spec gates record <SPEC-ID> --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command \"<text>\"]`" + ` so the next run reuses exact-input evidence instead of repeating the work.
 - ` + "`security`" + `, ` + "`validation`" + `, ` + "`data_loss`" + `, and ` + "`deterministic_oracle`" + ` are never ` + "`not_applicable`" + `. ` + "`accessibility`" + ` and ` + "`ux_verification`" + ` are ` + "`required`" + ` when the change set has UI paths and ` + "`not_applicable`" + ` reasoned ` + "`no UI surface in change set`" + ` otherwise; only the classifier decides that.
 - An auxiliary step reports ` + "`blocked`" + ` with a named fallback instead of stalling. @AX annotation with a missing reference source is ` + "`blocked`" + `; having nothing to annotate is ` + "`not_applicable`" + `.
-`
+- Pass ` + "`--change-class <class>`" + ` when a change contract declares one. Without it the class is derived from the change set, so it can never be understated.
+` + codexChangeContractPath() + codexMergedFinalVerification()
 }
 
 // codexLeadTimeTelemetryContract renders the `## Lead-Time Telemetry` section.

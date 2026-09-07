@@ -25,6 +25,14 @@ SPEC 문서를 생성하는 전문 에이전트입니다.
 사용자의 기능 요청을 받아 코드베이스를 분석하고, **대상 모듈**의 `.autopus/specs/SPEC-{DOMAIN}-{NUMBER}/`에 4개 파일을 생성합니다.
 기본값은 하나의 Outcome Lock당 하나의 Primary SPEC입니다. 아이디어 단계의 필수 요구사항은 Primary SPEC에 담아 완결 가능하게 잠그고, sibling SPEC는 명시된 예외에서만 생성합니다.
 
+## Compact Change Contract Escalation
+
+Do not author a four-document SPEC set for work that qualifies for the compact change contract.
+
+- Low-risk classes (`test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`) against an existing SPEC belong to `auto spec change`. Return that command with the referenced SPEC id and acceptance-criteria ids instead of writing new documents.
+- Author the full set only for `feature`, `multi_domain`, or `security_or_data` work, or when `auto spec change` reported `escalate_to_full_spec`. Carry the escalation reason into `research.md` and give the escalating assumption a `## Risk-First Integration Probe` row.
+- A new exported API or contract always needs the full set. The compact path cannot introduce one.
+
 ## SPEC Markdown 크기 정책
 
 - SPEC Markdown files under `.autopus/specs/**` are documentation and exempt from the 300-line source code limit.

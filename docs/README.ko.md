@@ -1304,6 +1304,9 @@ auto sync verify --spec SPEC-HOOK-001 --strict
 | `/auto map` | 코드베이스 구조 분석 |
 | `/auto sync SPEC-ID` | 구현 후 문서 동기화 |
 | `auto sync verify [--spec SPEC-ID] [--strict]` | 읽기 전용 fail-closed 멀티 리포 커밋 계획 |
+| `auto spec change SPEC-ID --class small_ui --ac AC-001 --surface path` | 저위험 작업용 짧은 변경 계약. 고위험 클래스는 정식 SPEC으로 escalate |
+| `auto spec gates SPEC-ID --change-class small_ui --json` | gate별 `required/not_applicable/blocked` 판정과 이유 |
+| `auto spec review SPEC-ID --single-pass` | provider round 1회. receipt에 `loop_status`·`blocking_reasons` 기록 |
 | `/auto dev "설명"` | 풀 파워: plan(--multi --ultrathink) → go(--team --loop) → sync |
 | `/auto setup` | 프로젝트 컨텍스트 문서 생성/업데이트 |
 | `/auto stale` | 오래된 결정 및 패턴 감지 |

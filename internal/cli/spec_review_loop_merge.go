@@ -189,7 +189,7 @@ func applySpecReviewJudge(
 		}
 		merged.Verdict = spec.ReviewVerdict(out.Verdict)
 		merged.Findings = judgedFindings
-		downgradeJudgePassWithBlockingSeverity(merged)
+		reconcileJudgePassAcceptance(merged)
 		return
 	}
 	applyFailedSpecReviewJudgeSummary(merged, result.FailedProviders, judgeProvider)
@@ -249,21 +249,22 @@ func trimSpecReviewJudgeSuffix(provider, fallback string) string {
 	return provider
 }
 
-// downgradeJudgePassWithBlockingSeverity lowers a judge PASS to REVISE only
-// when an accepted (still active) finding is blocking. Prior findings the
-// judge resolved keep their severity but must not veto convergence.
-func downgradeJudgePassWithBlockingSeverity(result *spec.ReviewResult) {
+// reconcileJudgePassAcceptance aligns judge acceptance with the runtime blocker
+// matrix. A judge PASS is an explicit non-blocking disposition for the findings
+// it accepted, so those findings are deferred instead of silently blocking the
+// verdict a judge just cleared (issue #187: judge PASS plus runtime REVISE with
+// no stated non-finding reason). Hard blockers — critical/major severity, the
+// security category, an escape hatch, or a regression — are never waived: they
+// stay open and surface as stated blocking reasons, which downgrades the verdict
+// in resolveReviewVerdict.
+func reconcileJudgePassAcceptance(result *spec.ReviewResult) {
 	if result == nil || result.Verdict != spec.VerdictPass {
 		return
 	}
-	for _, finding := range result.Findings {
-		if finding.Status != spec.FindingStatusOpen && finding.Status != spec.FindingStatusRegressed {
+	for i, finding := range result.Findings {
+		if !spec.IsActiveBlockingFinding(finding) || spec.IsHardBlockingFinding(finding) {
 			continue
 		}
-		switch strings.ToLower(strings.TrimSpace(finding.Severity)) {
-		case "critical", "major":
-			result.Verdict = spec.VerdictRevise
-			return
-		}
+		result.Findings[i].Status = spec.FindingStatusDeferred
 	}
 }

@@ -70,6 +70,15 @@ IMPORTANT: executor MUST NOT modify test files generated in Phase 1.5.
 - If a test appears incorrect or impossible to satisfy, report it in the `Issues` field of the completion report — do NOT modify the test file
 - Test file ownership during Phase 2 remains with tester
 
+## Change Contract Path
+
+When the task carries a compact change contract (`{SPEC_DIR}/change.md`, or `.autopus/specs/CHG-<id>/change.md` referencing the SPEC), that contract — not a second SPEC set — is the authority for scope.
+
+- Implement only inside the contract's `## Intended Surface`. A file outside it is out of scope: report it in the `Issues` field and stop instead of widening the surface.
+- A usable contract always reads `decision: compact_contract`. A task arriving with `escalate_to_full_spec` is not implementable: report `BLOCKED` and name the escalation reason.
+- A `test_only` contract forbids production-source edits. If new tests fail against current behaviour, that is a contract violation to report, not a licence to change production code.
+- Verify your own surface only. The merged build, race, coverage, and security run happens once after integration; do not re-run the full suite per task.
+
 ## 파일 소유권
 
 구현 담당:

@@ -60,6 +60,7 @@ func syncReviewedSpecStatusWithReceipt(
 	receipt.Providers = append([]spec.ProviderStatus(nil), result.ProviderStatuses...)
 	receipt.CriticalVeto = hasCriticalSpecReviewVeto(result.Findings)
 	applySpecReviewRepeatDiscovery(&receipt, result)
+	applySpecReviewLoopEvidence(&receipt, result)
 	if result.Judge != nil {
 		receipt.Judge = &specReviewJudgeReceipt{
 			Provider:    result.Judge.Provider,

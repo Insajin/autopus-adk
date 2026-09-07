@@ -88,9 +88,10 @@ Phase 1.8 이후, Phase 2 fan-out 전에 메인 세션에서 실행합니다. �
 - high/critical 가정이 `FAIL`이면 planning으로 돌아가 `plan.md`를 수정합니다. re-plan은 최대 1회이며, 두 번째 `FAIL`은 세 번째 시도 대신 사용자에게 surface합니다.
 - 구현자가 요구사항보다 넓은 제약(신규 ACL, 호환성 제한, 보안 제한)을 도입하면 scope expansion이므로 fan-out 전에 기존 런타임에서 probe합니다.
 
-Gate applicability는 에이전트 판단이 아니라 receipt에서 옵니다. Phase 2 fan-out 전에 `auto spec gates {SPEC_ID} --base <ref>`(또는 `--changed p1,p2,...`)를 실행하면 `{SPEC_DIR}/gate-applicability.json`이 `risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync` 전체에 대해 작성되고, 모든 worker 프롬프트가 그 결정을 `gate: applicability — reason`으로 전달합니다.
+Gate applicability는 에이전트 판단이 아니라 receipt에서 옵니다. Phase 2 fan-out 전에 `auto spec gates {SPEC_ID} --base <ref>`(또는 `--changed p1,p2,...`)를 실행하면 `{SPEC_DIR}/gate-applicability.json`이 `spec_authoring, risk_first_probe, build, unit_tests, integration, security, validation, data_loss, deterministic_oracle, accessibility, ux_verification, annotation, provider_review, doc_sync` 전체에 대해 작성되고, 모든 worker 프롬프트가 그 결정을 `gate: applicability — reason`으로 전달합니다.
 
-- `risk_first_probe`: 통합 경계가 있으면 `required`, doc-only 또는 low-risk면 `not_applicable`(단, `not-run` 한 행과 `no integration boundary` 이유 유지), fixture/환경이 없으면 `blocked`.
+- `spec_authoring`: 저위험 선언 클래스(`test_only`, `docs_only`, `small_ui`, `bugfix_existing_contract`)는 compact `change.md`가 4문서 SPEC 세트를 대체하므로 `not_applicable`, `feature`/`multi_domain`/`security_or_data`는 `required`.
+- `risk_first_probe`: 고위험 변경이 통합 경계를 건드리면 `required`, doc-only change set이나 저위험 선언 클래스면 `not_applicable`(단, `not-run` 한 행과 `no integration boundary` 이유 유지), fixture/환경이 없으면 `blocked`.
 - `reusable`은 receipt가 부여할 때만 유효합니다. 직전 `{SPEC_DIR}/gates/evidence-<gate>.json`의 `input_closure_sha256`이 현재 트리와 일치하고 `status: pass`, `complete: true`, `observed_at`이 `--max-age`(기본 168h) 안일 때만입니다. `input_globs`를 재확장하므로 파일 추가도 수정과 동일하게 evidence를 무효화하며, 의존성 변경·`fail`·`partial`·누락 입력·만료 receipt는 실패 조건을 명시한 `required`가 됩니다. 에이전트가 `reusable`을 자체 부여하지 않습니다.
 - 실제 build/test/UX 실행 직후 `auto spec gates record {SPEC_ID} --gate <id> --status pass|fail|partial --inputs <glob,...> [--dynamic-deps <path,...>] [--command "<text>"]`로 evidence를 기록합니다.
 - `security`, `validation`, `data_loss`, `deterministic_oracle`은 `not_applicable`이 될 수 없습니다. `accessibility`와 `ux_verification`은 변경 집합에 UI 경로가 있으면 `required`, 없으면 `no UI surface in change set` 이유의 `not_applicable`이며 classifier만 판단합니다.
@@ -214,6 +215,15 @@ approved였던 SPEC의 clean re-review는 `status_changed=false`여도 위 curre
 ```
 
 **Anti-recursion**: SPEC Quality Loop 는 단일 `go` invocation 안에서만 돕니다. PASS 후에도 자기 자신을 재귀 호출하지 않고 같은 invocation에서 Step 3 으로 순차 진행.
+
+### Step 2.5: Change Class and Gate Applicability
+
+- Phase 1 전에 `auto spec gates <SPEC-ID> --base <ref> [--change-class <class>] [--new-contract] --json`을 실행하고 모든 gate 결정을 각 worker 프롬프트에 전달합니다. `--change-class`를 생략하면 change set에서 클래스를 유도하므로 과소 선언이 불가능합니다.
+- `{SPEC_DIR}/change.md` 또는 이 SPEC을 참조하는 `.autopus/specs/CHG-<id>/change.md`가 있으면 compact change contract입니다. `## Intended Surface`가 구현 범위를, `## Verification Plan`이 검증 범위를 한정하며 이 경로에서는 SPEC 세트를 새로 작성하지 않습니다.
+- `change_risk.risk_tier: low`이면 `spec_authoring`과 `risk_first_probe`가 `not_applicable`입니다. `high`이면 둘 다 `required`이며 Phase 2 fan-out 전에 Phase 1.9 probe를 실행합니다.
+- `change_risk.decision: escalate_to_full_spec`이면 실행을 중단하고 승격 이유를 보고한 뒤 `@auto plan`으로 넘깁니다.
+- 소유 경로가 분리된 독립 태스크는 병렬 실행합니다. 전체 build/race/coverage/security/Phase 4 review는 통합 후 union change set에 대해 한 번만 실행하며 acceptance ID별 verdict와 evidence를 남깁니다. per-criterion 행이 없는 batch PASS는 불완전한 receipt입니다.
+- review loop는 `loop_status`로 종료합니다: `converged`, `awaiting_changes`(검토 입력이 그대로이므로 같은 입력으로 재검토하지 말고 명시된 blocking finding을 해결하거나 이유와 함께 defer), `revisions_exhausted`, `provider_unavailable`.
 
 ### Step 3: 파이프라인 라우팅
 

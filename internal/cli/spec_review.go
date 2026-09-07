@@ -34,14 +34,15 @@ func loopAwareMaxRevisions(configured int, loopMode bool) int {
 }
 
 // resolveSpecReviewMaxRevisions derives the effective revision budget from the
-// review gate config and the --loop flag. A non-positive gate.MaxRevisions
-// falls back to defaultMaxRevisions before the loop floor is applied.
-func resolveSpecReviewMaxRevisions(gate config.ReviewGateConf, loopMode bool) int {
-	configured := gate.MaxRevisions
-	if configured <= 0 {
-		configured = defaultMaxRevisions
+// review gate config, the --loop flag and --single-pass. singlePass is absolute:
+// exactly one provider round, so it also overrides the --loop floor. An omitted
+// max_revisions falls back to defaultMaxRevisions, while an explicitly
+// configured 0 means zero additional revisions.
+func resolveSpecReviewMaxRevisions(gate config.ReviewGateConf, loopMode, singlePass bool) int {
+	if singlePass {
+		return 0
 	}
-	return loopAwareMaxRevisions(configured, loopMode)
+	return loopAwareMaxRevisions(gate.ResolveMaxRevisions(defaultMaxRevisions), loopMode)
 }
 
 // wrapSpecLoadError wraps a spec.Load failure with a neutral prefix that names
@@ -62,6 +63,7 @@ func newSpecReviewCmd() *cobra.Command {
 		providers           []string
 		requiredDocuments   []string
 		conditionalProfiles []string
+		singlePass          bool
 	)
 
 	cmd := &cobra.Command{
@@ -77,6 +79,7 @@ func newSpecReviewCmd() *cobra.Command {
 				providers:           append([]string(nil), providers...),
 				requiredDocuments:   requiredDocuments,
 				conditionalProfiles: conditionalProfiles,
+				singlePass:          singlePass,
 			})
 		},
 	}
@@ -89,6 +92,8 @@ func newSpecReviewCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&providers, "providers", "p", nil, "Provider list override (default: from config)")
 	cmd.Flags().StringArrayVar(&requiredDocuments, "required-document", nil, "Additional root-relative required review document")
 	cmd.Flags().StringArrayVar(&conditionalProfiles, "conditional-profile", nil, "Declared conditional review context profile")
+	cmd.Flags().BoolVar(&singlePass, "single-pass", false,
+		"Run exactly one provider round: no revision loop, and --loop is ignored")
 
 	return cmd
 }
@@ -99,6 +104,9 @@ type specReviewOptions struct {
 	providers           []string
 	requiredDocuments   []string
 	conditionalProfiles []string
+	// singlePass caps the review at one provider round regardless of
+	// max_revisions or --loop.
+	singlePass bool
 }
 
 // runSpecReview executes the full SPEC review pipeline with REVISE loop.
@@ -142,8 +150,9 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 	requestedTimeout := timeout
 	timeout = resolveSpecReviewTimeout(cfg, timeout)
 	// SPEC-SPECREV-002 REQ-003: consume the global --loop flag so the revision
-	// budget honors the loop floor (inert seam otherwise).
-	maxRevisions := resolveSpecReviewMaxRevisions(gate, flags.LoopMode)
+	// budget honors the loop floor (inert seam otherwise). --single-pass wins
+	// over both the floor and max_revisions (issue #187).
+	maxRevisions := resolveSpecReviewMaxRevisions(gate, flags.LoopMode, opts.singlePass)
 
 	threshold := gate.VerdictThreshold
 	if threshold <= 0 {
@@ -226,6 +235,7 @@ func runSpecReviewWithOptions(ctx context.Context, specID, strategy string, time
 		}
 		fmt.Printf("SPEC 리뷰 완료: %s\n", specID)
 		fmt.Printf("판정: %s\n", finalResult.Verdict)
+		printSpecReviewLoopStatus(os.Stdout, finalResult)
 		fmt.Printf("Review receipt: %s\n", receiptPath)
 		if len(finalResult.Findings) > 0 {
 			// Issue #44: surface status breakdown instead of raw count so operators

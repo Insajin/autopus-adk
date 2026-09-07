@@ -216,7 +216,7 @@ func TestRunSpecReview_ResolvesJudgeConfigFromHarness(t *testing.T) {
 			cfg := config.DefaultFullConfig("judge-config")
 			cfg.Spec.ReviewGate.Providers = []string{tc.reviewers[0].Name}
 			cfg.Spec.ReviewGate.Judge = "claude"
-			cfg.Spec.ReviewGate.MaxRevisions = 0
+			cfg.Spec.ReviewGate.MaxRevisions = new(0)
 			cfg.Spec.ReviewGate.AutoCollectContext = false
 			cfg.Orchestra.Providers["claude"] = config.ProviderEntry{
 				Backend: config.ProviderBackendOMP,

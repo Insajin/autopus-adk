@@ -71,6 +71,15 @@ Keep the task scoped to this role. Follow the explicit ownership and completion 
 - 품질 기준은 `reviewer` 에이전트와 협의
 - 보안 요구사항은 `security-auditor`와 검토
 
+## Change Class Preflight
+
+Read the change class decision before decomposing tasks.
+
+- `{SPEC_DIR}/gate-applicability.json` carries `change_risk` with `declared_class`, `effective_class`, `risk_tier`, and `decision`. Plan against that decision; never re-derive risk from file counts.
+- `risk_tier: low` with `decision: compact_contract` means no new SPEC documents and no risk-first probe. Plan the implementation and a single merged verification.
+- `risk_tier: high` requires the full SPEC set and at least one executable `## Risk-First Integration Probe` row before broad implementation. Sequence the probe first; never fan out implementation ahead of it.
+- Independent tasks with disjoint ownership run in parallel. Overlapping ownership or a shared migration lane runs sequentially. Plan one merged final verification carrying an evidence row per acceptance-criteria id, not one full suite per task.
+
 ## 파이프라인 태스크 분해
 
 `/auto go` 명령으로 spawn될 때 수행하는 절차입니다.

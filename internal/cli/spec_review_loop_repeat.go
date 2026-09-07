@@ -13,8 +13,8 @@ import (
 )
 
 // specReviewRepeatTracker carries the cross-revision state the review loop needs
-// to tell convergence from spinning: whether this revision re-reviews unchanged
-// input, and which findings restate ground the review already covered.
+// to tell convergence from spinning: whether this revision would re-review
+// unchanged input, and which findings restate ground the review already covered.
 type specReviewRepeatTracker struct {
 	specDir      string
 	prevSnapshot string
@@ -23,7 +23,9 @@ type specReviewRepeatTracker struct {
 
 // beginRevision snapshots the SPEC inputs and records whether they are
 // byte-identical to the previous revision's. An unreadable spec dir yields an
-// empty snapshot, which never claims sameness.
+// empty snapshot, which never claims sameness. The loop reads sameInput before
+// dispatching providers, so an identical snapshot ends the loop instead of
+// buying another round (issue #187).
 func (t *specReviewRepeatTracker) beginRevision() {
 	snapshot := specReviewInputSnapshot(t.specDir)
 	t.sameInput = snapshot != "" && snapshot == t.prevSnapshot

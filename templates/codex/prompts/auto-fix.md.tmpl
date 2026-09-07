@@ -22,6 +22,11 @@ description: "버그 수정 — 재현 테스트를 먼저 작성한 뒤 최소 
 6. 테스트 통과 확인
 7. 전체 테스트 스위트 실행
 
+## Change Contract Boundary
+
+- 기존 계약 안의 버그 수정은 `bugfix_existing_contract`입니다. 저위험이며 SPEC 세트가 필요 없습니다. 승인된 SPEC이 해당 동작을 담고 있으면 `auto spec change <SPEC-ID> --class bugfix_existing_contract --ac <AC-ID,...> --surface <path,...> --verify "<command>"`로 계약을 기록합니다.
+- auth/billing/data/migration/security 경로, production code가 두 module root에 걸치는 경우, 새 exported API/contract는 `escalate_to_full_spec`입니다. 이때는 계약을 쓰지 않고 `@auto plan`으로 승격합니다. 안전 게이트는 두 경로 모두 `required`로 유지됩니다.
+
 ## 규칙
 
 - 재현 테스트 없이 수정하지 않음

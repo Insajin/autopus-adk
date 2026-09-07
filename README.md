@@ -1388,6 +1388,9 @@ Providers: **Claude** · **Codex** · **Gemini** · **OpenCode** — with gracef
 | `/auto map` | Codebase structure analysis |
 | `/auto sync SPEC-ID` | Sync docs after implementation |
 | `auto sync verify [--spec SPEC-ID] [--strict]` | Read-only, fail-closed multi-repo commit plan |
+| `auto spec change SPEC-ID --class small_ui --ac AC-001 --surface path` | Compact change contract for low-risk work; high-risk classes escalate to a full SPEC |
+| `auto spec gates SPEC-ID --change-class small_ui --json` | Per-gate `required/not_applicable/blocked` applicability with reasons |
+| `auto spec review SPEC-ID --single-pass` | One provider round; receipt carries `loop_status` and `blocking_reasons` |
 | `/auto dev "description"` | Full power: plan(--multi --ultrathink) → go(--team --loop) → sync |
 | `/auto setup` | Generate/update project context docs |
 | `/auto stale` | Detect stale decisions and patterns |

@@ -3,6 +3,7 @@ package gates
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -32,20 +33,26 @@ type PriorEvidence struct {
 type DecisionInput struct {
 	SpecID                     string
 	Classification             Classification
-	AnnotationReferenceMissing bool // the @AX reference source is absent
+	Change                     ChangeRisk // zero value is derived from Classification
+	AnnotationReferenceMissing bool       // the @AX reference source is absent
 	Prior                      map[GateID]PriorEvidence
 	Now                        time.Time
 	MaxAge                     time.Duration // zero selects DefaultMaxAge
 }
 
-// Decide computes the applicability receipt for input. Base rules derive
-// from the change class; evidence reuse then overlays required gates with
-// reusable when the exact-input rule holds.
+// Decide computes the applicability receipt for input. Base rules derive from
+// the change class and the risk tier of the declared change class; evidence
+// reuse then overlays required gates with reusable when the exact-input rule
+// holds.
 func Decide(input DecisionInput) ApplicabilityReceipt {
+	if input.Change.Tier == "" {
+		input.Change = AssessChange("", input.Classification, false)
+	}
 	receipt := ApplicabilityReceipt{
 		Schema:       ApplicabilitySchema,
 		SpecID:       input.SpecID,
 		ChangeClass:  input.Classification.Class,
+		ChangeRisk:   input.Change,
 		ChangedPaths: append([]string{}, input.Classification.Paths...),
 		GeneratedAt:  input.Now.UTC().Format(time.RFC3339),
 		Decisions:    make([]GateDecision, 0, len(Catalog)),
@@ -71,9 +78,17 @@ func baseDecision(entry CatalogEntry, input DecisionInput) GateDecision {
 	crossBoundary := class == ClassSecurityOrData || class == ClassMultiDomain
 
 	switch entry.ID {
+	case GateSpecAuthoring:
+		if input.Change.Tier == RiskLow {
+			return notApplicable(decision, fmt.Sprintf("low-risk %s change: the compact change contract replaces the four-document SPEC set", input.Change.EffectiveClass))
+		}
+		decision.Reason = fmt.Sprintf("high-risk %s change requires the full SPEC set: %s", input.Change.EffectiveClass, strings.Join(input.Change.Reasons, ", "))
 	case GateRiskFirstProbe:
 		if docOnly {
 			return notApplicable(decision, "no integration boundary")
+		}
+		if input.Change.Tier == RiskLow {
+			return notApplicable(decision, fmt.Sprintf("low-risk %s change: no integration boundary requiring a probe", input.Change.EffectiveClass))
 		}
 		decision.Reason = "integration boundary in change set"
 	case GateBuild, GateUnitTests:

@@ -75,10 +75,23 @@ func NormalizeAdvisoryFindings(findings []ReviewFinding) []ReviewFinding {
 }
 
 // IsAdvisoryFinding reports whether a finding is non-blocking review feedback.
+// Blocking is a function of category/impact first and the severity label second
+// (issue #187): a correctness, contract, data-loss or security finding blocks at
+// any severity, an advisory-category finding blocks only when a provider
+// escalated it to critical/major or the escape hatch flagged it, and any other
+// category falls back to the severity label.
 func IsAdvisoryFinding(f ReviewFinding) bool {
-	return strings.EqualFold(strings.TrimSpace(f.Severity), "suggestion") &&
-		f.Category != FindingCategorySecurity &&
-		!f.EscapeHatch
+	if f.EscapeHatch {
+		return false
+	}
+	category := normalizedFindingCategory(f.Category)
+	if _, blocking := impactCategories[category]; blocking {
+		return false
+	}
+	if _, advisory := advisoryCategories[category]; advisory {
+		return !isEscalatedSeverity(f.Severity)
+	}
+	return isSuggestionSeverity(f.Severity)
 }
 
 // IsActiveBlockingFinding reports whether a finding should block PASS.

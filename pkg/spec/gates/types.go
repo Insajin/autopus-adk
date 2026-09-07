@@ -27,6 +27,7 @@ const (
 type GateID string
 
 const (
+	GateSpecAuthoring       GateID = "spec_authoring"
 	GateRiskFirstProbe      GateID = "risk_first_probe"
 	GateBuild               GateID = "build"
 	GateUnitTests           GateID = "unit_tests"
@@ -65,6 +66,7 @@ type CatalogEntry struct {
 
 // Catalog lists every gate in receipt order.
 var Catalog = []CatalogEntry{
+	{ID: GateSpecAuthoring},
 	{ID: GateRiskFirstProbe},
 	{ID: GateBuild},
 	{ID: GateUnitTests},
@@ -117,6 +119,7 @@ type ApplicabilityReceipt struct {
 	Schema       string         `json:"schema"`
 	SpecID       string         `json:"spec_id"`
 	ChangeClass  ChangeClass    `json:"change_class"`
+	ChangeRisk   ChangeRisk     `json:"change_risk"`
 	ChangedPaths []string       `json:"changed_paths"`
 	GeneratedAt  string         `json:"generated_at"`
 	Decisions    []GateDecision `json:"decisions"`
