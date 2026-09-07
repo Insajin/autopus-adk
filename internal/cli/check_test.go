@@ -54,7 +54,7 @@ func TestCheckCmd_ArchFailsOnOversizedFile(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("package dummy\n")
 	for i := 0; i < 300; i++ {
-		sb.WriteString(fmt.Sprintf("// line %d\n", i))
+		sb.WriteString(fmt.Sprintf("var _ = %d\n", i))
 	}
 	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(sb.String()), 0o644); err != nil {
 		t.Fatal(err)
@@ -100,7 +100,7 @@ func TestCheckCmd_ArchSkipsGeneratedFiles(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("package dummy\n")
 	for i := 0; i < 300; i++ {
-		sb.WriteString(fmt.Sprintf("// line %d\n", i))
+		sb.WriteString(fmt.Sprintf("var _ = %d\n", i))
 	}
 	for _, name := range []string{"foo_generated.go", "bar_gen.go", "baz.pb.go"} {
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(sb.String()), 0o644); err != nil {
@@ -177,7 +177,7 @@ func TestCheckCmd_WarnOnlyExitsZero(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("package dummy\n")
 	for i := 0; i < 300; i++ {
-		sb.WriteString(fmt.Sprintf("// line %d\n", i))
+		sb.WriteString(fmt.Sprintf("var _ = %d\n", i))
 	}
 	if err := os.WriteFile(filepath.Join(dir, "big.go"), []byte(sb.String()), 0o644); err != nil {
 		t.Fatal(err)

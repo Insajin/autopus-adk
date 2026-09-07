@@ -40,13 +40,13 @@ func writeTestFile(t *testing.T, dir, name, content string) string {
 	return path
 }
 
-func writeGoFileWithComments(t *testing.T, dir, name string, commentLines int) string {
+func writeGoFileWithCodeLines(t *testing.T, dir, name string, codeLines int) string {
 	t.Helper()
 
 	var sb strings.Builder
 	sb.WriteString("package dummy\n")
-	for i := 0; i < commentLines; i++ {
-		sb.WriteString("// line\n")
+	for i := 0; i < codeLines; i++ {
+		sb.WriteString("var _ = 1\n")
 	}
 	return writeTestFile(t, dir, name, sb.String())
 }

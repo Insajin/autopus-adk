@@ -4,8 +4,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/insajin/autopus-adk/pkg/linecount"
 )
 
 func TestReleaseScripts_SourceFilesStayBelowLimit(t *testing.T) {
@@ -23,8 +24,13 @@ func TestReleaseScripts_SourceFilesStayBelowLimit(t *testing.T) {
 			return readErr
 		}
 		checked++
-		if lines := strings.Count(string(data), "\n") + 1; lines > 300 {
-			t.Errorf("%s has %d lines, want <= 300", path, lines)
+		counts, countErr := linecount.Source(path, data)
+		if countErr != nil {
+			return countErr
+		}
+		if counts.Counted > 300 {
+			t.Errorf("%s has %d counted lines, want <= 300 (%d comment-only lines excluded)",
+				path, counts.Counted, counts.CommentOnly)
 		}
 		return nil
 	})

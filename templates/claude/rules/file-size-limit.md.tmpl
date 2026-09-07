@@ -30,5 +30,9 @@ This limit applies to source code files only. The following are excluded:
 {{end}}
 ## Counting
 
-Count ALL lines including comments, blank lines, and imports.
+Count code lines: blank lines and imports count, comment-only lines do not.
+A line that carries code beside a trailing comment still counts. Comment
+markers inside strings, template literals, regex literals, or heredocs are
+content and count. `auto check --gate` and `go run ./cmd/source-lines`
+apply the same rule.
 Test files follow the same limit.

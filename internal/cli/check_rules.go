@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/insajin/autopus-adk/internal/cli/tui"
 	"github.com/insajin/autopus-adk/pkg/config"
+	"github.com/insajin/autopus-adk/pkg/linecount"
 	"github.com/insajin/autopus-adk/pkg/lore"
 )
 
@@ -43,7 +43,7 @@ var skipDirs = map[string]bool{
 // Returns false if any file exceeds the hard limit.
 func checkArch(dir string, out io.Writer, quiet, stagedOnly bool) bool {
 	if !quiet {
-		tui.SectionHeader(out, "arch: file size")
+		tui.SectionHeader(out, "arch: file size (code lines)")
 	}
 
 	if stagedOnly {
@@ -59,20 +59,25 @@ func isGeneratedGoFile(name string) bool {
 		strings.HasSuffix(name, ".pb.go")
 }
 
-// countLines counts the number of lines in a file.
+// countLines applies the shared source-line policy to worktree content.
 func countLines(path string) (int, error) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close() //nolint:errcheck
+	return countSourceLines(path, data)
+}
 
-	count := 0
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		count++
+// countSourceLines reports the physical count when it already sits under the
+// warn threshold, and lexes for comment-only lines only when the physical size
+// could still trip a threshold. Lexing costs about a megabyte per second; the
+// byte scan is effectively free.
+func countSourceLines(name string, data []byte) (int, error) {
+	if physical := linecount.Physical(data); physical <= warnLineLimit {
+		return physical, nil
 	}
-	return count, scanner.Err()
+	counts, err := linecount.Source(name, data)
+	return counts.Counted, err
 }
 
 // checkLore verifies that the most recent commit uses Lore format.

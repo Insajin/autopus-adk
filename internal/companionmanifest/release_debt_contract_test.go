@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/insajin/autopus-adk/pkg/linecount"
 )
 
 // @AX:NOTE [AUTO]: The 250-line ceiling preserves A22 expansion headroom below the 300-line source limit.
@@ -27,9 +29,13 @@ func TestReleaseDebtSaturatedScriptsHaveExpansionHeadroom(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if lines := strings.Count(string(data), "\n") + 1; lines > releaseDebtHeadroomLimit {
-			t.Errorf("%s has %d lines, want <= %d for A22 headroom",
-				path, lines, releaseDebtHeadroomLimit)
+		counts, countErr := linecount.Source(path, data)
+		if countErr != nil {
+			t.Fatal(countErr)
+		}
+		if counts.Counted > releaseDebtHeadroomLimit {
+			t.Errorf("%s has %d counted lines, want <= %d for A22 headroom",
+				path, counts.Counted, releaseDebtHeadroomLimit)
 		}
 	}
 }

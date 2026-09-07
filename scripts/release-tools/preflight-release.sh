@@ -12,8 +12,8 @@ set -euo pipefail
 umask 077
 
 readonly repository='Insajin/autopus-adk'
-readonly release_tag="${1:-v0.50.116}"
-readonly predecessor_tag="${2:-v0.50.115}"
+readonly release_tag="${1:-v0.50.117}"
+readonly predecessor_tag="${2:-v0.50.116}"
 readonly release_ref="refs/tags/${release_tag}"
 readonly version="${release_tag#v}"
 
@@ -59,9 +59,8 @@ fi
 
 section "content gates"
 if [[ -z "$(gofmt -l pkg internal cmd templates)" ]]; then pass 'gofmt clean'; else bad 'gofmt reports files'; fi
-oversized=$(find pkg internal cmd -name '*.go' -print0 | xargs -0 wc -l |
-  awk '$2 != "total" && $1 > 300 { print $2 }')
-if [[ -z "$oversized" ]]; then pass 'no source file over 300 lines'; else bad "over 300 lines: $oversized"; fi
+oversized=$(go run ./cmd/source-lines --max 300 --ext .go pkg internal cmd 2>&1 | grep -v '^source-lines:' || true)
+if [[ -z "$oversized" ]]; then pass 'no source file over 300 code lines'; else bad "over 300 code lines: $oversized"; fi
 before_generate=$(git status --porcelain)
 if go run ./cmd/generate-templates >/dev/null 2>&1 &&
   [[ "$(git status --porcelain)" == "$before_generate" ]]; then

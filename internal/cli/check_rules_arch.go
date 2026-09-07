@@ -95,6 +95,8 @@ func checkArchStaged(dir string, out io.Writer, quiet bool) bool {
 
 		lines, err := countStagedLines(dir, rel)
 		if err != nil {
+			tui.FAIL(out, fmt.Sprintf("%s (line count failed: %v)", rel, err))
+			passed = false
 			continue
 		}
 
@@ -214,16 +216,5 @@ func countStagedLines(dir, rel string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return countLinesInBytes(data), nil
-}
-
-func countLinesInBytes(data []byte) int {
-	if len(data) == 0 {
-		return 0
-	}
-	count := bytes.Count(data, []byte{'\n'})
-	if data[len(data)-1] != '\n' {
-		count++
-	}
-	return count
+	return countSourceLines(rel, data)
 }

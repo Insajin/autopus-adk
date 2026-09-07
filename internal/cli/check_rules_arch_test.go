@@ -15,7 +15,7 @@ func TestCheckArch_WarnRangeFile(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	writeGoFileWithComments(t, dir, "warn.go", 200)
+	writeGoFileWithCodeLines(t, dir, "warn.go", 200)
 
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, false, false)
@@ -27,7 +27,7 @@ func TestCheckArch_WarnRangeQuiet(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	writeGoFileWithComments(t, dir, "warn.go", 200)
+	writeGoFileWithCodeLines(t, dir, "warn.go", 200)
 
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, true, false)
@@ -40,7 +40,7 @@ func TestCheckArchStaged_OnlyChecksStaged(t *testing.T) {
 
 	dir := t.TempDir()
 	initTestGitRepo(t, dir)
-	writeGoFileWithComments(t, dir, "big.go", 300)
+	writeGoFileWithCodeLines(t, dir, "big.go", 300)
 	writeTestFile(t, dir, "small.go", "package dummy\n")
 
 	runGitCommand(t, dir, "add", "small.go")
@@ -55,7 +55,7 @@ func TestCheckArchStaged_FailsOnOversizedStaged(t *testing.T) {
 
 	dir := t.TempDir()
 	initTestGitRepo(t, dir)
-	writeGoFileWithComments(t, dir, "big.go", 300)
+	writeGoFileWithCodeLines(t, dir, "big.go", 300)
 
 	runGitCommand(t, dir, "add", "big.go")
 
@@ -119,7 +119,7 @@ func TestCheckArchWalk_SkipsSubmodule(t *testing.T) {
 		t,
 		os.WriteFile(filepath.Join(subDir, ".git"), []byte("gitdir: ../.git/modules/mysubmodule"), 0o644),
 	)
-	writeGoFileWithComments(t, subDir, "big.go", 300)
+	writeGoFileWithCodeLines(t, subDir, "big.go", 300)
 
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, true, false)
@@ -132,7 +132,7 @@ func TestCheckArchWalk_SkipsNestedGitRepository(t *testing.T) {
 	dir := t.TempDir()
 	nestedDir := filepath.Join(dir, "child-repo")
 	require.NoError(t, os.MkdirAll(filepath.Join(nestedDir, ".git"), 0o755))
-	writeGoFileWithComments(t, nestedDir, "big.go", 300)
+	writeGoFileWithCodeLines(t, nestedDir, "big.go", 300)
 
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, true, false)
@@ -146,7 +146,7 @@ func TestCheckArchWalk_SkipsRuntimeCacheDirs(t *testing.T) {
 	dir := t.TempDir()
 	cacheDir := filepath.Join(dir, ".autopus", "qa", "cache", "gopath", "pkg", "mod", "example")
 	require.NoError(t, os.MkdirAll(cacheDir, 0o755))
-	writeGoFileWithComments(t, cacheDir, "vendor_big.go", 300)
+	writeGoFileWithCodeLines(t, cacheDir, "vendor_big.go", 300)
 
 	var buf bytes.Buffer
 	result := checkArch(dir, &buf, true, false)
@@ -189,5 +189,5 @@ func TestCountLines_NonExistentFile(t *testing.T) {
 func writeSourceFileWithLines(t *testing.T, dir, name string, lines int) string {
 	t.Helper()
 
-	return writeTestFile(t, dir, name, strings.Repeat("// line\n", lines))
+	return writeTestFile(t, dir, name, strings.Repeat("let value = 1;\n", lines))
 }
