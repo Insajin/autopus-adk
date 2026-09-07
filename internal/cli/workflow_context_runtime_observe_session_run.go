@@ -33,6 +33,7 @@ func RunWorkflowContextObserveSession(
 		response.ErrorCode = workflowContextObserveSessionErrorCode(runErr)
 		response.ErrorStage = errorStage
 		response.FailedSequence = errorSequence
+		response.GateDiagnostic = workflowContextObserveSessionGateDiagnostic(runErr)
 		if err := encoder.Encode(response); err != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("observe-session error response: %w", err))
 		}

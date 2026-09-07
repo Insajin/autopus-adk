@@ -67,6 +67,10 @@ type workflowContextObserveSessionResponse struct {
 	ErrorCode                string                              `json:"error_code,omitempty"`
 	FailedSequence           int                                 `json:"failed_sequence,omitempty"`
 	ErrorStage               string                              `json:"error_stage,omitempty"`
+	// GateDiagnostic carries the cohort gate verdict (counts and basis points
+	// only, never transcript text) so a failed release canary still reports
+	// which bound the candidate missed.
+	GateDiagnostic string `json:"gate_diagnostic,omitempty"`
 }
 
 type workflowContextObserveSessionOptions struct {
@@ -92,12 +96,32 @@ type workflowContextObserveSessionOptions struct {
 	EvidenceValidFor    time.Duration
 }
 
+// workflowContextObserveSessionGatePrefix is the body-free cohort verdict
+// emitted by the promotion report validator.
+const workflowContextObserveSessionGatePrefix = "OMP context promotion cohort gates failed: "
+
+// workflowContextObserveSessionGateDiagnostic extracts the numeric gate verdict
+// from a run error, or returns "" for every other failure.
+func workflowContextObserveSessionGateDiagnostic(runErr error) string {
+	if runErr == nil {
+		return ""
+	}
+	message := runErr.Error()
+	index := strings.Index(message, workflowContextObserveSessionGatePrefix)
+	if index < 0 {
+		return ""
+	}
+	return message[index+len(workflowContextObserveSessionGatePrefix):]
+}
+
 func workflowContextObserveSessionErrorCode(runErr error) string {
 	if runErr == nil {
 		return ""
 	}
 	message := strings.ToLower(runErr.Error())
 	switch {
+	case strings.Contains(message, "cohort gates failed"):
+		return "cohort_gates_failed"
 	case strings.Contains(message, "handshake is invalid"),
 		strings.Contains(message, "shutdown is invalid"),
 		strings.Contains(message, "input continued after shutdown"),

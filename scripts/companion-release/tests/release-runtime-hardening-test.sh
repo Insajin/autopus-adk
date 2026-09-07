@@ -53,6 +53,19 @@ failure_receipt=$(canary_failure_receipt final 42 "$temp/canary-output.jsonl" 2>
 [[ "$failure_status" -eq 42 ]] || fail 'canary failure receipt did not preserve exit status'
 [[ "$failure_receipt" == *'final production canary execution failed: exit=42 transcript_records=2/42 error_code=network_transport error_stage=call failed_sequence=17'* ]] ||
   fail 'canary failure receipt omitted structured diagnostics'
+[[ "$failure_receipt" != *'gate verdict'* ]] || fail 'canary failure receipt invented a gate verdict'
+printf '%s\n' \
+  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"cohort_gates_failed","error_stage":"evidence","gate_diagnostic":"pairs=20/20 compactions=2/2 median_reduction_bp=0/2000"}' \
+  >"$temp/canary-gate.jsonl"
+gate_receipt=$(canary_failure_receipt final 1 "$temp/canary-gate.jsonl" 2>&1) || true
+[[ "$gate_receipt" == *'error_code=cohort_gates_failed error_stage=evidence'* &&
+   "$gate_receipt" == *'final production canary gate verdict: pairs=20/20 compactions=2/2 median_reduction_bp=0/2000'* ]] ||
+  fail 'canary failure receipt omitted the body-free gate verdict'
+printf '%s\n' \
+  '{"schema_version":"autopus.omp_context_observe_session_response.v1","type":"error","error_code":"cohort_gates_failed","error_stage":"evidence","gate_diagnostic":"assistant said: DROP TABLE"}' \
+  >"$temp/canary-gate-bad.jsonl"
+bad_receipt=$(canary_failure_receipt final 1 "$temp/canary-gate-bad.jsonl" 2>&1) || true
+[[ "$bad_receipt" != *'gate verdict'* ]] || fail 'canary failure receipt echoed a non-numeric diagnostic'
 git clone -q --no-hardlinks --no-tags "$repo" "$temp/source"
 git -C "$temp/source" config user.name 'Release Test'
 git -C "$temp/source" config user.email release-test@example.invalid

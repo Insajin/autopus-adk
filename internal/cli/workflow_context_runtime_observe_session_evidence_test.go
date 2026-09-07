@@ -118,6 +118,13 @@ func TestWorkflowContextObserveSession_WritesBodyFreeErrorFrame(t *testing.T) {
 	assert.Equal(t, "runtime_failed", workflowContextObserveSessionErrorCode(
 		fmt.Errorf("observe-session call 6 failed closed: managed active OMP transcript image is invalid"),
 	))
+	gateErr := fmt.Errorf("observe-session evidence: %w", fmt.Errorf(
+		"OMP context promotion cohort gates failed: pairs=20/20 compactions=2/2 median_reduction_bp=0/2000"))
+	assert.Equal(t, "cohort_gates_failed", workflowContextObserveSessionErrorCode(gateErr))
+	assert.Equal(t, "pairs=20/20 compactions=2/2 median_reduction_bp=0/2000",
+		workflowContextObserveSessionGateDiagnostic(gateErr))
+	assert.Empty(t, workflowContextObserveSessionGateDiagnostic(err))
+	assert.Empty(t, responses[0].GateDiagnostic)
 }
 
 func TestWorkflowContextObserveSessionHelp_DocumentsExplicitLiveLoopbackCanary(t *testing.T) {

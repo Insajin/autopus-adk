@@ -104,22 +104,28 @@ capture_canary_progress() {
 }
 canary_failure_receipt() {
   local label=$1 canary_status=$2 output=$3 transcript_records failure_fields
-  local failure_code failure_stage failed_sequence
+  local failure_code failure_stage failed_sequence gate_diagnostic
   if [[ ! "$canary_status" =~ ^[1-9][0-9]*$ ]] || (( canary_status > 255 )); then canary_status=1; fi
   transcript_records=$(wc -l <"$output" | tr -d ' ')
   [[ "$transcript_records" =~ ^[0-9]+$ ]] || transcript_records=unknown
   failure_fields=$(jq -s -r \
     '[.[] | select(.type? == "error")] | if length == 0 then
-       ["unclassified", "unknown", "0"] else
+       ["unclassified", "unknown", "0", ""] else
        [(.[-1].error_code? // "unclassified"), (.[-1].error_stage? // "unknown"),
-        ((.[-1].failed_sequence? // 0) | tostring)] end | @tsv' "$output" 2>/dev/null) ||
-    failure_fields=$'unparseable\tunknown\t0'
-  IFS=$'\t' read -r failure_code failure_stage failed_sequence <<<"$failure_fields"
+        ((.[-1].failed_sequence? // 0) | tostring), (.[-1].gate_diagnostic? // "")] end | @tsv' "$output" 2>/dev/null) ||
+    failure_fields=$'unparseable\tunknown\t0\t'
+  IFS=$'\t' read -r failure_code failure_stage failed_sequence gate_diagnostic <<<"$failure_fields"
   [[ "$failure_code" =~ ^[A-Za-z0-9_.:-]{1,128}$ ]] || failure_code=unparseable
   [[ "$failure_stage" =~ ^[a-z]{1,32}$ ]] || failure_stage=unknown
   [[ "$failed_sequence" =~ ^[0-9]+$ ]] || failed_sequence=0
+  # The gate verdict is counts and basis points by construction; anything else
+  # is dropped rather than echoed. (bash 3.2 rejects {n,m} after a bracket
+  # expression, hence the separate length bound.)
+  [[ ${#gate_diagnostic} -le 400 && "$gate_diagnostic" =~ ^[a-z_=/0-9[:space:]]*$ ]] || gate_diagnostic=''
   printf 'companion release prep: %s production canary execution failed: exit=%s transcript_records=%s/42 error_code=%s error_stage=%s failed_sequence=%s\n' \
     "$label" "$canary_status" "$transcript_records" "$failure_code" "$failure_stage" "$failed_sequence" >&2
+  [[ -z "$gate_diagnostic" ]] ||
+    printf 'companion release prep: %s production canary gate verdict: %s\n' "$label" "$gate_diagnostic" >&2
   return "$canary_status"
 }
 
