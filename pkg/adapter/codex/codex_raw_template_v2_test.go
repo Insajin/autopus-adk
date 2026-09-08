@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/insajin/autopus-adk/pkg/config"
 	"github.com/insajin/autopus-adk/templates"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -13,7 +14,7 @@ func TestCodexRawCollaborationTemplates_HaveNoLegacyResiduals(t *testing.T) {
 	t.Parallel()
 	bodies := map[string]string{
 		"agent-pipeline":       codexAgentPipelineSkillBody(),
-		"agent-teams-native":   codexAgentTeamsSkillBody(),
+		"agent-teams-native":   codexAgentTeamsSkillBody(config.CodexAgentConcurrencyDefault),
 		"worktree-isolation":   codexWorktreeIsolationSkillBody(),
 		"subagent-development": codexSubagentDevSkillBody(),
 	}

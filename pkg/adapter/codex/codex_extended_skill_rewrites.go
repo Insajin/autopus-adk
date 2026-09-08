@@ -1,11 +1,18 @@
 package codex
 
-import "strings"
+import (
+	"strings"
 
-func normalizeCodexExtendedSkill(name, body string) string {
+	"github.com/insajin/autopus-adk/pkg/config"
+)
+
+// normalizeCodexExtendedSkill replaces a shared skill body with the Codex
+// native rewrite. cfg supplies the project's own settings so the installed
+// skill states the configured worker ceiling instead of a literal default.
+func normalizeCodexExtendedSkill(name, body string, cfg *config.HarnessConfig) string {
 	switch name {
 	case "agent-teams":
-		return strings.TrimSpace(codexAgentTeamsSkillBody()) + "\n"
+		return strings.TrimSpace(codexAgentTeamsSkillBody(cfg.CodexAgentConcurrency())) + "\n"
 	case "agent-pipeline":
 		return strings.TrimSpace(codexAgentPipelineSkillBody()) + "\n"
 	case "worktree-isolation":

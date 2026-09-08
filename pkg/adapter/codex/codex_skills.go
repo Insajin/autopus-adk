@@ -68,6 +68,7 @@ var agentsMDTemplate = `# Autopus-ADK Harness
 
 {{if contains (join ", " .Platforms) "codex"}}- **Codex Invocation**: use ` + "`@auto <route> ...`" + ` or ` + "`$codex-auto <route> ...`" + `; load detailed ` + "`$codex-auto-<route>`" + ` and ` + "`$codex-<skill>`" + ` skills.
 - **Codex V2**: use only spawn_agent, send_message, followup_task, target-less wait_agent, interrupt_agent, and list_agents.
+- **Codex Concurrency**: the spawned-worker ceiling is ` + "`codex.agents.max_concurrent_threads`" + ` in ` + "`autopus.yaml`" + `; it counts spawned agents only, never the coordinator. It is a request: provider/account/host limits win, a change applies to a new session, and a successful config write is not proof of added capacity. Run ` + "`auto doctor`" + ` for requested/loaded/effective. Heavy local test and build concurrency is not governed by this value.
 - **Codex Shared Workspace**: every worker uses the same cwd/filesystem. Parallel writers require disjoint write ownership; overlapping writers run sequentially.
 - **Codex --auto**: ` + "`@auto ... --auto`" + ` explicitly approves the default subagent pipeline.
 - **Codex /goal**: use the native Codex goals feature; ` + "`@auto goal`" + ` is only a thin wrapper.

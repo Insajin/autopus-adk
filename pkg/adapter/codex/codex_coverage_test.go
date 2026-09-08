@@ -29,8 +29,9 @@ func TestRenderExtendedSkills(t *testing.T) {
 
 func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	t.Parallel()
+	cfg := config.DefaultFullConfig("rewrite-project")
 
-	teams := normalizeCodexExtendedSkill("agent-teams", "placeholder")
+	teams := normalizeCodexExtendedSkill("agent-teams", "placeholder", cfg)
 	assert.Contains(t, teams, "Codex Multi-Agent V2 Team Skill")
 	assert.Contains(t, teams, "same shared cwd and filesystem")
 	assert.Contains(t, teams, "Lead")
@@ -40,7 +41,7 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	assert.NotContains(t, teams, "SendMessage")
 	assert.NotContains(t, teams, "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS")
 
-	pipeline := normalizeCodexExtendedSkill("agent-pipeline", "placeholder")
+	pipeline := normalizeCodexExtendedSkill("agent-pipeline", "placeholder", cfg)
 	assert.Contains(t, pipeline, "@auto go")
 	assert.Contains(t, pipeline, "spawn_agent")
 	assert.Contains(t, pipeline, "explicit approval")
@@ -60,14 +61,14 @@ func TestNormalizeCodexExtendedSkill_RewritesSpecialSkills(t *testing.T) {
 	assert.NotContains(t, pipeline, "bypassPermissions")
 	assert.NotContains(t, pipeline, "auto permission detect")
 
-	worktree := normalizeCodexExtendedSkill("worktree-isolation", "placeholder")
+	worktree := normalizeCodexExtendedSkill("worktree-isolation", "placeholder", cfg)
 	assert.Contains(t, worktree, "shared cwd and filesystem")
 	assert.Contains(t, worktree, "disjoint write ownership")
 	assert.Contains(t, worktree, "owned_paths")
 	assert.Contains(t, worktree, "next_required_step")
 	assert.NotContains(t, worktree, "forked workspace")
 
-	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:")
+	prd := normalizeCodexExtendedSkill("prd", "사용자 입력이 불충분할 경우 AskUserQuestion으로 확인:", cfg)
 	assert.NotContains(t, prd, "AskUserQuestion")
 	assert.Contains(t, prd, "request_user_input")
 	assert.Contains(t, prd, "plain-text")

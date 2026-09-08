@@ -32,6 +32,9 @@ type jsonCheck struct {
 	Severity string `json:"severity,omitempty"`
 	Status   string `json:"status"`
 	Detail   string `json:"detail"`
+	// Fields carries the check's structured readings when a single detail
+	// sentence cannot be consumed programmatically.
+	Fields map[string]string `json:"fields,omitempty"`
 }
 
 type jsonErrorPayload struct {
@@ -181,7 +184,19 @@ func sanitizeJSONChecks(checks []jsonCheck) []jsonCheck {
 			Severity: check.Severity,
 			Status:   check.Status,
 			Detail:   sanitizeJSONString("", check.Detail),
+			Fields:   sanitizeJSONCheckFields(check.Fields),
 		})
+	}
+	return out
+}
+
+func sanitizeJSONCheckFields(fields map[string]string) map[string]string {
+	if len(fields) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(fields))
+	for key, value := range fields {
+		out[key] = sanitizeJSONString(key, value)
 	}
 	return out
 }

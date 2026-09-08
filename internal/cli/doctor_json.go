@@ -126,6 +126,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	report.collectDesktopShimCheck(diagnoseDesktopShim())
 	report.collectQualityGateChecks(cfg)
 	report.collectCodexModelOwnershipCheck(opts.dir, cfg)
+	report.collectCodexAgentConcurrencyCheck(opts.dir, cfg)
 	report.collectProviderTransportSmokeChecks(cfg, opts)
 	if configuresClaudeCode(cfg) {
 		report.collectHookChecks(opts.dir)

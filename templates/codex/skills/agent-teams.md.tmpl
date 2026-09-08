@@ -4,7 +4,7 @@ Use `@auto go SPEC-ID --team` or `$codex-auto-go SPEC-ID --team`.
 
 ## Native Binding
 
-Codex 0.149.1 exposes exactly these collaboration tools:
+The Multi-Agent V2 surface exposes exactly these collaboration tools:
 
 - `spawn_agent(task_name, message, ...)`
 - `send_message(...)`
@@ -12,6 +12,19 @@ Codex 0.149.1 exposes exactly these collaboration tools:
 - target-less `wait_agent()`
 - `interrupt_agent(...)`
 - `list_agents()`
+
+## Concurrency
+
+Team mode needs `[features.multi_agent_v2]` with `enabled = true`. The worker
+ceiling is a separate setting: `codex.agents.max_concurrent_threads` in
+`autopus.yaml`, which Autopus writes into the project `.codex/config.toml` as
+the documented `[agents]` table key.
+
+The ceiling counts spawned workers only; the coordinator is the primary thread
+and is not counted. Provider, account, and host limits win over the requested
+value, a change applies to a new session, and a successful config write is not
+evidence of added capacity. Local resource-heavy test and build jobs are not
+governed by this value.
 
 All workers use the same shared cwd and filesystem. Context forking changes
 conversation history only. It does not create another checkout, worktree, or

@@ -3,6 +3,8 @@ package codex
 import (
 	"fmt"
 	"strings"
+
+	"github.com/insajin/autopus-adk/pkg/codexruntime"
 )
 
 var codexManagedConfigKeys = map[string]map[string]bool{
@@ -14,15 +16,25 @@ var codexManagedConfigKeys = map[string]map[string]bool{
 	"features": {
 		"goals": true, "hooks": true, "shell_tool": true, "unified_exec": true,
 	},
+	// The undocumented features.multi_agent_v2 ceiling stays managed even though
+	// no render emits it any more: that is what drops it from a file an older
+	// Autopus wrote, leaving the documented [agents] key as the only ceiling.
 	"features.multi_agent_v2": {
-		"enabled": true, "max_concurrent_threads_per_session": true,
+		"enabled": true, codexruntime.AgentConcurrencyKey: true,
 	},
+	"agents":                           {codexruntime.AgentConcurrencyKey: true},
 	`plugins."browser@openai-bundled"`: {"enabled": true},
 	"mcp_servers.context7":             {"command": true, "args": true},
 }
+
+// max_threads is the documented legacy alias of the key Autopus emits, so
+// carrying both would leave two ceilings that can disagree in one file with no
+// documented winner. max_depth and job_max_runtime_seconds are keys the old
+// Autopus template wrote and no render emits; codex-cli 0.153.4 still parses
+// them, so they are removed as stale harness output rather than as dead keys.
 var codexObsoleteConfigKeys = map[string]map[string]bool{
 	"agents": {
-		"max_threads": true, "max_depth": true, "job_max_runtime_seconds": true,
+		codexruntime.LegacyAgentConcurrencyAliasKey: true, "max_depth": true, "job_max_runtime_seconds": true,
 	},
 	"features": {"multi_agent": true},
 }
@@ -98,7 +110,10 @@ func mergeCodexConfig(existing, rendered string) (string, error) {
 
 	present := collectCodexSections(existing)
 	for _, name := range managedCodexSectionOrder() {
-		if name == "" || present[name] {
+		// A managed section the current render left empty must not be written:
+		// a table Autopus no longer emits any key for would land as a bare,
+		// meaningless header.
+		if name == "" || present[name] || len(managed[name]) == 0 {
 			continue
 		}
 		if len(result) > 0 && strings.TrimSpace(result[len(result)-1]) != "" {
@@ -131,7 +146,10 @@ func collectManagedCodexConfig(content string) map[string][]codexConfigEntry {
 }
 
 func managedCodexSectionOrder() []string {
-	return []string{"", "features", "features.multi_agent_v2", `plugins."browser@openai-bundled"`, "mcp_servers.context7"}
+	return []string{
+		"", "features", "features.multi_agent_v2", "agents",
+		`plugins."browser@openai-bundled"`, "mcp_servers.context7",
+	}
 }
 
 func collectCodexSections(content string) map[string]bool {

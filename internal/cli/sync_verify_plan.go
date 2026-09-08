@@ -32,6 +32,19 @@ func renderPlan(out io.Writer, phaseA []phaseGroup, phaseB phaseGroup) {
 	fmt.Fprintln(out, loreReminderLine)
 }
 
+// renderSingleRepoPlan writes the single-repo commit plan. There is no module
+// boundary to split on, so every classified candidate shares one commit group;
+// blocked and unclassified paths stay in the warning block as in a workspace.
+func renderSingleRepoPlan(out io.Writer, group phaseGroup) {
+	fmt.Fprintln(out, "Commit candidates:")
+	if len(group.Files) == 0 {
+		fmt.Fprintln(out, "  (no changes)")
+		return
+	}
+	renderGroupActions(out, group)
+	fmt.Fprintln(out, loreReminderLine)
+}
+
 func renderGroupActions(out io.Writer, group phaseGroup) {
 	if len(group.AddFiles) > 0 {
 		fmt.Fprintf(out, "  git -C %s add -- %s\n", group.RepoPath, strings.Join(group.AddFiles, " "))

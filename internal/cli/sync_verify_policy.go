@@ -29,9 +29,10 @@ var rootTrackedPrefixes = []string{
 }
 
 var generatedRuntimeExact = map[string]bool{
-	".agents/plugins/marketplace.json": true,
-	".autopus/context/signatures.md":   true,
-	"config.toml":                      true,
+	".agents/plugins/marketplace.json":      true,
+	".autopus/context/signatures.md":        true,
+	".autopus/claude-code-permissions.json": true,
+	"config.toml":                           true,
 }
 
 var generatedRuntimePrefixes = []string{
@@ -53,6 +54,7 @@ var generatedRuntimePrefixes = []string{
 	".codex/",
 	".gemini/",
 	".opencode/",
+	".omp/",
 }
 
 var safePlanSegment = regexp.MustCompile(`^[A-Za-z0-9._+,-]+$`)

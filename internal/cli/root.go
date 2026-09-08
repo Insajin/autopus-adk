@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -153,6 +154,20 @@ func newVersionCmd() *cobra.Command {
 	return cmd
 }
 
+// exitCoder lets a command pick the process exit code, so a caller can tell
+// failure classes apart without parsing error text.
+type exitCoder interface{ ExitCode() int }
+
+// exitCodeForError maps a command error to its process exit code. Anything
+// that does not claim a code is an ordinary failure and exits 1.
+func exitCodeForError(err error) int {
+	var coder exitCoder
+	if errors.As(err, &coder) {
+		return coder.ExitCode()
+	}
+	return 1
+}
+
 // Execute runs the CLI.
 func Execute() {
 	// Initialize styles with NO_COLOR guard for non-TTY environments.
@@ -160,10 +175,11 @@ func Execute() {
 	tui.InitStyles()
 
 	if err := NewRootCmd().Execute(); err != nil {
+		code := exitCodeForError(err)
 		if isJSONFatalError(err) {
-			os.Exit(1)
+			os.Exit(code)
 		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		os.Exit(code)
 	}
 }

@@ -174,8 +174,6 @@ func TestGenerateConfig_DefaultSupervisorPolicyInheritsCodexRuntimeModel(t *test
 
 	assert.NotContains(t, rootSection, "\nmodel =")
 	assert.NotContains(t, rootSection, "model_reasoning_effort")
-	assert.Contains(t, string(files[0].Content), "[features.multi_agent_v2]")
-	assert.NotContains(t, string(files[0].Content), "[agents]")
 }
 
 func TestPrepareConfigFile_NoDiskWrite(t *testing.T) {
@@ -293,5 +291,6 @@ enabled = true
 		messages[e.Message] = true
 	}
 	assert.True(t, messages["Codex goals feature가 enabled 상태가 아님"])
-	assert.True(t, messages["Codex multi_agent_v2 feature 또는 session concurrency 설정이 올바르지 않음"])
+	assert.True(t, messages["Codex multi_agent_v2 feature가 enabled 상태가 아님"])
+	assert.True(t, messages["Codex agent concurrency 설정이 없음: 'auto update' 실행 필요"])
 }

@@ -1,6 +1,6 @@
 package codex
 
-// @AX:NOTE [AUTO]: the hardcoded 0.149.1 contract records the exact six-tool Multi-Agent V2 surface; update it with native collaboration schema changes.
+// @AX:NOTE [AUTO]: the six-tool Multi-Agent V2 surface is a contract, not a release note; update it with native collaboration schema changes.
 func codexAgentPipelineSkillBody() string {
 	return `
 # Agent Pipeline Skill
@@ -57,7 +57,7 @@ Treat the main session as a state-machine supervisor, not a passive router.
 - Do not treat subagents as autonomous teammates that negotiate among themselves.
 ### Multi-Agent V2 Collaboration
 
-Codex 0.149.1 exposes exactly ` + "`spawn_agent`" + `, ` + "`send_message`" + `, ` + "`followup_task`" + `, target-less ` + "`wait_agent()`" + `, ` + "`interrupt_agent`" + `, and ` + "`list_agents`" + `.
+The Multi-Agent V2 surface exposes exactly ` + "`spawn_agent`" + `, ` + "`send_message`" + `, ` + "`followup_task`" + `, target-less ` + "`wait_agent()`" + `, ` + "`interrupt_agent`" + `, and ` + "`list_agents`" + `.
 All workers use the same shared cwd and filesystem. Parallel writers require disjoint write ownership; overlapping writers run sequentially.
 ## Prompt Layer Discipline
 

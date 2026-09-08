@@ -55,11 +55,11 @@ func classifyWorkspace(repos []repoDirty) workspaceClassification {
 				result.Blocked = append(result.Blocked, partitionedPath{repo.Path, rel, "generated/runtime"})
 			case !isSafeRepoPath(repo.Path) || !isSafePlanPath(rel):
 				result.Unclassified = append(result.Unclassified, partitionedPath{repo.Path, rel, "unsafe-plan-path"})
-			case repo.IsRoot && isRootTracked(rel):
+			case repo.Role == repoRoleMeta && isRootTracked(rel):
 				candidates = append(candidates, rel)
-			case repo.IsRoot:
+			case repo.Role == repoRoleMeta:
 				result.Unclassified = append(result.Unclassified, partitionedPath{repo.Path, rel, "outside canonical root keep set"})
-			case strings.HasPrefix(rel, ".autopus/project/"):
+			case repo.Role == repoRoleModule && strings.HasPrefix(rel, ".autopus/project/"):
 				result.Unclassified = append(result.Unclassified, partitionedPath{repo.Path, rel, "root-scoped meta path in module"})
 			default:
 				candidates = append(candidates, rel)
@@ -67,7 +67,7 @@ func classifyWorkspace(repos []repoDirty) workspaceClassification {
 		}
 		sort.Strings(candidates)
 		group := buildPhaseGroup(repo.Path, candidates, dirtyByPath)
-		if repo.IsRoot {
+		if repo.isRoot() {
 			result.PhaseB = group
 		} else if len(candidates) > 0 {
 			result.PhaseA = append(result.PhaseA, group)
@@ -151,7 +151,7 @@ func detectMixing(repos []repoDirty) []string {
 func detectMisplacedMeta(repos []repoDirty) []string {
 	var warnings []string
 	for _, repo := range repos {
-		if repo.IsRoot {
+		if repo.isRoot() {
 			continue
 		}
 		var misplaced []string

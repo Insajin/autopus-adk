@@ -136,6 +136,11 @@ func DefaultFullConfig(projectName string) *HarnessConfig {
 				},
 			},
 		},
+		// Written explicitly so the knob is visible in a fresh autopus.yaml;
+		// a file that omits it keeps resolving to the same default.
+		Codex: CodexConf{
+			Agents: CodexAgentsConf{MaxConcurrentThreads: CodexAgentConcurrencyDefault},
+		},
 		Skills: SkillsConf{
 			AutoActivate:    true,
 			MaxActiveSkills: 5,

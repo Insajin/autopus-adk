@@ -30,14 +30,18 @@ func (a *Adapter) prepareCodexCatalog(ctx context.Context) {
 	a.codexCatalogJSON = output
 }
 
+// codexRenderData always answers with the context so a template can reach
+// adapter-owned runtime facts (probed catalog, probed CLI version). Profile
+// methods below fall back to the plain config values when the catalog was
+// never probed, which is what the template saw before the context existed.
 func (a *Adapter) codexRenderData(cfg *config.HarnessConfig) any {
-	if !a.codexCatalogProbed {
-		return cfg
-	}
 	return codexRenderContext{HarnessConfig: cfg, adapter: a}
 }
 
 func (c codexRenderContext) CodexSupervisorModel() string {
+	if !c.adapter.codexCatalogProbed {
+		return c.HarnessConfig.CodexSupervisorModel()
+	}
 	if !c.Quality.ManagesSupervisorModel() {
 		return ""
 	}
@@ -45,6 +49,9 @@ func (c codexRenderContext) CodexSupervisorModel() string {
 }
 
 func (c codexRenderContext) CodexSupervisorEffort() string {
+	if !c.adapter.codexCatalogProbed {
+		return c.HarnessConfig.CodexSupervisorEffort()
+	}
 	if !c.Quality.ManagesSupervisorModel() {
 		return ""
 	}
@@ -54,8 +61,12 @@ func (c codexRenderContext) CodexSupervisorEffort() string {
 // CodexAgentModel and CodexAgentEffort answer the agent TOML templates. Both
 // return an error so a catalog that rejects the native balanced placement stops
 // template execution, and with it the whole surface preparation, before any
-// mapping reaches the transaction.
+// mapping reaches the transaction. Without a probed catalog there is nothing to
+// resolve against, so both answer with the desired profile as declared.
 func (c codexRenderContext) CodexAgentModel(agentName, fallbackTier, declaredEffort string) (string, error) {
+	if !c.adapter.codexCatalogProbed {
+		return c.HarnessConfig.CodexAgentModel(agentName, fallbackTier, declaredEffort), nil
+	}
 	resolution, err := c.resolveAgent(agentName, fallbackTier, declaredEffort)
 	if err != nil {
 		return "", err
@@ -64,6 +75,9 @@ func (c codexRenderContext) CodexAgentModel(agentName, fallbackTier, declaredEff
 }
 
 func (c codexRenderContext) CodexAgentEffort(agentName, fallbackTier, declaredEffort string) (string, error) {
+	if !c.adapter.codexCatalogProbed {
+		return c.HarnessConfig.CodexAgentEffort(agentName, fallbackTier, declaredEffort), nil
+	}
 	resolution, err := c.resolveAgent(agentName, fallbackTier, declaredEffort)
 	if err != nil {
 		return "", err

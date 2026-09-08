@@ -58,7 +58,7 @@ func (a *Adapter) prepareSkillTemplateMappings(cfg *config.HarnessConfig) ([]ada
 			rendered = string(tmplContent)
 		}
 
-		rendered = normalizeCodexExtendedSkill(skillName, rendered)
+		rendered = normalizeCodexExtendedSkill(skillName, rendered, cfg)
 		rendered = ensureCodexSkillFrontmatter(
 			codexProjectSkillPath(skillName),
 			skillName,

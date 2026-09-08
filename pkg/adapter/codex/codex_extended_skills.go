@@ -56,7 +56,7 @@ func (a *Adapter) renderExtendedSkills(cfg *config.HarnessConfig) ([]adapter.Fil
 			strings.HasPrefix(filepath.ToSlash(state.TargetPath), ".codex/skills/") {
 			continue
 		}
-		content := normalizeCodexExtendedSkill(s.Name, s.Content)
+		content := normalizeCodexExtendedSkill(s.Name, s.Content, cfg)
 		content = normalizeCodexInvocationBody(content)
 		content = normalizeCodexHelperPaths(content)
 		content = normalizeCodexToolingBody(content)

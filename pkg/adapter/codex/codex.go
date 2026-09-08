@@ -27,6 +27,8 @@ type Adapter struct {
 	engine              *tmpl.Engine
 	codexCatalogProbed  bool
 	codexCatalogJSON    []byte
+	codexVersionProbed  bool
+	codexVersion        string
 	codexFallbackWriter io.Writer
 	codexFallbackSeen   map[string]struct{}
 }
@@ -39,6 +41,16 @@ func WithModelCatalog(catalogJSON []byte) Option {
 	return func(a *Adapter) {
 		a.codexCatalogProbed = true
 		a.codexCatalogJSON = append([]byte(nil), catalogJSON...)
+	}
+}
+
+// WithCLIVersion pins the `codex --version` response instead of probing the
+// CLI. An empty version marks the release as probed but unreadable, which is
+// how the generation path expresses "namespace chosen from documentation".
+func WithCLIVersion(version string) Option {
+	return func(a *Adapter) {
+		a.codexVersionProbed = true
+		a.codexVersion = version
 	}
 }
 
@@ -86,6 +98,7 @@ func (a *Adapter) applyPreparedFiles(
 	cfg *config.HarnessConfig,
 ) (*adapter.PlatformFiles, error) {
 	a.prepareCodexCatalog(ctx)
+	a.prepareCodexVersion(ctx)
 	oldManifest, err := adapter.LoadManifest(a.root, adapterName)
 	if err != nil {
 		return nil, fmt.Errorf("매니페스트 로드 실패: %w", err)

@@ -74,6 +74,7 @@ type HarnessConfig struct {
 	Session          SessionConf          `yaml:"session,omitempty"`
 	Orchestra        OrchestraConf        `yaml:"orchestra,omitempty"`
 	Quality          QualityConf          `yaml:"quality,omitempty"`
+	Codex            CodexConf            `yaml:"codex,omitempty"`
 	RoleModelPolicy  RoleModelPolicyConf  `yaml:"role_model_policy,omitempty"`
 	OMPContextPolicy OMPContextPolicyConf `yaml:"omp_context_policy,omitempty"`
 	Skills           SkillsConf           `yaml:"skills,omitempty"`
@@ -274,6 +275,9 @@ func (c *HarnessConfig) Validate() error {
 		return err
 	}
 	if err := c.Verify.Validate(); err != nil {
+		return err
+	}
+	if err := c.Codex.Validate(); err != nil {
 		return err
 	}
 	return nil

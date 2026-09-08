@@ -434,6 +434,8 @@ Codex 참고:
 - `.agents/plugins/marketplace.json`에 등록된 로컬 플러그인(`.autopus/plugins/auto`)을 설치하면 `@auto ...` 문법도 사용할 수 있습니다
 - 플러그인은 `@auto ...` 라우터만 제공합니다. 상세 워크플로는 `.codex/skills/codex-<name>/SKILL.md`에 고유한 네이티브 스킬로 생성하며, 저장소 안에 `.codex/prompts/`나 Markdown `.codex/rules/`를 만들지 않습니다
 - 멀티에이전트 모드는 `[features.multi_agent_v2]`와 현재의 협업 도구 6개를 사용합니다. 모든 worker가 같은 cwd와 파일시스템을 공유하며, 기존 `send_input`, `resume_agent`, `close_agent`는 사용하지 않습니다
+- 요청할 작업 에이전트 수는 `autopus.yaml`의 `codex.agents.max_concurrent_threads`로 설정합니다(기본 4, 범위 1–64). 주 에이전트는 포함하지 않습니다. `auto update`가 이 값을 `.codex/config.toml`에 반영하며, 명시한 값은 재생성 후에도 유지됩니다. CLI 호환성을 확인하지 못한 버전에는 문서화된 `[agents] max_concurrent_threads_per_session`을 사용하고 그 가정을 표시합니다. 실제 실행에서는 호스트와 계정의 제한이 우선합니다.
+- `auto doctor`는 요청한 수, 디스크에서 확인한 설정, 실행 중인 세션이 읽은 값, 실제 적용 한도를 구분합니다. 설정 파일을 읽었다고 활성 세션이 그 값을 적용했다고 간주하지 않으며, 관측할 수 없는 세션 값은 이유와 함께 `unknown`으로 표시합니다. 설정을 바꾼 뒤에는 새 세션을 시작해야 합니다. 활성 에이전트를 자동으로 중단하지 않으며, 이 값으로 로컬 빌드·테스트 동시 실행 수를 제어하지 않습니다.
 - `.codex/hooks.json`은 기본으로 생성하고, `.codex/config.toml`은 관련 없는 사용자 설정을 보존하도록 구조적으로 병합합니다
 
 OpenCode 참고:
@@ -1201,7 +1203,7 @@ SPEC 상태 업데이트, 프로젝트 문서 재생성, @AX 태그 라이프사
 auto sync verify --spec SPEC-HOOK-001 --strict
 ```
 
-멀티 리포 동기화를 커밋하기 전에 `auto sync verify`로 read-only Phase A/Phase B 스테이징 계획을 확인합니다. generated/runtime, tracked-but-ignored, 미분류, 셸에서 안전하지 않은 경로는 계획에서 제외합니다. `--spec`은 SPEC 호스트가 정확히 하나인지 확인한 뒤 워크스페이스 상대 경로 가운데 해당 SPEC이 소유한 파일만 남깁니다. `--strict`는 제외되거나 무관한 경로가 하나라도 있으면 실패합니다.
+커밋하기 전에 `auto sync verify`로 read-only 스테이징 계획을 확인합니다. 명령은 감지한 토폴로지를 함께 출력합니다. 멀티 리포 워크스페이스는 Phase A(모듈)와 Phase B(메타)로 나뉘고, `autopus.yaml`을 가진 단일 Git 리포지터리는 linked worktree를 포함해 커밋 그룹 하나로 묶입니다. 두 토폴로지 모두 generated/runtime, tracked-but-ignored, 미분류, 셸에서 안전하지 않은 경로를 계획에서 제외하며, 둘 중 어디에도 해당하지 않는 위치는 별도 종료 코드와 함께 `unsupported topology:` 진단으로 실패합니다. `--spec`은 SPEC 호스트가 정확히 하나인지 확인한 뒤 워크스페이스 상대 경로 가운데 해당 SPEC이 소유한 파일만 남깁니다. `--strict`는 제외되거나 무관한 경로가 하나라도 있으면 실패합니다.
 
 ```
 ╭────────────────────────────────────╮
@@ -1303,7 +1305,7 @@ auto sync verify --spec SPEC-HOOK-001 --strict
 | `/auto secure` | OWASP Top 10 보안 감사 |
 | `/auto map` | 코드베이스 구조 분석 |
 | `/auto sync SPEC-ID` | 구현 후 문서 동기화 |
-| `auto sync verify [--spec SPEC-ID] [--strict]` | 읽기 전용 fail-closed 멀티 리포 커밋 계획 |
+| `auto sync verify [--spec SPEC-ID] [--strict]` | 읽기 전용 fail-closed 커밋 계획. 단일 리포는 그룹 1개, 멀티 리포 워크스페이스는 Phase A/B |
 | `auto spec change SPEC-ID --class small_ui --ac AC-001 --surface path` | 저위험 작업용 짧은 변경 계약. 고위험 클래스는 정식 SPEC으로 escalate |
 | `auto spec gates SPEC-ID --change-class small_ui --json` | gate별 `required/not_applicable/blocked` 판정과 이유 |
 | `auto spec review SPEC-ID --single-pass` | provider round 1회. receipt에 `loop_status`·`blocking_reasons` 기록 |

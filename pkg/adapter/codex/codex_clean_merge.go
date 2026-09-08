@@ -200,8 +200,13 @@ func removeAutopusCodexConfig(content string) string {
 	return strings.TrimSpace(strings.Join(result, "\n")) + "\n"
 }
 
+// isAutopusOnlyCodexSection names the sections whose header Clean removes once
+// no user assignment is left in them. [agents] qualifies because Autopus is
+// what creates it: a user's own scalars there keep the header (they count as
+// user values) and per-role [agents.<name>] tables are separate sections.
 func isAutopusOnlyCodexSection(section string) bool {
 	return section == "features.multi_agent_v2" ||
+		section == "agents" ||
 		section == `plugins."browser@openai-bundled"` ||
 		section == "mcp_servers.context7"
 }

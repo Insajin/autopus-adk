@@ -8,13 +8,31 @@ import (
 	"github.com/insajin/autopus-adk/pkg/setup"
 )
 
+// repoRole selects the partition policy a repository's dirty paths follow.
+type repoRole int
+
+const (
+	// repoRoleMeta is the root of a multi-repo workspace: only canonical root
+	// documents may be committed there.
+	repoRoleMeta repoRole = iota
+	// repoRoleModule is a nested repository inside a multi-repo workspace.
+	repoRoleModule
+	// repoRoleSingle is a whole single-repository project. It carries product
+	// code and root documents together, so the canonical root keep set — which
+	// exists to push code out of a meta repo — does not apply.
+	repoRoleSingle
+)
+
 type repoDirty struct {
 	Path           string
 	AbsPath        string
-	IsRoot         bool
+	Role           repoRole
 	Files          []dirtyFile
 	TrackedIgnored []string
 }
+
+// isRoot reports whether the repository owns the workspace root path ".".
+func (r repoDirty) isRoot() bool { return r.Role != repoRoleModule }
 
 func resolveMetaRoot(startDir string) (string, error) {
 	abs, err := filepath.Abs(startDir)
@@ -75,14 +93,16 @@ func collectDirty(metaRoot string) ([]repoDirty, error) {
 		if err != nil {
 			return nil, fmt.Errorf("malformed tracked-but-ignored inventory for repo %s", diagnosticRepoLabel(component.Path))
 		}
+		role := repoRoleModule
 		if component.Path == "." {
+			role = repoRoleMeta
 			files = filterNestedRepoEntries(files, nested)
 			ignored = filterNestedPaths(ignored, nested)
 		}
 		repos = append(repos, repoDirty{
 			Path:           component.Path,
 			AbsPath:        component.AbsPath,
-			IsRoot:         component.Path == ".",
+			Role:           role,
 			Files:          files,
 			TrackedIgnored: ignored,
 		})
@@ -141,7 +161,7 @@ func belongsToNestedRepo(rel string, nested map[string]bool) bool {
 func moduleSet(repos []repoDirty) map[string]bool {
 	modules := map[string]bool{}
 	for _, repo := range repos {
-		if !repo.IsRoot {
+		if !repo.isRoot() {
 			modules[repo.Path] = true
 		}
 	}

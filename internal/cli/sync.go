@@ -19,8 +19,9 @@ var errSyncVerifyStrict = errors.New("sync verify: violations reported under --s
 func newSyncCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Multi-repo sync helpers (2-phase commit planning)",
-		Long:  "Read-only helpers for the multi-repo two-phase (module Phase A / meta Phase B) sync workflow.",
+		Short: "Sync helpers (commit planning)",
+		Long: "Read-only helpers for the sync workflow: single-repo commit planning and the " +
+			"multi-repo two-phase (module Phase A / meta Phase B) plan.",
 	}
 	cmd.AddCommand(newSyncVerifyCmd())
 	return cmd
@@ -36,9 +37,11 @@ func newSyncVerifyCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "verify",
-		Short: "Verify the deterministic 2-phase commit plan (read-only)",
-		Long: "Classify dirty files across the workspace root and nested repos into a deterministic " +
-			"Phase A / Phase B commit plan, warn on boundary violations, and never mutate any repo.",
+		Short: "Verify the deterministic commit plan (read-only)",
+		Long: "Classify every dirty path into a deterministic commit plan, warn on boundary " +
+			"violations, and never mutate any repo. A multi-repo workspace is split into Phase A " +
+			"(module repos) and Phase B (meta root); a single Git repository holding autopus.yaml " +
+			"yields one commit group. Generated/runtime and unclassified paths are excluded in both.",
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_, err := executeSyncVerify(cmd.OutOrStdout(), dir, specID, strict)
@@ -69,11 +72,11 @@ func executeSyncVerify(out io.Writer, dir, specID string, strict bool) (int, err
 		dir = wd
 	}
 
-	metaRoot, err := resolveMetaRoot(dir)
+	topology, err := resolveSyncTopology(dir)
 	if err != nil {
 		return 0, err
 	}
-	repos, err := collectDirty(metaRoot)
+	repos, err := collectTopologyDirty(topology)
 	if err != nil {
 		return 0, err
 	}
@@ -101,8 +104,13 @@ func executeSyncVerify(out io.Writer, dir, specID string, strict bool) (int, err
 	}
 	sort.Strings(warnings)
 
-	fmt.Fprintf(out, "sync verify — %d repo(s), read-only (no git mutations)\n\n", len(repos))
-	renderPlan(out, classified.PhaseA, classified.PhaseB)
+	fmt.Fprintf(out, "sync verify — %d repo(s), read-only (no git mutations)\n", len(repos))
+	fmt.Fprintf(out, "%s\n\n", topology.line())
+	if topology.Single {
+		renderSingleRepoPlan(out, classified.PhaseB)
+	} else {
+		renderPlan(out, classified.PhaseA, classified.PhaseB)
+	}
 	if specID != "" {
 		renderSpecSplit(out, specID, specOwned, specUnrelated)
 	}

@@ -39,6 +39,7 @@ var agentsMDTemplate = `# Autopus-ADK Harness
 ## Execution Model
 
 {{if contains (join ", " .Platforms) "codex"}}- **Codex V2**: multi_agent_v2 uses spawn_agent, send_message, followup_task, wait_agent, interrupt_agent, list_agents.
+- **Codex Concurrency**: spawn 되는 worker 상한은 autopus.yaml의 codex.agents.max_concurrent_threads이며(기본 4), coordinator thread는 세지 않습니다. 요청한 값은 요청일 뿐입니다. provider/account/host 한도가 우선하고, 변경은 새 세션부터 적용되며, config 파일 쓰기 성공은 확보된 capacity의 근거가 아닙니다. auto doctor의 doctor.codex.agents.concurrency에서 requested/loaded/effective를 확인하세요. 무거운 로컬 test/build 병렬도는 이 값이 관리하지 않습니다.
 - **Codex Workspace**: 모든 agent는 shared cwd/filesystem을 사용합니다. fork_turns는 대화 context만 분기하며 filesystem isolation이나 merge를 제공하지 않습니다.
 - **Codex Router**: @auto <route> ...는 auto plugin을 호출하고 상세 workflow는 $codex-auto-<route> skill로 라우팅합니다.
 - **Codex /goal**: Codex goals feature를 사용합니다. @auto goal은 이 기능의 thin wrapper이며, active goal이 있으면 get_goal로 목표를 반영하고 create_goal/update_goal은 Codex goal tool contract를 만족할 때만 사용하세요.

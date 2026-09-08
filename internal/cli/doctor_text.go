@@ -144,6 +144,9 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	if !checkCodexModelOwnershipText(out, opts.dir, cfg) {
 		allOK = false
 	}
+	// Codex agent concurrency is advisory: a drifted worker ceiling is worth
+	// reporting but never marks the harness unhealthy.
+	checkCodexAgentConcurrencyText(out, opts.dir, cfg)
 
 	if !checkProviderTransportSmokeText(out, cfg, opts) {
 		allOK = false

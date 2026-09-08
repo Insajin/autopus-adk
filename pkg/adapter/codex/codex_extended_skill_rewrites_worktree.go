@@ -48,12 +48,12 @@ Do not invent other collaboration lifecycle calls.
 `
 }
 
-// @AX:NOTE [AUTO]: the hardcoded 0.149.1 contract records the exact six-tool Multi-Agent V2 surface; update it with native collaboration schema changes.
+// @AX:NOTE [AUTO]: the six-tool Multi-Agent V2 surface is a contract, not a release note; update it with native collaboration schema changes.
 func codexSubagentDevSkillBody() string {
 	return `
 # Codex Multi-Agent V2 Development Skill
 
-Design workers around Codex 0.149.1's six collaboration tools:
+Design workers around the six Multi-Agent V2 collaboration tools:
 
 - ` + "`spawn_agent(task_name, message, ...)`" + ` for a new scoped task
 - ` + "`send_message(...)`" + ` for coordination

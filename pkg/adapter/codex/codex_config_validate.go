@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/insajin/autopus-adk/pkg/adapter"
+	"github.com/insajin/autopus-adk/pkg/config"
 )
 
 func (a *Adapter) validateConfig(errs *[]adapter.ValidationError) {
@@ -160,15 +161,45 @@ func validateCodexFeatureFlags(content string, errs *[]adapter.ValidationError) 
 			File: codexConfigRelPath, Message: message, Level: "warning",
 		})
 	}
-	v2Valid := sectionHasKeyValue(content, "features.multi_agent_v2", "enabled", "true") &&
-		sectionHasKeyValue(content, "features.multi_agent_v2", "max_concurrent_threads_per_session", "4")
-	if !v2Valid {
+	if !sectionHasKeyValue(content, "features.multi_agent_v2", "enabled", "true") {
 		*errs = append(*errs, adapter.ValidationError{
 			File:    codexConfigRelPath,
-			Message: "Codex multi_agent_v2 feature 또는 session concurrency 설정이 올바르지 않음",
+			Message: "Codex multi_agent_v2 feature가 enabled 상태가 아님",
 			Level:   "error",
 		})
 	}
+	validateCodexAgentConcurrency(content, errs)
+}
+
+// validateCodexAgentConcurrency accepts the ceiling under any name a config
+// file can carry it: the documented key, its documented legacy alias, and the
+// undocumented table an older Autopus wrote. Only the documented key is ever
+// generated, but validation reads the file on disk, and a project that has not
+// been regenerated yet still configures a real ceiling. The value is checked
+// against the harness bounds rather than against a fixed 4, which is now a
+// default the project may override.
+func validateCodexAgentConcurrency(content string, errs *[]adapter.ValidationError) {
+	for _, source := range agentConcurrencySources() {
+		raw, ok := sectionConfigValue(content, source.namespace, source.key)
+		if !ok {
+			continue
+		}
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < config.CodexAgentConcurrencyMin || value > config.CodexAgentConcurrencyMax {
+			*errs = append(*errs, adapter.ValidationError{
+				File: codexConfigRelPath,
+				Message: fmt.Sprintf("Codex agent concurrency 값이 유효 범위(%d-%d)를 벗어남: %s",
+					config.CodexAgentConcurrencyMin, config.CodexAgentConcurrencyMax, raw),
+				Level: "error",
+			})
+		}
+		return
+	}
+	*errs = append(*errs, adapter.ValidationError{
+		File:    codexConfigRelPath,
+		Message: "Codex agent concurrency 설정이 없음: 'auto update' 실행 필요",
+		Level:   "error",
+	})
 }
 
 func sectionHasEnabledTrue(content, wantSection string) bool {
@@ -195,6 +226,13 @@ func sectionHasKeyValue(content, wantSection, wantKey, wantValue string) bool {
 }
 
 func sectionHasConfigKey(content, wantSection, wantKey string) bool {
+	_, ok := sectionConfigValue(content, wantSection, wantKey)
+	return ok
+}
+
+// sectionConfigValue returns the assigned value of one key inside one section
+// with any trailing comment removed, so a caller can parse the value itself.
+func sectionConfigValue(content, wantSection, wantKey string) (string, bool) {
 	var section string
 	for _, line := range strings.Split(content, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -202,10 +240,10 @@ func sectionHasConfigKey(content, wantSection, wantKey string) bool {
 			section = parsed
 			continue
 		}
-		key, _, ok := parseCodexConfigAssignment(trimmed)
+		key, value, ok := parseCodexConfigAssignment(trimmed)
 		if section == wantSection && ok && key == wantKey {
-			return true
+			return strings.TrimSpace(codexTOMLValueWithoutComment(value)), true
 		}
 	}
-	return false
+	return "", false
 }
