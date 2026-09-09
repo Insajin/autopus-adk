@@ -773,6 +773,36 @@ brew uninstall --formula auto
 brew install --cask Insajin/autopus/auto
 ```
 
+#### Existing installs on Homebrew 6 or later
+
+Homebrew 6 requires explicit trust for non-official taps. A new install using the
+fully qualified command above trusts the ADK cask. An existing installation may
+still lack that trust after upgrading Homebrew. This can interrupt `brew upgrade`
+or automatic `brew cleanup`, even when you are updating another tool. A retained
+ADK tap and old download cache can trigger this after the ADK cask is uninstalled.
+
+Run `auto doctor` from an initialized project to inspect the read-only Homebrew
+trust check (`doctor.homebrew.tap_trust` in `auto doctor --json`). The check reports
+missing cask trust and probe failures separately; `--fix` does not grant trust.
+
+If Homebrew reports `Refusing to load cask insajin/autopus/auto from untrusted tap`,
+trust just the ADK cask, then check cleanup without deleting anything:
+
+```bash
+brew trust --cask insajin/autopus/auto
+brew cleanup --dry-run
+```
+
+For the legacy Formula, use `brew trust --formula insajin/autopus/auto` before the
+uninstall-and-install migration above. These commands grant trust only to the
+named package; there is no need to trust the entire tap or disable Homebrew's
+trust checks. See [Homebrew's Tap Trust documentation](https://docs.brew.sh/Tap-Trust).
+
+If the error follows an upgrade, check the installed version with
+`brew list --versions <package>` before retrying: installation may have succeeded
+before cleanup failed. `HOMEBREW_NO_ENV_HINTS=1` only hides hints and does not fix
+missing trust.
+
 </details>
 
 <details>

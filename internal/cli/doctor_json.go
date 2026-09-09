@@ -124,6 +124,7 @@ func collectDoctorJSONReport(cmd *cobra.Command, opts doctorOptions) doctorJSONR
 	}
 	report.collectCLIChecks()
 	report.collectDesktopShimCheck(diagnoseDesktopShim())
+	report.collectHomebrewTrustCheck(diagnoseHomebrewTrust(ctx))
 	report.collectQualityGateChecks(cfg)
 	report.collectCodexModelOwnershipCheck(opts.dir, cfg)
 	report.collectCodexAgentConcurrencyCheck(opts.dir, cfg)

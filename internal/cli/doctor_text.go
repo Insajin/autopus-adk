@@ -136,6 +136,9 @@ func runDoctorText(cmd *cobra.Command, opts doctorOptions) error {
 	// The Desktop launcher check is advisory: a managed installation is valid,
 	// so it never touches allOK.
 	checkDesktopShimText(out, diagnoseDesktopShim())
+	if !checkHomebrewTrustText(out, diagnoseHomebrewTrust(ctx)) {
+		allOK = false
+	}
 
 	tui.SectionHeader(out, "Quality Gate")
 	if !checkQualityGate(out, cfg) {
