@@ -21,6 +21,8 @@ export MOCK_RELEASE_PREP_STATE="$state" PATH="$temp_dir/bin:$PATH"
 repository='Insajin/autopus-adk'; environment_name='adk-companion-release'
 # shellcheck source=../prepare-release-runtime-lib.sh
 source "$runtime_lib"
+# shellcheck source=../prepare-release-probe-lib.sh
+source "$script_dir/prepare-release-probe-lib.sh"
 grep -Fq "trap 'cleanup \$?' EXIT" "$prep" || fail 'release prep does not preserve the original cleanup status'
 
 builder_error="$temp_dir/builder-error"

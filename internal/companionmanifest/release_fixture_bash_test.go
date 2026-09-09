@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -38,6 +39,21 @@ func TestReleaseHardeningBashContract(t *testing.T) {
 	command.Env = os.Environ()
 	if output, err := command.CombinedOutput(); err != nil {
 		t.Fatalf("release hardening contract: %v\n%s", err, output)
+	}
+}
+
+func TestReleaseProbeHardeningBashContract(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("release probe shell isolation uses Darwin ownership tools")
+	}
+	root := repositoryRoot(t)
+	contract := filepath.Join(root, "scripts", "companion-release", "tests",
+		"release-probe-hardening-test.sh")
+	command := exec.CommandContext(t.Context(), "/bin/bash", contract)
+	command.Dir = root
+	command.Env = os.Environ()
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("release probe hardening contract: %v\n%s", err, output)
 	}
 }
 
