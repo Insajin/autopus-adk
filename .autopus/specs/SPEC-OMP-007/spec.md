@@ -4,7 +4,7 @@
 id: SPEC-OMP-007
 title: OMP context promotion oracle — 18.x에서도 유효한 compaction 효과 측정
 version: 0.2.0
-status: draft
+status: approved
 priority: HIGH
 created: 2026-09-08
 domain: OMP
