@@ -36,18 +36,23 @@ func startPipelineOMPActiveEvaluatorSession(
 	prepared pipelineOMPManagedActivePrepared,
 	optimized bool,
 	sandboxMode pipelineOMPActiveSandboxMode,
+	probe *pipelineOMPActiveProbe,
 ) (*pipelineOMPActiveEvaluatorSession, error) {
 	active, err := preparePipelineOMPActiveProcessConfig(backend, candidate, prepared)
 	if err != nil {
 		return nil, err
 	}
 	active.sandboxMode = sandboxMode
+	// Only the optimized branch compacts, so only its overlay needs the probe
+	// method order. The full branch keeps the production body.
+	active.probeMethodOrder = probe != nil && optimized
 	process, err := startPipelineOMPActiveProcess(ctx, active)
 	if err != nil {
 		return nil, err
 	}
 	protocol := newPipelineOMPRPCProtocol(process)
 	protocol.declaredContextWindow = backend.ModelContextWindow
+	protocol.probe = probe
 	sessionID, err := protocol.initializeManaged(ctx, candidate.Provider+"/"+candidate.Model)
 	if err != nil {
 		_ = process.Close()

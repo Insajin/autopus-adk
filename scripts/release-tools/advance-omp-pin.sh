@@ -18,19 +18,45 @@ set -euo pipefail
 #        advance-omp-pin.sh TO_VERSION --dry-run
 #        advance-omp-pin.sh TO_VERSION --measure  # move an unmeasured version so the
 #                                                 # next release-prep.sh --apply measures it
+#        advance-omp-pin.sh TO_VERSION --probe    # prepare a candidate for one probe run
+#                                                 # (SPEC-OMP-007 T0): records observations
+#                                                 # only, measures and attests nothing
 
 readonly repository='can1357/oh-my-pi'
 readonly declaration='scripts/companion-release/prepare-release.sh'
 
 fail() { printf 'advance omp pin: %s\n' "$1" >&2; exit 1; }
 note() { printf '  %s\n' "$1"; }
+# A probe is not a measurement and never a release authorization. Every probe
+# path says so in the same words so an operator cannot read a prepared pin as a
+# verdict.
+probe_note() {
+  note "$1"
+  note 'the probe run records observations only: no measurement, verdict, evidence, tag or coordinate'
+  note 'set OMP_CONTEXT_PROBE_DIR to the retained directory and run release-prep.sh --apply once'
+  note 'restore the pin afterwards; a probe never authorizes an ordinary release'
+}
+probe_admits_refusal() {
+  [[ "$mode" == '--probe' ]] || return 1
+  probe_note "omp/${to_version} is refused on performance ($1); --probe prepares the candidate only"
+}
 
-[[ $# -ge 1 ]] || fail 'usage: advance-omp-pin.sh TO_VERSION [--dry-run|--measure]'
+[[ $# -ge 1 ]] || fail 'usage: advance-omp-pin.sh TO_VERSION [--dry-run|--measure|--probe]'
 readonly to_version="${1#v}"
 readonly mode="${2-}"
 [[ "$to_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "TO_VERSION must be N.N.N, got ${to_version}"
-[[ -z "$mode" || "$mode" == '--dry-run' || "$mode" == '--measure' ]] ||
-  fail 'second argument must be --dry-run or --measure'
+[[ -z "$mode" || "$mode" == '--dry-run' || "$mode" == '--measure' || "$mode" == '--probe' ]] ||
+  fail 'second argument must be --dry-run, --measure or --probe'
+# A probe is an observation run, so it may proceed against a version this table
+# refuses on performance. It may not proceed against a major whose effective
+# compaction chain nobody has read out of a binary: the probe would then record
+# a chain the runtime refuses to derive.
+if [[ "$mode" == '--probe' ]]; then
+  case "${to_version%%.*}" in
+    17 | 18) ;;
+    *) fail "omp/${to_version}: effective compaction chain is unverified; read the binary and add a verified row first" ;;
+  esac
+fi
 readonly dry_run="$mode"
 [[ -f "$declaration" && ! -L "$declaration" ]] || fail "run from the repository root; ${declaration} is missing"
 
@@ -77,6 +103,7 @@ case "$to_version" in
     : # the pin in use; measured good
     ;;
   18.1.2 | 18.1.5)
+    probe_admits_refusal 'oracle=v1 compactions=2/2 median_reduction_bp=0/2000, measured 2026-09-03' ||
     fail "$(printf '%s\n' \
       "omp/${to_version} was measured on 2026-09-03 and does not reduce context." \
       "  Standalone cohort, identical workload to the passing omp/17.2.7 run:" \
@@ -87,6 +114,7 @@ case "$to_version" in
       "  See docs/runbooks/omp-pin-advance.md for the full comparison.")"
     ;;
   18.1.13)
+    probe_admits_refusal 'oracle=v1 compactions=2/2 median_reduction_bp=895/2000, measured 2026-09-07' ||
     fail "$(printf '%s\n' \
       "omp/${to_version} was measured on 2026-09-07 and reduces context below the floor." \
       "  A29 release attempt, identical workload and model to the omp/17.2.7 run:" \
@@ -96,7 +124,9 @@ case "$to_version" in
       "  See docs/runbooks/omp-pin-advance.md, 'Measured 2026-09-07'.")"
     ;;
   *)
-    if [[ "$mode" == '--measure' || "$mode" == '--dry-run' ]]; then
+    if [[ "$mode" == '--probe' ]]; then
+      probe_note "omp/${to_version} is unmeasured; --probe prepares the candidate only"
+    elif [[ "$mode" == '--measure' || "$mode" == '--dry-run' ]]; then
       note "omp/${to_version} is unmeasured; ${mode#--} only proves the launch contract"
       note 'the next release-prep.sh --apply is the measurement; record its verdict in this table'
     else
@@ -197,6 +227,14 @@ printf '  go test ./internal/cli/ -run TestWorkflowContextImplementationIdentity
 printf '    (the policy identity digest is derived from the pin; re-measure and update it)\n'
 printf '  bash scripts/companion-release/tests/release-exec-smoke-hardening-test.sh\n'
 printf '  bash scripts/release-tools/preflight-release.sh\n'
+if [[ "$mode" == '--probe' ]]; then
+  printf 'This pin was prepared for one probe run, not for a release:\n'
+  printf '  commit and push this pin move first: the canary refuses a dirty worktree\n'
+  printf '  or a source that is not exact origin/main, exactly as it does for --measure\n'
+  printf '  OMP_CONTEXT_PROBE_DIR=<retained dir> bash scripts/release-tools/release-prep.sh --apply\n'
+  printf '  the run exits nonzero by construction and publishes no report, evidence, tag or coordinate\n'
+  printf '  restore this pin with advance-omp-pin.sh %s once the records are retained\n' "$from_version"
+fi
 printf 'The reduction floor is measured, not declared: if omp/%s compacts less\n' "$to_version"
 printf 'than min_reduction_basis_points, evidence generation fails in the canary\n'
 printf 'and the pin must go back.\n'

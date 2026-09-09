@@ -166,6 +166,21 @@ for key in "$r2_key" "$k3_key"; do
   [[ -f "$key" && ! -L "$key" ]] || fail "signing key is missing at $key"
 done
 
+# Probe opt-in (SPEC-OMP-007 T0). The variable names the directory the runner
+# keeps the exported probe records in after the canary UID is gone;
+# prepare-release.sh validates ownership and mode and then refuses every
+# publication path for that run. It is exported here because an env file may
+# only assign it, and it deliberately stays in this process tree: the canary
+# receives an isolated TMPDIR probe directory as a flag, never this path.
+if [[ -n "${OMP_CONTEXT_PROBE_DIR:-}" ]]; then
+  [[ "$mode" == '--apply' ]] || fail 'OMP_CONTEXT_PROBE_DIR requires --apply'
+  [[ "$OMP_CONTEXT_PROBE_DIR" == /* && -d "$OMP_CONTEXT_PROBE_DIR" && ! -L "$OMP_CONTEXT_PROBE_DIR" ]] ||
+    fail 'OMP_CONTEXT_PROBE_DIR must name an existing absolute retained directory'
+  export OMP_CONTEXT_PROBE_DIR
+  printf 'release prep: probe mode; retained probe directory=%s; no report, evidence, tag or coordinate is published\n' \
+    "$OMP_CONTEXT_PROBE_DIR" >&2
+fi
+
 printf 'release prep: %s via %s with provider=%s model=%s omp=%s\n' \
   "$mode" "$gateway_source" "$provider" "$model" "$omp_version" >&2
 

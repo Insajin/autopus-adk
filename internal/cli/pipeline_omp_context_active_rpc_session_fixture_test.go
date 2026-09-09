@@ -66,7 +66,7 @@ func pipelineOMPActiveRPCSessionFixtureWithModel(
 		ModelScopeDigest: candidate.ModelScopeDigest,
 	}}
 	session, err := startPipelineOMPActiveEvaluatorSession(
-		context.Background(), config, candidate, prepared, true, sandboxMode,
+		context.Background(), config, candidate, prepared, true, sandboxMode, nil,
 	)
 	return session, config, logPath, err
 }

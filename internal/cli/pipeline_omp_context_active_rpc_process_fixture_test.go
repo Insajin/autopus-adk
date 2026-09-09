@@ -150,12 +150,22 @@ func runPipelineOMPActiveRPCFixture() int {
 				Messages: transcript, TotalMessages: len(transcript), NextCursor: nil,
 			})
 		case "compact":
+			if modelID == pipelineOMPActiveProbeRefuseModel {
+				_ = output.Encode(map[string]any{
+					"id": command.ID, "type": "response", "command": "compact",
+					"success": false, "error": "Nothing to compact (session too small)",
+				})
+				break
+			}
 			compactionCount++
 			inputTokens = 0
 			outputTokens = 0
 			cacheReadTokens = 0
 			messageCount = 0
-			writePipelineOMPActiveCompaction(output, command)
+			if modelID == pipelineOMPActiveProbeRemoteModel {
+				transcript = append(transcript, pipelineOMPActiveProbeSummaryMessage(compactionCount))
+			}
+			writePipelineOMPActiveCompaction(output, command, modelID, compactionCount)
 		default:
 			writePipelineOMPActiveResponse(output, command, nil)
 		}
@@ -172,7 +182,27 @@ func writePipelineOMPActiveResponse(output *json.Encoder, command pipelineOMPRPC
 	})
 }
 
-func writePipelineOMPActiveCompaction(output *json.Encoder, command pipelineOMPRPCCommand) {
+// pipelineOMPActiveProbeRemoteModel drives the fake OMP through a remote
+// compaction: a notice, a native start/end naming the remote method, a compact
+// response carrying provider usage, and a compactionSummary message with one
+// new image digest. pipelineOMPActiveProbeRefuseModel declines every request.
+const (
+	pipelineOMPActiveProbeRemoteModel = "model-probe-remote"
+	pipelineOMPActiveProbeRefuseModel = "model-probe-refuse"
+)
+
+func pipelineOMPActiveProbeSummaryMessage(sequence int) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(
+		`{"role":"compactionSummary","method":"remote","tokensBefore":61904,"tokensAfter":30000,`+
+			`"images":[{"type":"image","data":"iVBORw0KGgoAAAA%02d","mimeType":"image/png"}]}`, sequence))
+}
+
+func writePipelineOMPActiveCompaction(
+	output *json.Encoder,
+	command pipelineOMPRPCCommand,
+	modelID string,
+	sequence int,
+) {
 	binding := WorkflowContextBridgeBinding{
 		SchemaVersion: workflowContextBridgeSchemaVersion,
 		BindingHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_BINDING_HASH"),
@@ -180,9 +210,20 @@ func writePipelineOMPActiveCompaction(output *json.Encoder, command pipelineOMPR
 		SessionHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_SESSION_HASH"),
 		NonceHash:     os.Getenv("AUTOPUS_OMP_CONTEXT_NONCE_HASH"),
 	}
-	legacyLifecycle := os.Getenv("AUTOPUS_TEST_OMP_ACTIVE_LEGACY_COMPACTION") == "1"
-	if legacyLifecycle {
-		_ = output.Encode(map[string]any{"type": "auto_compaction_start", "reason": "manual", "action": "snapcompact"})
+	remote := modelID == pipelineOMPActiveProbeRemoteModel
+	native := remote || os.Getenv("AUTOPUS_TEST_OMP_ACTIVE_LEGACY_COMPACTION") == "1"
+	action := "snapcompact"
+	if remote {
+		action = "remote"
+	}
+	if native {
+		_ = output.Encode(map[string]any{"type": "auto_compaction_start", "reason": "manual", "action": action})
+	}
+	if remote {
+		_ = output.Encode(map[string]any{
+			"id": fmt.Sprintf("active-notice-%d", sequence), "type": "extension_ui_request",
+			"method": "notify", "title": "OMP notice", "message": "context compaction started",
+		})
 	}
 	for index, event := range []string{WorkflowContextEventPreCompaction, WorkflowContextEventPostCompaction} {
 		envelope, _ := json.Marshal(workflowContextManagedBridgeEnvelope{
@@ -195,10 +236,17 @@ func writePipelineOMPActiveCompaction(output *json.Encoder, command pipelineOMPR
 			"title": "Autopus context " + event, "message": json.RawMessage(message),
 		})
 	}
-	writePipelineOMPActiveResponse(output, command, map[string]any{"summary": "safe compacted context"})
-	if legacyLifecycle {
+	result := map[string]any{"summary": "safe compacted context"}
+	if remote {
+		result["preserveData"] = map[string]any{"openaiRemoteCompaction": map[string]any{
+			"version": "v2", "provider": "openai-codex", "usedTokens": 20000,
+			"usage": map[string]any{"inputTokens": 20000, "outputTokens": 500, "totalTokens": 20500},
+		}}
+	}
+	writePipelineOMPActiveResponse(output, command, result)
+	if native {
 		_ = output.Encode(map[string]any{
-			"type": "auto_compaction_end", "reason": "manual", "action": "snapcompact",
+			"type": "auto_compaction_end", "reason": "manual", "action": action,
 			"result": map[string]any{"summary": "safe compacted context"},
 		})
 	}

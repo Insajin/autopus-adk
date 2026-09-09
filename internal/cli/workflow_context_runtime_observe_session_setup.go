@@ -37,6 +37,7 @@ type workflowContextObserveSessionSetup struct {
 	providerAuthorityDigest string
 	segmentsStarted         int
 	sandboxMode             pipelineOMPActiveSandboxMode
+	probe                   *pipelineOMPActiveProbe
 }
 
 const (
@@ -80,7 +81,8 @@ func validateWorkflowContextObserveSessionOptions(options workflowContextObserve
 		options.EvidenceValidFor <= 0 || options.EvidenceValidFor > 24*time.Hour ||
 		(options.SandboxMode != pipelineOMPActiveSandboxManaged &&
 			options.SandboxMode != pipelineOMPActiveSandboxInheritedParent) ||
-		strings.TrimSpace(options.Endpoint) == "" || strings.TrimSpace(options.Executable) == "" {
+		strings.TrimSpace(options.Endpoint) == "" || strings.TrimSpace(options.Executable) == "" ||
+		!validWorkflowContextObserveSessionProbeDir(options.ProbeDir) {
 		return errors.New("workflow context-runtime observe-session coordinates are invalid")
 	}
 	return nil
@@ -213,13 +215,13 @@ func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) erro
 		return errors.New("observe-session segment startup is invalid")
 	}
 	full, err := startPipelineOMPActiveEvaluatorSession(
-		ctx, setup.backend, setup.candidate, setup.prepared, false, setup.sandboxMode,
+		ctx, setup.backend, setup.candidate, setup.prepared, false, setup.sandboxMode, setup.probe,
 	)
 	if err != nil {
 		return err
 	}
 	optimized, err := startPipelineOMPActiveEvaluatorSession(
-		ctx, setup.backend, setup.candidate, setup.prepared, true, setup.sandboxMode,
+		ctx, setup.backend, setup.candidate, setup.prepared, true, setup.sandboxMode, setup.probe,
 	)
 	if err != nil {
 		_ = full.Close()

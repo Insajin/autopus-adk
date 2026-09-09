@@ -14,7 +14,7 @@ readonly environment_name='adk-companion-release'
 readonly release_tag='v0.50.118'
 readonly spec_id='SPEC-OMP-004'
 readonly expected_go_toolchain='go1.26.6'
-readonly expected_omp_sha256='cd2f47545cb3f8eb5e15c91bc9054d73967774652e020b432e294803d1b71ea0'
+readonly expected_omp_sha256='a4c5c9cc5b8222184d0d7429b0bb6ac2a92bbe45dd11bf68e4b1360050791909'
 readonly expected_promotion_key_id='omp-context-promotion-2026-q3-k3'
 readonly release_ref="refs/tags/${release_tag}"
 readonly evidence_tag="omp-context-evidence-${release_tag}"
@@ -116,7 +116,8 @@ sudo_keepalive_pid=''; live_canary_started=0
 release_canary_user=''; release_canary_uid=''; release_canary_gid=''; release_canary_home=''
 release_canary_marker=''; release_canary_attempt=''; release_canary_next_attempt=1
 release_canary_account_created=0
-for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh; do
+for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.sh prepare-release-local-lib.sh \
+  prepare-release-probe-lib.sh; do
   staged_runtime_lib="$temp_dir/$runtime_lib_name"
   runtime_lib_blob=$(git rev-parse --verify "${source_commit}:scripts/companion-release/${runtime_lib_name}") ||
     fail "release prep runtime helper ${runtime_lib_name} is absent from the exact source"
@@ -130,13 +131,14 @@ for runtime_lib_name in prepare-release-user-lib.sh prepare-release-runtime-lib.
   exec 9<&-
 done
 trap 'cleanup $?' EXIT
-staged_omp="$temp_dir/omp-v17.2.7"
+probe_configure
+staged_omp="$temp_dir/omp-v18.1.13"
 readonly staged_omp
 cp "$omp_executable" "$staged_omp"; chmod 0500 "$staged_omp"
 [[ "$(shasum -a 256 "$staged_omp" | awk '{print $1}')" == "$expected_omp_sha256" ]] || fail 'staged OMP executable digest differs'
-[[ "$("$staged_omp" --version)" == 'omp/17.2.7' ]] || fail 'verified OMP version differs from v17.2.7'
+[[ "$("$staged_omp" --version)" == 'omp/18.1.13' ]] || fail 'verified OMP version differs from v18.1.13'
 omp_executable=$staged_omp
-verify_tag_signing_authority
+probe_verify_tag_signing_authority
 environment_variables=$(gh variable list --repo "$repository" --env "$environment_name" --json name,value) ||
   fail 'protected environment variables are unavailable'
 readonly environment_variables
@@ -200,7 +202,7 @@ create_canary_plan "$static_policy_file"
 IFS= read -r static_policy_b64 <"$static_policy_file"
 build_candidate "$static_policy_b64" "$final_candidate"
 candidate_sha256=$(shasum -a 256 "$final_candidate" | awk '{print $1}')
-if [[ "$evidence_present" -eq 1 ]]; then
+if [[ "$evidence_present" -eq 1 && "$probe_enabled" -eq 0 ]]; then
   load_evidence
   derive_policy "$verified_report" "$final_static_policy_file"
   cmp "$static_policy_file" "$final_static_policy_file" || fail 'verified evidence static policy differs from the current A24 plan'
@@ -223,12 +225,13 @@ if [[ "$operation" == 'preflight' ]]; then
       canary_records:42,provider_calls:40,task_pairs:20,remote_mutations:0}'
   exit 0
 fi
-if [[ "$evidence_present" -eq 1 ]]; then
+if [[ "$evidence_present" -eq 1 && "$probe_enabled" -eq 0 ]]; then
   if [[ "$release_present" -eq 1 ]]; then publish_coordinates reconcile; exit 0; fi
   ensure_prep_lock "$verified_report"; publish_coordinates "$evidence_source_commit"; exit 0
 fi
 env GOENV=off GOTOOLCHAIN="$expected_go_toolchain" go build -trimpath -o "$execsmoke" ./scripts/companion-release/execsmoke
 env GOENV=off GOTOOLCHAIN="$expected_go_toolchain" go build -trimpath -o "$uidrunner" ./scripts/companion-release/uidrunner
+probe_build_export_tool
 (
   while /bin/sleep 30; do /usr/bin/sudo -n -v || exit 1; done
 ) &
@@ -236,6 +239,7 @@ sudo_keepalive_pid=$!
 final_project="$temp_dir/final-project"; final_output="$temp_dir/final-output.jsonl"
 extract_project "$final_project"
 run_canary "$final_candidate" "$final_project" "$final_output" final
+probe_terminate
 validate_canary "$final_project" "$final_output" "$final_candidate"
 final_report="$final_project/.autopus/runtime/omp-context/promotion-report-v1.json"
 derive_policy "$final_report" "$final_static_policy_file"

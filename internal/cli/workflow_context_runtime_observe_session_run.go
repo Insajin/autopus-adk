@@ -42,6 +42,12 @@ func RunWorkflowContextObserveSession(
 	if err != nil || !validWorkflowContextObserveHandshake(first) {
 		return errors.New("observe-session handshake is invalid")
 	}
+	errorStage = "probe"
+	probe, err := startWorkflowContextObserveSessionProbe(options)
+	if err != nil {
+		return err
+	}
+	defer func() { runErr = errors.Join(runErr, probe.abort(runErr)) }()
 	errorStage = "setup"
 	setup, err := prepareWorkflowContextObserveSessionForRun(ctx, options, first.ChallengeDigest)
 	if err != nil {
@@ -49,6 +55,7 @@ func RunWorkflowContextObserveSession(
 	}
 	errorModelScope = setup.candidate.ModelScopeDigest
 	defer func() { runErr = errors.Join(runErr, setup.close()) }()
+	setup.probe = probe
 	errorStage = "startup"
 	if err := setup.start(ctx); err != nil {
 		return err
@@ -118,6 +125,8 @@ func RunWorkflowContextObserveSession(
 		if !lastCompleted.IsZero() && !startedAt.After(lastCompleted) {
 			startedAt = lastCompleted.Add(time.Nanosecond)
 		}
+		probe.beginCall(sequence, command.Variant,
+			segmentVariantCalls[command.Variant]+1, setup.segmentsStarted)
 		assistant, receipt, err := session.Execute(ctx, providerPrompt)
 		endedAt := time.Now().UTC()
 		if !endedAt.After(startedAt) {
@@ -200,6 +209,7 @@ func RunWorkflowContextObserveSession(
 		if err := encoder.Encode(response); err != nil {
 			return err
 		}
+		probe.observeCallElapsed(startedAt, endedAt)
 	}
 	errorSequence = 0
 	errorStage = "cohort"
@@ -208,7 +218,8 @@ func RunWorkflowContextObserveSession(
 		variantCalls["B"] != workflowContextObserveSessionPairCount ||
 		setup.segmentsStarted != workflowContextObserveSessionSegmentCount ||
 		len(allSessionBindings) != workflowContextObserveSessionSegmentCount*2 ||
-		compactionCycles < 2 || sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
+		compactionCycles < workflowContextObserveSessionCompactionFloor(probe) ||
+		sessionBindings["A"] == "" || sessionBindings["B"] == "" ||
 		sessionBindings["A"] == sessionBindings["B"] {
 		return errors.New("observe-session task or reusable-session cardinality is invalid")
 	}
@@ -226,6 +237,10 @@ func RunWorkflowContextObserveSession(
 		return err
 	}
 	setup.taskRoot = ""
+	if probe.enabled() {
+		errorStage = "probe"
+		return probe.finish()
+	}
 	errorStage = "evidence"
 	checkedAt := time.Now().UTC()
 	if !checkedAt.After(lastCompleted) {

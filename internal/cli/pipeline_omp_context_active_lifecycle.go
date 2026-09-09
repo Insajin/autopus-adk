@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 )
 
 // A refused compaction is not a protocol violation. OMP declines in two shapes
@@ -45,7 +42,9 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	binding WorkflowContextBridgeBinding,
 	expectedSession string,
 	preparePrompt func() (string, error),
-) (bool, error) {
+) (performed bool, runErr error) {
+	protocol.probe.beginCompaction()
+	defer func() { protocol.probe.finishCompaction(pipelineOMPActiveProbeAbortReason(runErr)) }()
 	preProof, _, err := protocol.validatePipelineOMPActiveTranscript(ctx, false)
 	if err != nil {
 		return false, err
@@ -65,15 +64,20 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 		if frame.Type == "extension_error" {
 			return false, errors.New("managed active OMP extension failed during manual compaction")
 		}
+		protocol.probe.observeCompactionFrame(frame)
 		switch frame.Type {
 		case "auto_compaction_start":
-			if started || postACKed || frame.Action != "snapcompact" || frame.Reason != "manual" {
+			if started || postACKed || frame.Reason != "manual" ||
+				!protocol.probe.acceptsCompactionAction(frame.Action) {
 				return false, errors.New("managed active OMP manual compaction start is invalid")
 			}
 			started = true
 		case "extension_ui_request":
 			event, bridgeErr := validatePipelineOMPActiveBridgeFrame(frame, binding)
 			if bridgeErr != nil {
+				if protocol.probe.toleratesUIRequest(frame) {
+					continue
+				}
 				return false, bridgeErr
 			}
 			if event == WorkflowContextEventPreCompaction {
@@ -97,6 +101,7 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			if frame.ID == id && frame.Command == "compact" && !frame.Success && !started &&
 				!postACKed && !responded &&
 				pipelineOMPActiveCompactionRefused(frame.Error) {
+				protocol.probe.observeCompactRefusal(frame.Error)
 				postProof, _, proofErr := protocol.validatePipelineOMPActiveTranscript(ctx, false)
 				state, stateErr := protocol.readIdleState(ctx, "managed-compaction-noop")
 				if proofErr != nil || postProof != preProof || stateErr != nil ||
@@ -123,11 +128,12 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			}
 			responded = true
 			nativeResult = frame.Data
+			protocol.probe.observeCompactResult(frame.Data)
 			if !started {
 				ended = true
 			}
 		case "auto_compaction_end":
-			if !started || !responded || ended || !validPipelineOMPActiveNativeEnd(frame) {
+			if !started || !responded || ended || !protocol.probe.validNativeEnd(frame) {
 				return false, errors.New("managed active OMP manual compaction completion is invalid")
 			}
 			nativeResult = append(nativeResult, 0)
@@ -137,7 +143,10 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			return false, errors.New("managed active OMP provider activity crossed the compaction barrier")
 		}
 	}
+	protocol.probe.collectTranscript(true)
 	postProof, images, err := protocol.validatePipelineOMPActiveTranscript(ctx, true)
+	protocol.probe.collectTranscript(false)
+	protocol.probe.observeCompactionImages(images)
 	if err != nil {
 		return false, err
 	}
@@ -210,6 +219,7 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 				return errors.New("managed active OMP primary turn is out of order")
 			}
 			inTurn, turns = false, turns+1
+			protocol.probe.observeTurnFrame(frame)
 		case "agent_end":
 			if !started || inTurn || turns == 0 || ended {
 				return errors.New("managed active OMP primary terminal event is invalid")
@@ -223,65 +233,4 @@ func (protocol *pipelineOMPRPCProtocol) callManagedPrompt(ctx context.Context, p
 		}
 	}
 	return nil
-}
-
-func validPipelineOMPActivePromptResponseData(data json.RawMessage) bool {
-	body := bytes.TrimSpace(data)
-	if len(body) == 0 || bytes.Equal(body, []byte("null")) {
-		return true
-	}
-	if rejectDuplicatePipelineOMPJSON(body) != nil {
-		return false
-	}
-	var exact map[string]json.RawMessage
-	if json.Unmarshal(body, &exact) != nil || len(exact) != 1 {
-		return false
-	}
-	var invoked bool
-	value, ok := exact["agentInvoked"]
-	return ok && json.Unmarshal(value, &invoked) == nil && invoked
-}
-
-func (protocol *pipelineOMPRPCProtocol) confirmPipelineOMPActiveBridge(id string) error {
-	confirmed := true
-	return protocol.process.send(pipelineOMPRPCCommand{
-		ID: id, Type: "extension_ui_response", Confirmed: &confirmed,
-	})
-}
-
-func validPipelineOMPActiveManualResult(data json.RawMessage) bool {
-	var result struct {
-		Summary string `json:"summary"`
-	}
-	return json.Unmarshal(data, &result) == nil && strings.TrimSpace(result.Summary) != ""
-}
-
-func validPipelineOMPActiveNativeEnd(frame pipelineOMPRPCFrame) bool {
-	result := bytes.TrimSpace(frame.Result)
-	return frame.Type == "auto_compaction_end" && frame.Action == "snapcompact" &&
-		!frame.Aborted && !frame.Skipped && frame.ErrorMessage == "" &&
-		len(result) > 0 && !bytes.Equal(result, []byte("null"))
-}
-
-func validatePipelineOMPActiveBridgeFrame(
-	frame pipelineOMPRPCFrame,
-	binding WorkflowContextBridgeBinding,
-) (string, error) {
-	if frame.Type != "extension_ui_request" || frame.Method != "confirm" || frame.ID == "" {
-		return "", errors.New("managed active OMP emitted unsupported UI activity")
-	}
-	var message string
-	var envelope workflowContextManagedBridgeEnvelope
-	var exact map[string]any
-	if json.Unmarshal(frame.Message, &message) != nil || json.Unmarshal([]byte(message), &envelope) != nil ||
-		json.Unmarshal([]byte(message), &exact) != nil || len(exact) != 6 ||
-		envelope.SchemaVersion != binding.SchemaVersion || frame.Title != "Autopus context "+envelope.Event ||
-		!workflowContextSecureEqual(envelope.BindingHash, binding.BindingHash) ||
-		!workflowContextSecureEqual(envelope.OptionsHash, binding.OptionsHash) ||
-		!workflowContextSecureEqual(envelope.SessionHash, binding.SessionHash) ||
-		!workflowContextSecureEqual(envelope.NonceHash, binding.NonceHash) ||
-		(envelope.Event != WorkflowContextEventPreCompaction && envelope.Event != WorkflowContextEventPostCompaction) {
-		return "", errors.New("managed active OMP bridge authority mismatch")
-	}
-	return envelope.Event, nil
 }

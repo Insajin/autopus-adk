@@ -12,6 +12,7 @@ remove_isolation_root() {
   /usr/bin/sudo -n /bin/rm -rf -- "$root" || return 1
   [[ ! -e "$root" && ! -L "$root" ]]
 }
+invalidate_sudo_authorization() { /usr/bin/sudo -k; }
 cleanup() {
   local status=$1 remote_status=0 remote_source='' record cleanup_failed=0
   if [[ -n "${sudo_keepalive_pid:-}" ]]; then
@@ -38,10 +39,14 @@ cleanup() {
       cleanup_failed=1
     fi
   done
-  if ! /usr/bin/sudo -k; then
+  if ! invalidate_sudo_authorization; then
     printf 'companion release prep: sudo authorization invalidation failed\n' >&2
     cleanup_failed=1
   fi
+  # Probe records are retained only by a cleanup that dismantled the live UID,
+  # the account, every isolation root and the sudo authorization, and only
+  # before the staging tree is removed. The probe lane reports its own outcome.
+  probe_finalize_records "$cleanup_failed" || cleanup_failed=1
   if [[ -n "$evidence_source_commit" && "$retain_prep_lock" -eq 0 ]]; then
     remote_source=$(GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=10 \
       git ls-remote --exit-code --refs origin "$evidence_source_ref" 2>/dev/null) || remote_status=$?
@@ -171,6 +176,7 @@ run_canary() {
     fail 'root-owned canary executable bytes differ'
   sandbox_args=(--omp "$isolated_omp")
   if [[ "$inherit_parent_sandbox" -eq 1 ]]; then sandbox_args+=(--inherit-parent-sandbox); fi
+  if [[ "${probe_enabled:-0}" -eq 1 ]]; then sandbox_args+=(--probe-dir "$isolated_tmp/probe"); fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped before production canary'
   while :; do
     select_release_canary_account "$isolated_home" ||
@@ -189,6 +195,7 @@ run_canary() {
   live_canary_started=1
   printf 'companion release prep: %s production canary started (40 sequential provider calls, 20 task pairs)\n' "$label" >&2
   started_at=$SECONDS
+  canary_status=0
   if {
     printf '%s\n' "$provider_credential"
     /bin/cat "$input_jsonl"
@@ -207,15 +214,13 @@ run_canary() {
     --credential-locator "$credential_locator" --producer-repository "$repository" --producer-workflow-ref "$producer_workflow_ref" \
     --producer-run-id "$producer_run_id" --producer-run-attempt 1 --candidate-repository "$repository" \
     --policy-id omp-context-active-v1 --oracle-policy-digest "$oracle_policy_digest" --target-git-commit "$source_commit" \
-    "${sandbox_args[@]}" | capture_canary_progress "$output" "$label"; then
-    :
-  else
-    canary_status=$?
-    canary_failure_receipt "$label" "$canary_status" "$output"
-  fi
+    "${sandbox_args[@]}" | capture_canary_progress "$output" "$label"; then :; else canary_status=$?; fi
   kill -0 "$sudo_keepalive_pid" >/dev/null 2>&1 || fail 'sudo keepalive stopped during production canary'
   cleanup_live_canary_uid ||
     fail 'one-shot live-canary UID cleanup is incomplete'
+  probe_export_records "$isolated_tmp" "$output" "$label" ||
+    fail 'probe record export failed; nothing is staged and nothing is retained'
+  if [[ "$canary_status" -ne 0 ]]; then canary_failure_receipt "$label" "$canary_status" "$output"; fi
   remove_release_canary_account ||
     fail 'one-shot live-canary account cleanup is incomplete'
   /usr/bin/sudo -n /usr/sbin/chown -R nobody:nobody \

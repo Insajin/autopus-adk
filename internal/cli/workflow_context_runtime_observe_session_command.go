@@ -72,6 +72,8 @@ func newWorkflowContextObserveSessionCmd() *cobra.Command {
 	cmd.Flags().StringVar(&options.PolicyID, "policy-id", "", "Signed active-history policy identity")
 	cmd.Flags().StringVar(&options.OraclePolicyDigest, "oracle-policy-digest", "", "Body-free quality/security oracle digest")
 	cmd.Flags().DurationVar(&options.EvidenceValidFor, "evidence-valid-for", time.Hour, "Current-run evidence validity window")
+	cmd.Flags().StringVar(&options.ProbeDir, "probe-dir", "",
+		"Write REQ-PROBE-001 measurement records to <dir>/probe.jsonl and produce no report, evidence or attestation")
 	return cmd
 }
 

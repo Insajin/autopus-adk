@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **SPEC-OMP-007의 계측 전용 probe 경로를 추가한다** (2026-09-09): 명시적 `--probe-dir`에서 primary usage와 compaction 방법·거부·metadata를 기록하고 report·attestation·태그 생성 전에 종료한다. 관측하지 못한 provider 시도별 비용은 `unknown`으로 남긴다. probe 완료 판정은 실제 보존된 40개 call·18개 attempt의 순서·세션·AB/BA 균형·필수 stats를 확인한다. 반출은 UID 종료 확인 후 동일 descriptor로 검증하며, 검증된 레코드를 임시 보관한 뒤 계정·isolation root·sudo 정리가 모두 성공했을 때만 새 retained 파일로 발행한다. 경로 교체, symlink/hardlink, 중복·누락 기록, cleanup 실패를 회귀 검증했다. `advance-omp-pin.sh --probe`는 성능 거부 후보의 관측 준비만 허용한다. 현재 18.1.13 핀은 이 관측 실행을 위한 임시 선택이며 v2 오라클이나 릴리스 승인을 뜻하지 않는다.
+
 - **단일 저장소에서도 `auto sync verify`로 커밋 대상을 분류한다 (#188)** (2026-09-09): `autopus.yaml`이 있는 단일 Git 저장소와 linked worktree에서 제품 파일, 생성·런타임 경로, 안전하게 분류할 수 없는 경로를 구분한다. 멀티 저장소의 Phase A/B 분류는 유지한다. Git 저장소가 아닌 위치와 손상된 meta root는 `unsupported topology`와 종료 코드 2로 알리며, `--strict` 분류 실패의 종료 코드 1과 구분한다. 실제 생성 프로젝트에서 발견한 `.omp/` 및 Claude 권한 기록의 제외 누락도 수정했다. 생성 정책은 두 토폴로지를 설명하고 `auto check --hygiene --staged`가 동등한 대체 검증이 아님을 명시한다.
 
 - **Codex 작업 에이전트 수를 설정하고 요청·관측 상태를 구분한다 (#189)** (2026-09-09): `autopus.yaml`의 `codex.agents.max_concurrent_threads`로 요청할 작업 에이전트 수를 지정한다(기본 4, 범위 1–64, 주 에이전트 제외). 재생성 시 명시한 값을 유지하고 이전 별칭과 feature-table 설정을 문서화된 `[agents] max_concurrent_threads_per_session` 키로 정리한다. 검증하지 않은 버전의 지원 여부를 추정하지 않으며, 문서 기준으로 생성한 경우 그 가정을 표시한다. doctor는 `requested`, `on_disk`, `loaded`, `effective`와 출처를 나누어 보고한다. 디스크 설정만으로 실행 중인 세션의 적용값을 추정하지 않으므로 `loaded`·`effective`는 관측할 수 없을 때 `unknown`이다. 활성 에이전트를 중단하거나 호스트 제한을 우회하지 않는다.

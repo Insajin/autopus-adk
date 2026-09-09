@@ -69,6 +69,7 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 	if err != nil {
 		return "", pipelineOMPActiveCallReceipt{}, err
 	}
+	protocol.probe.observeStatsBefore(beforeStats, err)
 	err = protocol.callManagedPrompt(ctx, prompt)
 	if err != nil {
 		return "", pipelineOMPActiveCallReceipt{}, err
@@ -78,6 +79,7 @@ func (protocol *pipelineOMPRPCProtocol) executeManaged(
 		return "", pipelineOMPActiveCallReceipt{}, errors.New("managed active OMP primary did not settle in the same session")
 	}
 	afterStats, err := protocol.sessionStats(ctx, expectedSession)
+	protocol.probe.observeStatsAfter(afterStats, err)
 	if err != nil || afterStats.Input < beforeStats.Input || afterStats.Output < beforeStats.Output ||
 		afterStats.Total < beforeStats.Total {
 		return "", pipelineOMPActiveCallReceipt{}, fmt.Errorf(

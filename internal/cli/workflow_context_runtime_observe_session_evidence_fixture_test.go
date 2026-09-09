@@ -27,6 +27,19 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 	string,
 ) {
 	t.Helper()
+	return workflowContextObserveSessionFixtureWithModel(t, challenge, "model-a")
+}
+
+// workflowContextObserveSessionFixtureWithModel selects the fake OMP behaviour
+// through the model id, which is the only channel that reaches the child: the
+// managed environment is built from a fixed list, so an exported test variable
+// never arrives there.
+func workflowContextObserveSessionFixtureWithModel(t *testing.T, challenge, model string) (
+	workflowContextObserveSessionSetup,
+	workflowContextObserveSessionOptions,
+	string,
+) {
+	t.Helper()
 	backend, _ := pipelineOMPBackendTestConfig(t)
 	writeWorkflowContextObserveCanonicalDocuments(t, backend.ProjectDir, backend.SpecID)
 	deliveryOptions := promptlayer.ContextDeliveryOptions{
@@ -47,7 +60,7 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 	endpoint, credential := "http://127.0.0.1:43123", "fixture-provider-token-value-123456"
 	backend.Executable = os.Args[0]
 	backend.RuntimeBase, backend.SnapshotHash, backend.GitCommitHash = runtimeBase, snapshotHash, commit
-	backend.PhaseModels = workflowContextObserveSessionPhaseModels("openai/model-a")
+	backend.PhaseModels = workflowContextObserveSessionPhaseModels("openai/" + model)
 	backend.Environment = append(backend.Environment,
 		pipelineOMPActiveEndpointKey+"="+endpoint,
 		pipelineOMPActiveCredentialKey+"="+credential,
@@ -88,7 +101,7 @@ func workflowContextObserveEvidenceFixture(t *testing.T, challenge string) (
 		sandboxMode: pipelineOMPActiveSandboxManaged,
 	}
 	options := workflowContextObserveSessionOptions{
-		ProjectDir: backend.ProjectDir, SpecID: backend.SpecID, Provider: "openai", Model: "model-a",
+		ProjectDir: backend.ProjectDir, SpecID: backend.SpecID, Provider: "openai", Model: model,
 		ModelContextWindow: pipelineOMPActiveDefaultContextWindow,
 		Endpoint:           endpoint, CredentialLocator: "AUTOPUS_TEST_PROVIDER_TOKEN", Executable: os.Args[0],
 		TargetGitCommit: commit, SandboxMode: pipelineOMPActiveSandboxManaged,

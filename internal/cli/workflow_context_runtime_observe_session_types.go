@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"strings"
 	"time"
 
@@ -94,6 +95,9 @@ type workflowContextObserveSessionOptions struct {
 	OraclePolicyDigest  string
 	PromotionPolicy     promptlayer.OMPContextPromotionPolicyV1
 	EvidenceValidFor    time.Duration
+	// ProbeDir turns the run into a REQ-PROBE-001 measurement probe. It is
+	// empty on every production and release-evidence run.
+	ProbeDir string
 }
 
 // workflowContextObserveSessionGatePrefix is the body-free cohort verdict
@@ -118,6 +122,9 @@ func workflowContextObserveSessionErrorCode(runErr error) string {
 	if runErr == nil {
 		return ""
 	}
+	if errors.Is(runErr, errWorkflowContextObserveSessionProbeCompleted) {
+		return "probe_completed"
+	}
 	message := strings.ToLower(runErr.Error())
 	switch {
 	case strings.Contains(message, "cohort gates failed"):
@@ -141,6 +148,10 @@ func workflowContextObserveSessionErrorCode(runErr error) string {
 		return "runtime_readback_failed"
 	case strings.Contains(message, "canonical admission failed"):
 		return "runtime_admission_failed"
+	// Last, so a run that failed for its own reason keeps that reason even
+	// when the probe file could not be closed on the way out.
+	case strings.Contains(message, "probe records"):
+		return "probe_records_failed"
 	}
 	class, _ := classifyOperationalError("", runErr)
 	if class == "unknown" {

@@ -45,6 +45,9 @@ type pipelineOMPRPCFrame struct {
 	Skipped      bool            `json:"skipped,omitempty"`
 	IsTerminal   *bool           `json:"isTerminal,omitempty"`
 	Messages     json.RawMessage `json:"messages,omitempty"`
+	// Usage carries the per-turn provider usage a lifecycle frame reports. It
+	// is read by the probe only; no production admission depends on it.
+	Usage json.RawMessage `json:"usage,omitempty"`
 }
 
 type pipelineOMPRPCProtocol struct {
@@ -55,6 +58,9 @@ type pipelineOMPRPCProtocol struct {
 	declaredContextWindow int
 	// lastTurn is the assistant identity reported by the most recent agent_end.
 	lastTurn pipelineOMPTurnIdentity
+	// probe is nil on every production run. When set, the managed path records
+	// REQ-PROBE-001 metadata without changing any admission decision.
+	probe *pipelineOMPActiveProbe
 }
 
 type pipelineOMPModelState struct {

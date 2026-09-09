@@ -26,9 +26,16 @@ type pipelineOMPActiveSessionStats struct {
 }
 
 type pipelineOMPActiveUsage struct {
+	// Input is the billed primary input: tokens.input + cacheRead + cacheWrite.
 	Input  int64
 	Output int64
 	Total  int64
+	// ReportedInput, CacheRead and CacheWrite are the unaggregated
+	// get_session_stats components. Only probe records read them apart; the
+	// promotion oracle keeps using the aggregated Input.
+	ReportedInput int64
+	CacheRead     int64
+	CacheWrite    int64
 }
 
 func (protocol *pipelineOMPRPCProtocol) sessionStats(
@@ -55,7 +62,10 @@ func (protocol *pipelineOMPRPCProtocol) sessionStats(
 		tokens.Total < minimumTotal {
 		return pipelineOMPActiveUsage{}, errors.New("managed active OMP session stats are invalid")
 	}
-	return pipelineOMPActiveUsage{Input: effectiveInputWithWrite, Output: tokens.Output, Total: tokens.Total}, nil
+	return pipelineOMPActiveUsage{
+		Input: effectiveInputWithWrite, Output: tokens.Output, Total: tokens.Total,
+		ReportedInput: tokens.Input, CacheRead: tokens.CacheRead, CacheWrite: tokens.CacheWrite,
+	}, nil
 }
 
 // pipelineOMPActiveUsageVerdict decides whether one managed call moved usage,

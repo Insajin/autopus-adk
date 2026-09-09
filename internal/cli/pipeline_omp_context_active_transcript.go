@@ -108,6 +108,7 @@ func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveMessageValue(
 			}
 			return nil
 		case map[string]any:
+			protocol.probe.observeTranscriptMessage(typed)
 			if typeName, _ := typed["type"].(string); typeName == "image" {
 				image, found := pipelineOMPActiveImageDigest(typed)
 				if !found {

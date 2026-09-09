@@ -28,7 +28,9 @@ func newWorkflowContextProductOverlay(
 	runtimeRoot string,
 	memoryMode string,
 ) (WorkflowContextOverlayController, string, error) {
-	path, body, activeInfo, err := prepareWorkflowContextProductOverlay(runtimeRoot, memoryMode, true)
+	path, body, activeInfo, err := prepareWorkflowContextProductOverlay(
+		runtimeRoot, memoryMode, true, workflowContextProductOverlayMethodOrder,
+	)
 	if err != nil {
 		return nil, "", err
 	}
@@ -40,13 +42,28 @@ func newWorkflowContextProductOverlay(
 }
 
 func newWorkflowContextManagedManualCompactionOverlay(runtimeRoot, memoryMode string) (string, error) {
-	path, _, _, err := prepareWorkflowContextProductOverlay(runtimeRoot, memoryMode, false)
+	path, _, _, err := prepareWorkflowContextProductOverlay(
+		runtimeRoot, memoryMode, false, workflowContextProductOverlayMethodOrder,
+	)
+	return path, err
+}
+
+// newWorkflowContextManagedProbeCompactionOverlay writes the manual-compaction
+// overlay with the probe method order. REQ-PROBE-001 has to watch what an OMP
+// binary does when remote compaction is available, which the production body
+// forbids; nothing else about the overlay changes and no production caller
+// reaches this function.
+func newWorkflowContextManagedProbeCompactionOverlay(runtimeRoot, memoryMode string) (string, error) {
+	path, _, _, err := prepareWorkflowContextProductOverlay(
+		runtimeRoot, memoryMode, false, workflowContextProbeOverlayMethodOrder,
+	)
 	return path, err
 }
 
 func prepareWorkflowContextProductOverlay(
 	runtimeRoot, memoryMode string,
 	automaticCompaction bool,
+	methodOrder string,
 ) (string, []byte, fs.FileInfo, error) {
 	if memoryMode != config.OMPContextMemoryOff && memoryMode != config.OMPContextMemoryShadow {
 		return "", nil, nil, errors.New("product OMP overlay memory mode is invalid")
@@ -64,7 +81,7 @@ func prepareWorkflowContextProductOverlay(
 		return "", nil, nil, fmt.Errorf("secure product OMP overlay root: %w", err)
 	}
 	path := filepath.Join(root, "context-product.yml")
-	body := workflowContextProductOverlayBody(automaticCompaction)
+	body := workflowContextProductOverlayBody(automaticCompaction, methodOrder)
 	if err := writeWorkflowContextProductOverlay(path, body); err != nil {
 		return "", nil, nil, err
 	}
@@ -103,7 +120,7 @@ func (overlay *workflowContextProductOverlay) Apply(
 		}
 		return overlay.readback(request, config.OMPContextHistoryShadow, overlay.activeHash), nil
 	case config.OMPContextHistoryShadow, config.OMPContextHistoryOff:
-		body := workflowContextProductOverlayBody(false)
+		body := workflowContextProductOverlayBody(false, workflowContextProductOverlayMethodOrder)
 		if err := writeWorkflowContextProductOverlay(overlay.path, body); err != nil {
 			return WorkflowContextOverlayReadback{}, err
 		}
@@ -138,8 +155,16 @@ func (overlay *workflowContextProductOverlay) verifyActive() error {
 	return verifyWorkflowContextProductOverlay(overlay.path, overlay.activeBody, overlay.activeHash)
 }
 
+const (
+	// workflowContextProductOverlayMethodOrder is the production compaction
+	// chain. workflowContextProbeOverlayMethodOrder is written only by the
+	// REQ-PROBE-001 measurement path.
+	workflowContextProductOverlayMethodOrder = "[snapcompact]"
+	workflowContextProbeOverlayMethodOrder   = "[remote, snapcompact]"
+)
+
 // @AX:NOTE [AUTO] @AX:SPEC: SPEC-OMP-004: 100k threshold and 128/256-token windows bound local compaction; rollback only disables it.
-func workflowContextProductOverlayBody(active bool) []byte {
+func workflowContextProductOverlayBody(active bool, methodOrder string) []byte {
 	enabled := "false"
 	if active {
 		enabled = "true"
@@ -148,7 +173,7 @@ func workflowContextProductOverlayBody(active bool) []byte {
 		"extensions: []\nmcp:\n  enableProjectConfig: false\n" +
 		"commands:\n  enableClaudeProject: false\n  enableClaudeUser: false\n" +
 		"  enableOpencodeProject: false\n  enableOpencodeUser: false\n" +
-		"compaction:\n  enabled: " + enabled + "\n  methodOrder: [snapcompact]\n  midTurnEnabled: false\n" +
+		"compaction:\n  enabled: " + enabled + "\n  methodOrder: " + methodOrder + "\n  midTurnEnabled: false\n" +
 		"  thresholdTokens: 100000\n  thresholdPercent: -1\n  reserveTokens: 128\n" +
 		"  keepRecentTokens: 256\n  autoContinue: false\n" +
 		"memory:\n  backend: off\nskills:\n  enableCodexUser: false\n  enableClaudeUser: false\n" +
