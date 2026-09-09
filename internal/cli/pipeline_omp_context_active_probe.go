@@ -33,12 +33,13 @@ type pipelineOMPActiveProbe struct {
 	sessionSegment  int
 	// callOpen marks a call whose record has not been emitted yet, so an abort
 	// attaches its reason to that call instead of filing a second record.
-	callOpen    bool
-	statsBefore *ompprobe.Usage
-	statsAfter  *ompprobe.Usage
-	turnUsages  []ompprobe.Usage
-	rejected    int
-	attempt     *pipelineOMPActiveProbeAttempt
+	callOpen      bool
+	callStartedAt time.Time
+	statsBefore   *ompprobe.Usage
+	statsAfter    *ompprobe.Usage
+	turnUsages    []ompprobe.Usage
+	rejected      int
+	attempt       *pipelineOMPActiveProbeAttempt
 }
 
 // pipelineOMPActiveProbeTally counts metadata identifiers verbatim and
@@ -100,6 +101,7 @@ func (probe *pipelineOMPActiveProbe) beginCall(sequence int, variant string, ses
 	probe.statsBefore, probe.statsAfter = nil, nil
 	probe.turnUsages, probe.rejected, probe.attempt = nil, 0, nil
 	probe.callOpen = true
+	probe.callStartedAt = time.Now()
 }
 
 func (probe *pipelineOMPActiveProbe) observeStatsBefore(usage pipelineOMPActiveUsage, err error) {

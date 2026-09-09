@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/insajin/autopus-adk/pkg/ompprobe"
 )
@@ -13,6 +14,7 @@ import (
 // measurement, not a gap: REQ-PROBE-001 keeps its outcome, its refusal class
 // and whatever the transcript showed afterwards.
 type pipelineOMPActiveProbeAttempt struct {
+	startedAt    time.Time
 	outcome      string
 	method       string
 	refusal      string
@@ -34,7 +36,8 @@ func (probe *pipelineOMPActiveProbe) beginCompaction() {
 		return
 	}
 	probe.attempt = &pipelineOMPActiveProbeAttempt{
-		outcome: ompprobe.OutcomeFailed, method: ompprobe.MethodNone, refusal: ompprobe.RefusalNone,
+		startedAt: time.Now(),
+		outcome:   ompprobe.OutcomeFailed, method: ompprobe.MethodNone, refusal: ompprobe.RefusalNone,
 	}
 }
 
@@ -154,6 +157,7 @@ func (probe *pipelineOMPActiveProbe) finishCompaction(abortReason string) {
 		Kind: ompprobe.KindCompaction, Sequence: probe.sequence, Variant: probe.variant,
 		SessionSequence: probe.sessionSequence, SessionSegment: probe.sessionSegment,
 		Outcome: attempt.outcome, Method: attempt.method, Refusal: attempt.refusal,
+		ElapsedMS:   pipelineOMPActiveProbeElapsedMS(time.Since(attempt.startedAt)),
 		AbortReason: abortReason, TokensBefore: attempt.tokensBefore, TokensAfter: attempt.tokensAfter,
 		MaintenanceUsagePresent: attempt.usagePresent,
 		MaintenanceUsageKeys:    attempt.usageKeys.names(),
@@ -240,6 +244,10 @@ func pipelineOMPActiveProbeAbortReason(err error) string {
 		return "noop_proof_invalid"
 	case strings.Contains(message, "post-compaction state is invalid"):
 		return "post_state_invalid"
+	case strings.Contains(message, "pre-compaction checkpoint is out of order"):
+		return "pre_ack_out_of_order"
+	case strings.Contains(message, "post-compaction rehydration is out of order"):
+		return "post_ack_out_of_order"
 	case strings.Contains(message, "is out of order"):
 		return "ack_out_of_order"
 	case strings.Contains(message, "bridge authority mismatch"),

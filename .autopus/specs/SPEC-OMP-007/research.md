@@ -185,4 +185,12 @@ These are optional improvements and do not block sync completion.
 - Q-CORR-02 / Q-CORR-04: descriptor exporter·probe flags·attempt coverage는 모두 계획이며 기존 기능으로 주장하지 않는다.
 - Q-COMP-06 | status: PASS | attempt: 4 | files: spec.md, research.md | reason: requirement·plan·AC·invariant의 추적표와 revision 3 Reviewer Brief를 연결했다.
 - Q-COMP-07 | status: PASS | attempt: 4 | files: research.md | reason: probe·allowlist·측정은 Completion Debt로, historical fixture vendoring은 기존 deferred advisory로 구분했다.
-- Static document validation은 Main이 실행한다. 마지막 정식 receipt는 이 수정 전 입력에 대한 REJECT이며, Claude reviewer/judge 429 때문에 독립 재리뷰는 아직 완료하지 못했다.
+- 독립 리뷰 승인: 사용자 승인에 따른 Codex·Gemini 리뷰/Codex judge 실행 `orch-ed56c3aba701c8c12ee8721e2b5f1730`, 48/48 PASS, gate passed, current_status approved, override_applied false. 이 승인은 문서 계약만 대상으로 하며 runtime probe 성공을 뜻하지 않는다.
+
+## T0 attempt 1 — retained partial observation (2026-09-09)
+
+- Source `a36b8d4790a12408dc2083cd85ff78fa38208544`, OMP 18.1.13, model gpt-5.6-sol. Five primary calls completed; sequence 6 stopped before the next primary prompt. Six call records (one failed) and two compaction-attempt records survived cleanup; rejected=0, complete=false, mode 0600. No report, signature or tag was produced.
+- Local retained artifact: `.autopus/runtime/omp007/retained/probe-00b0f30b2c4114520557e9a5eb579b51.jsonl`, SHA256 `b87a661b0a0bc01106eee0d4fa40652f5a5f3d7829542e4272e0238c1a4ec357`.
+- Attempt at sequence 3 was refused as `too_small`. Attempt at sequence 6 recorded `ack_out_of_order`, `method=none`, `attempt_coverage=unknown`; neither remote completion nor net maintenance was observed. This is not a zero-reduction result.
+- Instrumentation gaps found: pre/post ordering shared one reason token; compaction and failed-call durations were left at zero. The next diagnostic-only revision separates `pre_ack_out_of_order`/`post_ack_out_of_order` and records actual durations. It preserves the ACK rejection conditions.
+- [STATIC] [OMP 18.1.13 session-maintenance.ts](https://github.com/can1357/oh-my-pi/blob/v18.1.13/packages/coding-agent/src/session/session-maintenance.ts) emits `session_before_compact` for an attempt (around lines 860–871) and can recursively enter the next method after failure (around 1115–1130). Repeated pre-checkpoints are a plausible cause, not proven by the retained generic reason. No ordering tolerance is introduced without identifying the observed sequence.

@@ -75,7 +75,7 @@ func (probe *pipelineOMPActiveProbe) abort(runErr error) error {
 	}
 	reason := workflowContextObserveSessionErrorCode(runErr)
 	if probe.callOpen {
-		probe.finishCall(0, reason)
+		probe.finishCall(time.Since(probe.callStartedAt), reason)
 	} else {
 		probe.recordAbort(reason)
 	}
