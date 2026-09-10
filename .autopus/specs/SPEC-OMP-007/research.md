@@ -163,7 +163,6 @@ These are optional improvements and do not block sync completion.
 
 - Intended scope: promotion evidence의 측정 주장을 유효 chain의 유효(provider 청구, 관측된 유지비 net) 감축 + segment 누적 집계로 바꾸고(v2), 검증된 major(17·18)에서 evidence를 만들며, v1 검증 불변, probe 선행, Verdict State Table로 pin/doctor/diagnostic 정렬.
 - Explicit non-goals: floor 완화, cohort 형태, attestation envelope/키, upstream 수정, threshold 자동 compaction, `Already compacted` no-op 승격, 비용 계산.
-- Self-verified: Traceability Matrix, INV-001–011 ↔ AC-001–012, existing/[NEW] 분리(신규 flag·env 포함), 바이너리 line 인용은 실제 `sed -n` 출력(rev 2에서 snapcompact 로컬 렌더·LLM 대체·실패 재귀 line 재확인), evidence 숫자는 로컬 tag에서 jq로 재계산, 음수 fixture(−131 bp)와 diagnostic 길이(217·220바이트) 산술 확인, rev 0 finding 10건과 rev 2의 P-1–P-9 반영(spec.md 두 Revision 절).
 - Reviewer focus (revision 3): (1) final remote usage가 내부 재시도 비용을 포함한다는 가정을 제거했는지, (2) descriptor 기반 probe export가 검사-사용 경쟁을 막는지, (3) camelCase histogram이 allowlist 근거를 보존하는지, (4) 현재 oracle 실패/중단과 historical 성공의 우선순위가 일관적인지, (5) 세 execution outcome이 17.2.7 및 18.x 모두에서 거짓 수치 없이 닫히는지. 이전 self-verify PASS는 재리뷰가 발견한 문제를 대신하지 않는다.
 
 ## Security Boundary
@@ -176,12 +175,9 @@ These are optional improvements and do not block sync completion.
 ## Self-Verify Summary
 
 - Revision 3은 2026-09-09 review의 열린 finding만 다룬다. 이전 revision의 PASS 주장은 해당 입력에 대한 자체 검토 기록이며 정식 승인 근거가 아니다.
-- Q-COMP-02 / Q-COMP-04 / Q-COH-02: SPEC Completion evidence·Verdict State Table·T7·AC-009/012를 세 execution outcome과 현재 oracle 우선순위로 맞췄다. 승격을 보장하지 않는다.
-- Q-COMP-05: AC-004에 내부 재시도 final-usage-only 거부와 complete two-attempt 비용 합산을 추가했다. 이 fixture는 현재 OMP가 그런 transport receipt를 제공한다는 주장이 아니다. 관측원이 없으면 blocked다.
-- Q-FEAS-03: probe metadata identifier에 camelCase를 보존하고 full/partial 종료를 구분했다. 승인 전 live probe는 미실행이다.
-- Q-SEC-02 / Q-SEC-03: file path 검사 후 raw install 대신 process-free·동일 descriptor 검증·검증된 레코드만 발행하도록 고쳤다. 경로/상위 디렉터리 교체·hardlink·symlink·잔존 프로세스 fixture를 AC-010에 명시했다.
 - Q-CORR-01: remote 내부 retry 및 final usage 누락 가능성은 Codex 재리뷰의 `Toe`/`moe=2` 정적 분석에 근거한다. 런타임에서 전체 attempt coverage는 아직 관측되지 않았다.
 - Q-COMP-03: `maint_input_tokens`는 전체 cohort 합으로 정의했다(20000+20000=40000, 10000+30000=40000); segment min은 별도다.
+- Q-COMP-05 | status: PASS | attempt: 5 | files: acceptance.md, research.md | reason: 회귀 검증과 실제 partial probe 결과를 구분하여 기록했으며 AC-010 전체 성공이나 v2 감축률을 주장하지 않는다.
 - Q-CORR-02 / Q-CORR-04: descriptor exporter·probe flags·attempt coverage는 모두 계획이며 기존 기능으로 주장하지 않는다.
 - Q-COMP-06 | status: PASS | attempt: 4 | files: spec.md, research.md | reason: requirement·plan·AC·invariant의 추적표와 revision 3 Reviewer Brief를 연결했다.
 - Q-COMP-07 | status: PASS | attempt: 4 | files: research.md | reason: probe·allowlist·측정은 Completion Debt로, historical fixture vendoring은 기존 deferred advisory로 구분했다.
@@ -194,3 +190,11 @@ These are optional improvements and do not block sync completion.
 - Attempt at sequence 3 was refused as `too_small`. Attempt at sequence 6 recorded `ack_out_of_order`, `method=none`, `attempt_coverage=unknown`; neither remote completion nor net maintenance was observed. This is not a zero-reduction result.
 - Instrumentation gaps found: pre/post ordering shared one reason token; compaction and failed-call durations were left at zero. The next diagnostic-only revision separates `pre_ack_out_of_order`/`post_ack_out_of_order` and records actual durations. It preserves the ACK rejection conditions.
 - [STATIC] [OMP 18.1.13 session-maintenance.ts](https://github.com/can1357/oh-my-pi/blob/v18.1.13/packages/coding-agent/src/session/session-maintenance.ts) emits `session_before_compact` for an attempt (around lines 860–871) and can recursively enter the next method after failure (around 1115–1130). Repeated pre-checkpoints are a plausible cause, not proven by the retained generic reason. No ordering tolerance is introduced without identifying the observed sequence.
+
+## T0 attempt 2 — checkpoint boundary identified (2026-09-10)
+
+- Source `81a5361e12bad684dc46c4bd08fb4c35a23c2836`, OMP 18.1.13, model gpt-5.6-sol; five successful primary calls, sequence 6 aborted before primary execution. Retained records: six call records (one failed), two compaction attempts; complete=false, rejected=0, mode 0600.
+- Artifact `.autopus/runtime/omp007/retained/probe-c046b270bbac69ffb1ec736409a138da.jsonl`, SHA256 `e27902849b1f79a25f8d3ac6d9ce0fbfab8710099f76c84ae6e9731200a79753`.
+- Sequence 6 compaction recorded `pre_ack_out_of_order`, elapsed 61ms; failed call elapsed 111ms. `method=none` and `attempt_coverage=unknown` remain observations of missing evidence, not a successful remote compaction or zero maintenance claim.
+- In `manualCompact`, this error is raised for an authenticated pre-checkpoint after pre/post/response state was already established. A repeated pre-checkpoint within the current compact transaction is therefore established; the first method's internal failure is not. The pinned upstream recursive fallback is a compatible explanation, not proof of that internal failure.
+- This is a protocol compatibility blocker, not a token-reduction verdict. After two failures the live probe stops; restore the release pin to 17.2.7 and revise/review a bounded per-method checkpoint contract before any further live retry. No report, attestation, release tag or evidence tag was produced.

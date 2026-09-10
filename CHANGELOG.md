@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **OMP-007 probe가 반복 pre-checkpoint 경계에서 중단된 근거를 기록한다** (2026-09-10): 두 번째 실제 관측도 primary 호출 5개를 마친 뒤 sequence 6에서 중단됐으며, 보완한 진단은 `pre_ack_out_of_order`와 compaction 경과 시간 61ms를 기록했다. 부분 기록 8개는 cleanup 후 0600 파일로 보존됐다. 이는 단일 pre-checkpoint를 전제한 하네스 계약과의 충돌이지 감축률 0bp나 remote 승격 성공이 아니다. 첫 방법의 내부 실패 사유는 아직 관측되지 않았다. 두 번의 실패 뒤 추가 유료 재시도를 멈추고 임시 probe 핀을 17.2.7로 복원한다. 방법별 checkpoint와 replay를 구분하는 계약 개정·리뷰 전에는 oracle 구현과 릴리스를 진행하지 않는다.
+
 - **SPEC-OMP-007의 계측 전용 probe 경로를 추가한다** (2026-09-09): 명시적 `--probe-dir`에서 primary usage와 compaction 방법·거부·metadata를 기록하고 report·attestation·태그 생성 전에 종료한다. 관측하지 못한 provider 시도별 비용은 `unknown`으로 남긴다. probe 완료 판정은 실제 보존된 40개 call·18개 attempt의 순서·세션·AB/BA 균형·필수 stats를 확인한다. 반출은 UID 종료 확인 후 동일 descriptor로 검증하며, 검증된 레코드를 임시 보관한 뒤 계정·isolation root·sudo 정리가 모두 성공했을 때만 새 retained 파일로 발행한다. 경로 교체, symlink/hardlink, 중복·누락 기록, cleanup 실패를 회귀 검증했다. `advance-omp-pin.sh --probe`는 성능 거부 후보의 관측 준비만 허용한다. 현재 18.1.13 핀은 이 관측 실행을 위한 임시 선택이며 v2 오라클이나 릴리스 승인을 뜻하지 않는다.
 
 - **단일 저장소에서도 `auto sync verify`로 커밋 대상을 분류한다 (#188)** (2026-09-09): `autopus.yaml`이 있는 단일 Git 저장소와 linked worktree에서 제품 파일, 생성·런타임 경로, 안전하게 분류할 수 없는 경로를 구분한다. 멀티 저장소의 Phase A/B 분류는 유지한다. Git 저장소가 아닌 위치와 손상된 meta root는 `unsupported topology`와 종료 코드 2로 알리며, `--strict` 분류 실패의 종료 코드 1과 구분한다. 실제 생성 프로젝트에서 발견한 `.omp/` 및 Claude 권한 기록의 제외 누락도 수정했다. 생성 정책은 두 토폴로지를 설명하고 `auto check --hygiene --staged`가 동등한 대체 검증이 아님을 명시한다.
