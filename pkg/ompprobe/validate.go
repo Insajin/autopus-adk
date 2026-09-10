@@ -136,6 +136,9 @@ func validateRecordEnums(record Record) error {
 		return errRecordEnum
 	}
 	if record.Kind == KindCall {
+		if record.PreCheckpoints != 0 || record.PostCheckpoints != 0 {
+			return errRecordScope
+		}
 		if record.Outcome != "" || record.Method != "" || record.Refusal != "" || record.AttemptCoverage != "" {
 			return errRecordScope
 		}
@@ -165,6 +168,10 @@ func validateRecordEnums(record Record) error {
 }
 
 func validateRecordMetadata(record Record) error {
+	if record.PreCheckpoints < 0 || record.PreCheckpoints > maxCountValue ||
+		record.PostCheckpoints < 0 || record.PostCheckpoints > maxCountValue {
+		return errRecordCount
+	}
 	if record.CompactionImages < 0 || record.CompactionImages > maxCountValue {
 		return errRecordCount
 	}

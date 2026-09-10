@@ -25,6 +25,10 @@ type pipelineOMPActiveProbe struct {
 	// record is not a completed probe, so the run reports that instead of
 	// probe_completed.
 	failure error
+	// Measured OMP identity, bound once from the observe-session setup. A
+	// checkpoint profile is granted from this and from nothing else.
+	ompVersion          string
+	ompExecutableSHA256 string
 	// Identity of the call in flight, set by the observe-session run before it
 	// hands the prompt to a session.
 	sequence        int

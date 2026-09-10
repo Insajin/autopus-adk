@@ -35,9 +35,9 @@ func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveTranscript(
 	newImages := make([]string, 0)
 	seenCursors := map[string]struct{}{"": {}}
 	for {
-		data, err := protocol.call(ctx, pipelineOMPRPCCommand{
+		data, err := protocol.readMessagesPage(ctx, pipelineOMPRPCCommand{
 			Type: "get_messages_page", Cursor: cursor, Limit: pipelineOMPActiveTranscriptPageSize,
-		}, false)
+		})
 		if err != nil {
 			return "", nil, errors.New("managed active OMP transcript snapshot is unavailable")
 		}
@@ -86,6 +86,22 @@ func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveTranscript(
 		return "", nil, errors.New("managed active OMP transcript page count is incomplete")
 	}
 	return pipelineOMPActiveHash(all), newImages, nil
+}
+
+// readMessagesPage answers one transcript page query. Outside a held
+// compaction barrier the correlating reader is right; the repeated-pre proof
+// of REQ-CHECKPOINT-001 installs a strict reader for the duration of its
+// query, because there the frames that reader would walk past are exactly the
+// ones that must fail the transaction. Pagination, the structural walk and the
+// proof hash stay here either way.
+func (protocol *pipelineOMPRPCProtocol) readMessagesPage(
+	ctx context.Context,
+	command pipelineOMPRPCCommand,
+) (json.RawMessage, error) {
+	if protocol.pageReader != nil {
+		return protocol.pageReader(ctx, command)
+	}
+	return protocol.call(ctx, command, false)
 }
 
 func (protocol *pipelineOMPRPCProtocol) validatePipelineOMPActiveMessageValue(

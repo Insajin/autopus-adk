@@ -53,6 +53,15 @@ func startPipelineOMPActiveEvaluatorSession(
 	protocol := newPipelineOMPRPCProtocol(process)
 	protocol.declaredContextWindow = backend.ModelContextWindow
 	protocol.probe = probe
+	// The checkpoint profile follows the measured runtime identity and the
+	// overlay chain this session actually wrote, so an unmeasured binary or a
+	// production chain keeps the single-pre rule.
+	if probe != nil {
+		ompVersion, ompDigest := probe.runtimeIdentity()
+		protocol.configureProbeCheckpointProfile(
+			ompVersion, ompDigest, optimized, pipelineOMPActiveOverlayChain(active.probeMethodOrder),
+		)
+	}
 	sessionID, err := protocol.initializeManaged(ctx, candidate.Provider+"/"+candidate.Model)
 	if err != nil {
 		_ = process.Close()

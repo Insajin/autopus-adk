@@ -83,6 +83,15 @@ func runPipelineOMPActiveRPCFixture() int {
 	if modelID == "model-text-only" {
 		modelInput = []string{"text"}
 	}
+	// A checkpoint model owns its own compact transaction, so the mutation a
+	// completed compaction performs moves behind this callback: nothing the
+	// transaction has not settled may be visible to a proof query.
+	checkpoint := newPipelineOMPActiveCheckpointFixture(modelID)
+	completeCompaction := func() {
+		compactionCount++
+		inputTokens, outputTokens, cacheReadTokens, messageCount = 0, 0, 0, 0
+		transcript = append(transcript, pipelineOMPActiveCheckpointSummary())
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		var command pipelineOMPRPCCommand
@@ -94,11 +103,16 @@ func runPipelineOMPActiveRPCFixture() int {
 			Provider: command.Provider, ModelID: command.ModelID, Message: command.Message,
 			Protocol: command.ProtocolVersion,
 		})
+		if checkpoint.handles(command.Type) {
+			checkpoint.handle(output, command, transcript, completeCompaction)
+			continue
+		}
 		switch command.Type {
 		case "negotiate_protocol":
 			writePipelineOMPActiveResponse(output, command, map[string]any{"protocolVersion": 2})
 		case "set_model":
 			provider, modelID = command.Provider, command.ModelID
+			checkpoint.retarget(modelID)
 			modelInput = []string{"text", "image"}
 			if modelID == "model-text-only" {
 				modelInput = []string{"text"}
@@ -203,13 +217,7 @@ func writePipelineOMPActiveCompaction(
 	modelID string,
 	sequence int,
 ) {
-	binding := WorkflowContextBridgeBinding{
-		SchemaVersion: workflowContextBridgeSchemaVersion,
-		BindingHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_BINDING_HASH"),
-		OptionsHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_OPTIONS_HASH"),
-		SessionHash:   os.Getenv("AUTOPUS_OMP_CONTEXT_SESSION_HASH"),
-		NonceHash:     os.Getenv("AUTOPUS_OMP_CONTEXT_NONCE_HASH"),
-	}
+	binding := pipelineOMPActiveFixtureBinding()
 	remote := modelID == pipelineOMPActiveProbeRemoteModel
 	native := remote || os.Getenv("AUTOPUS_TEST_OMP_ACTIVE_LEGACY_COMPACTION") == "1"
 	action := "snapcompact"

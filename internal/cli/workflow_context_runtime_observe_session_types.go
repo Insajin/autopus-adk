@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,6 +105,11 @@ type workflowContextObserveSessionOptions struct {
 // emitted by the promotion report validator.
 const workflowContextObserveSessionGatePrefix = "OMP context promotion cohort gates failed: "
 
+var workflowContextObserveSessionGatePattern = regexp.MustCompile(
+	`^pairs=[0-9]+/[0-9]+ ab=[0-9]+/[0-9]+ ba=[0-9]+/[0-9]+ observed_ab=[0-9]+ observed_ba=[0-9]+ ` +
+		`compactions=[0-9]+/2 integrity_failures=[0-9]+ security_failures=[0-9]+ quality_regressions=[0-9]+ ` +
+		`fallback_verified=(true|false) rollback_verified=(true|false) median_reduction_bp=-?[0-9]+/[0-9]+$`)
+
 // workflowContextObserveSessionGateDiagnostic extracts the numeric gate verdict
 // from a run error, or returns "" for every other failure.
 func workflowContextObserveSessionGateDiagnostic(runErr error) string {
@@ -115,7 +121,11 @@ func workflowContextObserveSessionGateDiagnostic(runErr error) string {
 	if index < 0 {
 		return ""
 	}
-	return message[index+len(workflowContextObserveSessionGatePrefix):]
+	diagnostic := message[index+len(workflowContextObserveSessionGatePrefix):]
+	if len(diagnostic) > 400 || !workflowContextObserveSessionGatePattern.MatchString(diagnostic) {
+		return ""
+	}
+	return diagnostic
 }
 
 func workflowContextObserveSessionErrorCode(runErr error) string {
@@ -127,8 +137,6 @@ func workflowContextObserveSessionErrorCode(runErr error) string {
 	}
 	message := strings.ToLower(runErr.Error())
 	switch {
-	case strings.Contains(message, "cohort gates failed"):
-		return "cohort_gates_failed"
 	case strings.Contains(message, "handshake is invalid"),
 		strings.Contains(message, "shutdown is invalid"),
 		strings.Contains(message, "input continued after shutdown"),

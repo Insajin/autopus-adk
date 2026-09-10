@@ -44,7 +44,11 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	preparePrompt func() (string, error),
 ) (performed bool, runErr error) {
 	protocol.probe.beginCompaction()
-	defer func() { protocol.probe.finishCompaction(pipelineOMPActiveProbeAbortReason(runErr)) }()
+	checkpoints := pipelineOMPActiveCheckpoints{limit: protocol.preCheckpointLimit}
+	defer func() {
+		protocol.probe.observeCheckpoints(checkpoints.pre, checkpoints.post)
+		protocol.probe.finishCompaction(pipelineOMPActiveProbeAbortReason(runErr))
+	}()
 	preProof, _, err := protocol.validatePipelineOMPActiveTranscript(ctx, false)
 	if err != nil {
 		return false, err
@@ -54,7 +58,7 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 	if err := protocol.process.send(pipelineOMPRPCCommand{ID: id, Type: "compact"}); err != nil {
 		return false, err
 	}
-	started, preACKed, postACKed, responded, ended := false, false, false, false, false
+	started, responded, ended := false, false, false
 	var nativeResult []byte
 	for !ended {
 		frame, err := protocol.process.next(ctx)
@@ -67,7 +71,7 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 		protocol.probe.observeCompactionFrame(frame)
 		switch frame.Type {
 		case "auto_compaction_start":
-			if started || postACKed || frame.Reason != "manual" ||
+			if started || checkpoints.postACKs > 0 || frame.Reason != "manual" ||
 				!protocol.probe.acceptsCompactionAction(frame.Action) {
 				return false, errors.New("managed active OMP manual compaction start is invalid")
 			}
@@ -81,25 +85,33 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 				return false, bridgeErr
 			}
 			if event == WorkflowContextEventPreCompaction {
-				if preACKed || postACKed || responded {
-					return false, errors.New("managed active OMP pre-compaction checkpoint is out of order")
+				repeat, admitErr := checkpoints.admitPre(frame.ID, responded)
+				if admitErr != nil {
+					return false, admitErr
 				}
-				preACKed = true
+				// The bounded second pre is admitted only for the history the
+				// transaction opened on, and the proof runs before its
+				// acknowledgement so a rewritten transcript is never confirmed.
+				if repeat {
+					if err := protocol.proveRepeatedPreCheckpoint(ctx, binding, &checkpoints, preProof); err != nil {
+						return false, err
+					}
+				}
 			} else {
-				if !preACKed || postACKed || responded {
-					return false, errors.New("managed active OMP post-compaction rehydration is out of order")
+				if err := checkpoints.admitPost(frame.ID, responded); err != nil {
+					return false, err
 				}
 				if _, err := preparePrompt(); err != nil {
 					return false, err
 				}
-				postACKed = true
 			}
 			if err := protocol.confirmPipelineOMPActiveBridge(frame.ID); err != nil {
 				return false, err
 			}
+			checkpoints.acknowledged(event)
 		case "response":
 			if frame.ID == id && frame.Command == "compact" && !frame.Success && !started &&
-				!postACKed && !responded &&
+				checkpoints.postACKs == 0 && !responded &&
 				pipelineOMPActiveCompactionRefused(frame.Error) {
 				protocol.probe.observeCompactRefusal(frame.Error)
 				postProof, _, proofErr := protocol.validatePipelineOMPActiveTranscript(ctx, false)
@@ -112,7 +124,8 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 				return false, nil
 			}
 			if frame.ID != id || frame.Command != "compact" || !frame.Success || responded ||
-				!preACKed || !postACKed || !validPipelineOMPActiveManualResult(frame.Data) {
+				checkpoints.preACKs == 0 || checkpoints.postACKs == 0 ||
+				!validPipelineOMPActiveManualResult(frame.Data) {
 				// The bare form of this error cost a whole cohort run to learn
 				// nothing: omp/18.1.5 failed here at call 6 of 42 and the message
 				// named no field. Reaching a real compaction needs cohort-scale
@@ -123,7 +136,8 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 						"id_match=%t command=%q success=%t already_responded=%t "+
 						"pre_acked=%t post_acked=%t summary_valid=%t error=%q",
 					frame.ID == id, frame.Command, frame.Success, responded,
-					preACKed, postACKed, validPipelineOMPActiveManualResult(frame.Data),
+					checkpoints.preACKs > 0, checkpoints.postACKs > 0,
+					validPipelineOMPActiveManualResult(frame.Data),
 					frame.Error)
 			}
 			responded = true
@@ -139,7 +153,7 @@ func (protocol *pipelineOMPRPCProtocol) manualCompact(
 			nativeResult = append(nativeResult, 0)
 			nativeResult = append(nativeResult, frame.Result...)
 			ended = true
-		case "agent_start", "turn_end", "agent_end", "prompt_result":
+		case "agent_start", "turn_start", "turn_end", "agent_end", "prompt_result":
 			return false, errors.New("managed active OMP provider activity crossed the compaction barrier")
 		}
 	}

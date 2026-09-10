@@ -29,6 +29,10 @@ type pipelineOMPActiveProbeAttempt struct {
 	roles        pipelineOMPActiveProbeTally
 	contentTypes pipelineOMPActiveProbeTally
 	collecting   bool
+	// Authenticated checkpoint events this attempt received, including the ones
+	// it refused for ordering. Never a provider request count.
+	preCheckpoints  int
+	postCheckpoints int
 }
 
 func (probe *pipelineOMPActiveProbe) beginCompaction() {
@@ -169,6 +173,7 @@ func (probe *pipelineOMPActiveProbe) finishCompaction(abortReason string) {
 		// presence, method and image count instead.
 		AttemptCoverage:  ompprobe.AttemptCoverageUnknown,
 		CompactionImages: attempt.images, UIRequestMethods: attempt.uiMethods.names(),
+		PreCheckpoints: attempt.preCheckpoints, PostCheckpoints: attempt.postCheckpoints,
 		Roles: attempt.roles.histogram(), ContentTypes: attempt.contentTypes.histogram(),
 		RejectedIdentifiers: rejected,
 	})
@@ -248,6 +253,14 @@ func pipelineOMPActiveProbeAbortReason(err error) string {
 		return "pre_ack_out_of_order"
 	case strings.Contains(message, "post-compaction rehydration is out of order"):
 		return "post_ack_out_of_order"
+	case strings.Contains(message, "checkpoint request ID is replayed"):
+		return "checkpoint_id_replayed"
+	case strings.Contains(message, "repeated pre-compaction proof changed"):
+		return "pre_proof_changed"
+	case strings.Contains(message, "checkpoint arrived during the compaction proof"):
+		return "checkpoint_during_proof"
+	case strings.Contains(message, "compaction proof query was not answered"):
+		return "proof_query_unanswered"
 	case strings.Contains(message, "is out of order"):
 		return "ack_out_of_order"
 	case strings.Contains(message, "bridge authority mismatch"),

@@ -214,6 +214,9 @@ func (setup *workflowContextObserveSessionSetup) start(ctx context.Context) erro
 		setup.segmentsStarted >= workflowContextObserveSessionSegmentCount {
 		return errors.New("observe-session segment startup is invalid")
 	}
+	// A checkpoint profile may only follow the identity this setup measured, so
+	// it is bound once here, before any segment can send a frame.
+	setup.probe.bindRuntimeIdentity(setup.ompVersion, setup.ompExecutableSHA256)
 	full, err := startPipelineOMPActiveEvaluatorSession(
 		ctx, setup.backend, setup.candidate, setup.prepared, false, setup.sandboxMode, setup.probe,
 	)

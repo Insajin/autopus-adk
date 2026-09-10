@@ -61,6 +61,16 @@ type pipelineOMPRPCProtocol struct {
 	// probe is nil on every production run. When set, the managed path records
 	// REQ-PROBE-001 metadata without changing any admission decision.
 	probe *pipelineOMPActiveProbe
+	// preCheckpointLimit is how many authenticated pre-compaction checkpoints
+	// one manual compact transaction may acknowledge. Production and every
+	// unverified runtime keep one; REQ-CHECKPOINT-001 raises it to two for the
+	// measured probe profile alone.
+	preCheckpointLimit int
+	// pageReader overrides the transcript page query for one operation. It is
+	// nil except while a held compaction barrier proves a repeated
+	// pre-checkpoint, where the correlating reader would discard the very
+	// frames that must fail the transaction.
+	pageReader func(context.Context, pipelineOMPRPCCommand) (json.RawMessage, error)
 }
 
 type pipelineOMPModelState struct {
@@ -93,7 +103,17 @@ func (state pipelineOMPState) supportsNativeImageCompaction(selector string) boo
 }
 
 func newPipelineOMPRPCProtocol(process *pipelineOMPProcess) *pipelineOMPRPCProtocol {
-	return &pipelineOMPRPCProtocol{process: process, safeCompactionImages: make(map[string]struct{})}
+	return &pipelineOMPRPCProtocol{
+		process: process, safeCompactionImages: make(map[string]struct{}),
+		preCheckpointLimit: pipelineOMPActiveSinglePreCheckpoint,
+	}
+}
+
+// nextCommandID mints the correlation ID of one RPC command. Every reader that
+// waits for an exact response derives its expectation from the same counter.
+func (protocol *pipelineOMPRPCProtocol) nextCommandID() string {
+	protocol.nextID++
+	return fmt.Sprintf("pipeline-%d", protocol.nextID)
 }
 
 // @AX:ANCHOR [AUTO] @AX:SPEC: SPEC-OMP-004: negotiation disables OMP retry and automatic compaction before phase prompts.
@@ -193,8 +213,7 @@ func (protocol *pipelineOMPRPCProtocol) call(
 	command pipelineOMPRPCCommand,
 	waitLifecycle bool,
 ) (json.RawMessage, error) {
-	protocol.nextID++
-	command.ID = fmt.Sprintf("pipeline-%d", protocol.nextID)
+	command.ID = protocol.nextCommandID()
 	if err := protocol.process.send(command); err != nil {
 		return nil, err
 	}

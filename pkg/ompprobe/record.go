@@ -106,7 +106,10 @@ type Record struct {
 	MaintenanceInputTokens  *int64   `json:"maintenance_input_tokens,omitempty"`
 	MaintenanceOutputTokens *int64   `json:"maintenance_output_tokens,omitempty"`
 
-	CompactionImages    int            `json:"compaction_images,omitempty"`
+	CompactionImages int `json:"compaction_images,omitempty"`
+	// Counts are authenticated received events, not provider attempts or costs.
+	PreCheckpoints      int            `json:"pre_checkpoints,omitempty"`
+	PostCheckpoints     int            `json:"post_checkpoints,omitempty"`
 	UIRequestMethods    []string       `json:"ui_request_methods,omitempty"`
 	Roles               map[string]int `json:"roles,omitempty"`
 	ContentTypes        map[string]int `json:"content_types,omitempty"`

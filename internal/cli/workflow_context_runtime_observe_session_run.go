@@ -33,7 +33,14 @@ func RunWorkflowContextObserveSession(
 		response.ErrorCode = workflowContextObserveSessionErrorCode(runErr)
 		response.ErrorStage = errorStage
 		response.FailedSequence = errorSequence
-		response.GateDiagnostic = workflowContextObserveSessionGateDiagnostic(runErr)
+		// Only the local evidence validator may supply numeric gate metadata.
+		// Provider/setup errors are untrusted even if they copy its prefix.
+		if errorStage == "evidence" {
+			response.GateDiagnostic = workflowContextObserveSessionGateDiagnostic(runErr)
+			if response.GateDiagnostic != "" {
+				response.ErrorCode = "cohort_gates_failed"
+			}
+		}
 		if err := encoder.Encode(response); err != nil {
 			runErr = errors.Join(runErr, fmt.Errorf("observe-session error response: %w", err))
 		}
