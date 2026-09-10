@@ -3,7 +3,7 @@
 ---
 id: SPEC-OMP-007
 title: OMP context promotion oracle — 18.x에서도 유효한 compaction 효과 측정
-version: 0.2.0
+version: 0.3.0
 status: approved
 priority: HIGH
 created: 2026-09-08
@@ -25,9 +25,10 @@ domain: OMP
 ## Outcome Boundary
 
 - **Outcome Lock**: promotion evidence v2가 "OMP의 유효 compaction chain(policy `effective_method_order`: 이 저장소가 바이너리로 읽은 major만 — omp/17.x는 `[snapcompact]`, omp/18.x는 `[remote, snapcompact]`, 그 외 major는 fail-closed; 오버레이 body는 두 경우 모두 `methodOrder: [remote, snapcompact]`)이 10-call segment의 provider 청구 primary input을 관측된 compaction 유지비까지 계상해 20% 이상 줄였다"를 attest하고, 유지비가 관측 불가한 compaction은 통과가 아니라 fail-closed이며, 이 oracle 아래에서 floor를 넘는 버전은 통과하고 넘지 못하는 버전은 실패하며, 과거 v1 evidence 23건은 변경 전후 동일하게 검증되고, `auto doctor`·`advance-omp-pin.sh`·canary gate verdict가 하나의 Verdict State Table에서 같은 metric 이름을 말한다. 오라클 변경 전에 probe cohort 1회가 H1′–H4를 판정한다. 이 SPEC은 어떤 버전이 v2 floor를 넘는다고 주장하지 않는다 — 17.2.7의 v2 값도 미측정이고, 측정값이 floor 미만이면 결과는 아래 Completion evidence의 `blocked` outcome이다.
-- **Mandatory requirements**: REQ-MEASURE-001/002, REQ-METHOD-001/002, REQ-ATTEST-001, REQ-COMPAT-001/002, REQ-DIAG-001, REQ-PIN-001, REQ-DOCTOR-001, REQ-PROBE-001, REQ-PRODUCT-001.
+- **Mandatory requirements**: REQ-MEASURE-001/002, REQ-METHOD-001/002, REQ-ATTEST-001, REQ-COMPAT-001/002, REQ-DIAG-001, REQ-PIN-001, REQ-DOCTOR-001, REQ-PROBE-001, REQ-PRODUCT-001, REQ-CHECKPOINT-001.
 - **Explicit non-goals**: `min_reduction_basis_points` 2000의 수치 완화, 20 pair/40 call cohort 형태·AB/BA 균형·serial 실행 변경, attestation v2 envelope·서명키·lineage 변경(SPEC-ADK-RELEASE-SIGNING-001 영역), product runtime의 threshold 자동 compaction 임계값 변경, upstream snapcompact projection 수정, `Already compacted` 거부의 no-op 승격, 통화 단위 비용 계산, tools allowlist·sandbox 변경, 리뷰 backend(SPEC-OMP-006) 변경.
 - **Completion evidence**: AC-001–AC-012 검증과 historical v1 동일 결과를 남긴다. T7의 실행 결과는 `passed`, `blocked_below_floor`, `blocked_unobservable`로 구분한다. `passed`만 v2 서명·발행을 허용한다. 완전한 cohort가 floor 미만이면 숫자·oracle·cohort digest를 `refused`로 기록한다. 관측 불가나 안전 경계 오류로 중단되면 감축률을 만들지 않고 `unmeasured`와 body-free `last_attempt_reason`을 남긴다. 후보가 어느 blocked 결과든 실제 release pin을 복원하고 선택된 핀에서도 같은 절차로 한 번 측정한다. 그 핀도 실패하면 v2 발행은 blocked로 남고 사용자에게 알린다. 기존 v1 서명 이력은 별도 보존하며, 실패값을 verified 값으로 덮어쓰거나 floor 2000을 완화하지 않는다.
+The completion boundary also requires AC-013 for REQ-CHECKPOINT-001 before the resumed live probe; an earlier document-approval receipt does not approve this amendment.
 
 ## Requirements
 
@@ -142,6 +143,18 @@ Precedence fixture: pinned 17.2.7 with historical v1=2335 and complete v2=1300 i
 - SPEC-OMP-006: RPC 리뷰 backend, 17.x/18.1.x prompt ack 이중 수락 — 같은 `pipelineOMPRPCProtocol`을 공유하며 이 SPEC은 compaction 경로만 건드린다.
 - SPEC-ADK-RELEASE-SIGNING-001: attestation v2 envelope·키·lineage — 변경 없음(non-goal). report 파일명 이동은 release contract 테스트로 고정한다.
 
+## Checkpoint compatibility amendment — review required
+
+The two retained T0 runs prove a repeated authenticated pre-checkpoint, not the first method's failure cause. This amendment is scoped to diagnostic probes. It does not enable multiple checkpoints in the existing v1 producer or waive C2 attempt-cost evidence. Its own current-input review must pass before implementation and another live run.
+
+**REQ-CHECKPOINT-001 — bounded authenticated pre-checkpoint retries**
+Type: Event-driven | Priority: Must
+WHEN an explicitly enabled probe uses the measured Darwin/arm64 `omp/18.1.13` executable (SHA256 `a4c5c9cc5b8222184d0d7429b0bb6ac2a92bbe45dd11bf68e4b1360050791909`) and its verified B overlay is exactly `[remote, snapcompact]`, THEN THE SYSTEM SHALL allow at most two authenticated pre-checkpoints within one correlated manual compact transaction, SHALL require a distinct nonempty request ID for each checkpoint, SHALL re-read and validate the transcript before acknowledging the second pre-checkpoint and require its proof to equal the transaction's initial pre-transcript proof, and SHALL allow that second pre only before any post-checkpoint or compact response.
+THE SYSTEM SHALL reject replayed IDs, a third pre, post-before-pre, duplicate post, pre-after-post/response, changed transcript between pre-checkpoints, invalid binding/schema/session/nonce, and primary provider activity crossing the barrier. It SHALL keep canonical re-admission and the single post-checkpoint acknowledgement required for a successful compaction, retain the same-session/idle and refusal proof checks, and use the existing deadline rather than resetting it on retry.
+THE SYSTEM SHALL keep the compaction barrier active during every page of the repeated-pre transcript query. Its page reader SHALL accept only the successful `get_messages_page` response with the exact query ID and command; provider lifecycle frames, checkpoint frames, early compact responses, extension errors and unrelated responses SHALL fail the transaction before acknowledging the pending pre. No receive loop may silently discard those frames. Authenticated checkpoint events received during the query SHALL still contribute to the probe's received-event counts, but SHALL never be acknowledged there. The structural walker, paging bounds and proof computation remain shared with the existing transcript validator.
+THE SYSTEM SHALL keep the single-pre behavior for non-probe execution, A sessions, a different/unmeasured executable identity, or any other overlay. The profile SHALL derive only from runtime-measured identity and verified overlay, never from user-supplied retry limits or model names. Probe records SHALL expose bounded `pre_checkpoints` and `post_checkpoints` counts of authenticated received events (including an event rejected for ordering), with body-free abort reasons, while `attempt_coverage` remains `unknown`: checkpoint count is not a provider request count or a method identity claim.
+Observability: AC-013 stateful fake RPC exchange and retained checkpoint counts; no report/signature/tag.
+
 ## Traceability Matrix
 
 | Requirement | Plan Task | Acceptance Scenario | Semantic Invariant |
@@ -157,6 +170,7 @@ Precedence fixture: pinned 17.2.7 with historical v1=2335 and complete v2=1300 i
 | REQ-PIN-001 | T5 | AC-009 | INV-008 |
 | REQ-DOCTOR-001 | T5 | AC-009 | INV-008 |
 | REQ-PROBE-001 | T0 | AC-005, AC-010 | INV-001, INV-009, INV-011, INV-012 |
+| REQ-CHECKPOINT-001 | T0-C | AC-013 | INV-013 |
 | REQ-PRODUCT-001 | T1, T5 | AC-011 | INV-004 |
 | Completion evidence | T6, T7 | AC-012 | INV-002, INV-005 |
 

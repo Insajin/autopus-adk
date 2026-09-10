@@ -5,9 +5,9 @@ Clarification Ledger unavailable — 이 SPEC은 direct 지시(Facts/Constraints
 ## Outcome Lock
 
 - User-visible outcome: 릴리즈 핀이 evidence 오라클의 위치 취약성 때문에 정체되지 않고, 유효(provider 청구, 관측된 유지비 net) 컨텍스트 감축을 실제로 내는 OMP 버전은 evidence로 핀을 올릴 수 있으며, 내지 않는 버전은 여전히 refused되고, 현재 핀 17.2.7은 v2 오라클에서도 evidence를 **생성**할 수 있다 — 그 cohort가 floor를 넘는지는 미측정이고, 넘지 못하면 결과는 `blocked`로 기록되어 사용자 결정으로 escalate된다.
-- Mandatory requirements: REQ-MEASURE-001/002, REQ-METHOD-001/002, REQ-ATTEST-001, REQ-COMPAT-001/002, REQ-DIAG-001, REQ-PIN-001, REQ-DOCTOR-001, REQ-PROBE-001, REQ-PRODUCT-001.
+- Mandatory requirements: REQ-MEASURE-001/002, REQ-METHOD-001/002, REQ-ATTEST-001, REQ-COMPAT-001/002, REQ-DIAG-001, REQ-PIN-001, REQ-DOCTOR-001, REQ-PROBE-001, REQ-PRODUCT-001, REQ-CHECKPOINT-001.
 - Explicit non-goals: floor 2000 bp 수치 완화, cohort 형태 변경, attestation envelope·키·lineage 변경, upstream 수정, `Already compacted` no-op 승격, 비용(통화) 계산, sandbox/tools 변경.
-- Completion evidence: AC-001–AC-012, retained probe 파일 요약, 23개 로컬 evidence tag의 변경 전후 동일 historical proof, 선택된 핀의 측정 결과가 `passed`(v2 서명 evidence가 `effective-reduction` 통과) 또는 `blocked`(측정값·cohort digest 기록, v2 evidence 없음, escalate) 중 하나로 기록, runbook·Verdict State Table·doctor 갱신.
+- Completion evidence: AC-001–AC-013, retained probe 요약, 23개 historical v1 동일 검증, 선택된 핀의 `passed` 또는 `blocked_below_floor`/`blocked_unobservable` 결과. 중단에는 수치를 만들지 않는다. checkpoint 개정안은 별도 current-input review 통과 후 구현하며, runbook·상태표·doctor를 동일한 결과로 갱신한다.
 
 ## Visual Planning Brief
 
@@ -123,6 +123,7 @@ Upstream 릴리즈 노트(`gh api repos/can1357/oh-my-pi/releases`, 2026-09-08):
 | INV-010 | remote 최종 usage는 전 시도 비용의 증거가 아님. 실패·내부 재시도 포함 complete attempt coverage 없으면 `unobserved`, C2 숫자나 서명 evidence 없음 | parser / data source | maintenance, partial abort | AC-001, AC-004, AC-012 |
 | INV-011 | transcript novelty: post-compaction `role`/`type` 토큰 ⊆ pre-compaction ∪ `{compactionSummary}` ∪ allowlist; 위반은 body-free 오류(토큰은 `^[a-z_]{1,32}$`일 때만 출력); barrier에 `turn_start` 포함 | state / security | error text, probe histogram | AC-005 |
 | INV-012 | probe metadata 식별자는 `^[A-Za-z_][A-Za-z0-9_]{0,63}$` 범위에서 대소문자 그대로 보존; 진단 문자열 redaction과 분리 | encoding / security | role/type/usage key histogram | AC-010 |
+| INV-013 | only verified 18.1.13 B probes permit a second distinct authenticated pre, with unchanged transcript before ACK; all replay/order/authority barriers and ordinary single-pre behavior remain | protocol / security | checkpoint counts, abort reason | AC-013 |
 
 ## Feature Coverage Map
 
@@ -185,16 +186,15 @@ These are optional improvements and do not block sync completion.
 
 ## T0 attempt 1 — retained partial observation (2026-09-09)
 
-- Source `a36b8d4790a12408dc2083cd85ff78fa38208544`, OMP 18.1.13, model gpt-5.6-sol. Five primary calls completed; sequence 6 stopped before the next primary prompt. Six call records (one failed) and two compaction-attempt records survived cleanup; rejected=0, complete=false, mode 0600. No report, signature or tag was produced.
-- Local retained artifact: `.autopus/runtime/omp007/retained/probe-00b0f30b2c4114520557e9a5eb579b51.jsonl`, SHA256 `b87a661b0a0bc01106eee0d4fa40652f5a5f3d7829542e4272e0238c1a4ec357`.
+- Source `a36b8d4790a12408dc2083cd85ff78fa38208544`, OMP 18.1.13, model gpt-5.6-sol: five primary calls completed, sequence 6 stopped; six call records (one failed), two compaction attempts, rejected=0, complete=false, mode 0600, no publication. Artifact `.autopus/runtime/omp007/retained/probe-00b0f30b2c4114520557e9a5eb579b51.jsonl`, SHA256 `b87a661b0a0bc01106eee0d4fa40652f5a5f3d7829542e4272e0238c1a4ec357`.
 - Attempt at sequence 3 was refused as `too_small`. Attempt at sequence 6 recorded `ack_out_of_order`, `method=none`, `attempt_coverage=unknown`; neither remote completion nor net maintenance was observed. This is not a zero-reduction result.
 - Instrumentation gaps found: pre/post ordering shared one reason token; compaction and failed-call durations were left at zero. The next diagnostic-only revision separates `pre_ack_out_of_order`/`post_ack_out_of_order` and records actual durations. It preserves the ACK rejection conditions.
 - [STATIC] [OMP 18.1.13 session-maintenance.ts](https://github.com/can1357/oh-my-pi/blob/v18.1.13/packages/coding-agent/src/session/session-maintenance.ts) emits `session_before_compact` for an attempt (around lines 860–871) and can recursively enter the next method after failure (around 1115–1130). Repeated pre-checkpoints are a plausible cause, not proven by the retained generic reason. No ordering tolerance is introduced without identifying the observed sequence.
 
 ## T0 attempt 2 — checkpoint boundary identified (2026-09-10)
 
-- Source `81a5361e12bad684dc46c4bd08fb4c35a23c2836`, OMP 18.1.13, model gpt-5.6-sol; five successful primary calls, sequence 6 aborted before primary execution. Retained records: six call records (one failed), two compaction attempts; complete=false, rejected=0, mode 0600.
-- Artifact `.autopus/runtime/omp007/retained/probe-c046b270bbac69ffb1ec736409a138da.jsonl`, SHA256 `e27902849b1f79a25f8d3ac6d9ce0fbfab8710099f76c84ae6e9731200a79753`.
+- Source `81a5361e12bad684dc46c4bd08fb4c35a23c2836`, OMP 18.1.13, model gpt-5.6-sol: five primary calls completed, sequence 6 stopped; six call records (one failed), two compaction attempts, rejected=0, complete=false, mode 0600. Artifact `.autopus/runtime/omp007/retained/probe-c046b270bbac69ffb1ec736409a138da.jsonl`, SHA256 `e27902849b1f79a25f8d3ac6d9ce0fbfab8710099f76c84ae6e9731200a79753`.
 - Sequence 6 compaction recorded `pre_ack_out_of_order`, elapsed 61ms; failed call elapsed 111ms. `method=none` and `attempt_coverage=unknown` remain observations of missing evidence, not a successful remote compaction or zero maintenance claim.
 - In `manualCompact`, this error is raised for an authenticated pre-checkpoint after pre/post/response state was already established. A repeated pre-checkpoint within the current compact transaction is therefore established; the first method's internal failure is not. The pinned upstream recursive fallback is a compatible explanation, not proof of that internal failure.
 - This is a protocol compatibility blocker, not a token-reduction verdict. After two failures the live probe stops; restore the release pin to 17.2.7 and revise/review a bounded per-method checkpoint contract before any further live retry. No report, attestation, release tag or evidence tag was produced.
+- T0-C amendment: repeated pre motivates a stateful no-provider reproduction, not a remote/billing success claim. F-013 requires a strict page-response reader that retains the barrier during proof queries; F-014 updates native-end symbols; F-015 aligns the EARS type to Event-driven. Current-input Codex/Gemini review with Codex judge must approve this amendment before admission changes; ordinary v1 producer behavior remains unchanged.
